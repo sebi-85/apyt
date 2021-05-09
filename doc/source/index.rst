@@ -1,4 +1,5 @@
 .. include:: apyt.rst
+   :end-before: :noindex:
 
 
 Indices and tables
