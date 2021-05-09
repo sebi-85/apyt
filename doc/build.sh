@@ -1,5 +1,5 @@
 #/bin/bash
 #
 rm -rf build/*
-sphinx-apidoc -f -T -E -o source ..
+sphinx-apidoc -o source -e -T -E ../apyt
 sphinx-build source/ build/
