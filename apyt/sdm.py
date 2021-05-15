@@ -30,28 +30,30 @@ General procedure
 -----------------
 
 As shown by |Geiser|, the lateral resolution is optimized if the
-:math:`\Delta x_{ij}, \Delta y_{ij}` are chosen for atomic pairs within a very
+:math:`(\Delta x_{ij}, \Delta y_{ij})` are chosen for atomic pairs within a very
 narrow :math:`\Delta z`-separation, which requires an optimal alignment of the
 sample in :math:`z`-direction. The SDMs created this way do show distinct
-maxima, however, their positions are distorted. Since the real crystallographic
-positions of these maxima are known, a system of linear equations can be solved
-which transforms the distorted SDM into its correct shape. The remaining
-:math:`z`-scaling factor needs to be determined.
+maxima, however, their positions are still distorted. Since the real
+crystallographic positions of these maxima are known, a system of linear
+equations can be solved which transforms the distorted SDM into its correct
+shape. The remaining :math:`z`-scaling factor can be determined easily.
 
 
 Howto
 -----
 
-The usage of this module is demonstrated in an auxiliary script which basically
-serves as a wrapper for this module.
+The usage of this module is demonstrated in an auxiliary script
+(``wrapper_scripts/apyt_sdm.py``) which basically serves as a wrapper for this
+module. Detailed usage information can be obtained by invoking this script with
+the ``"--help"`` option.
 
 
 List of methods
 ---------------
 
-This module provides some generic functions for the creation of spatial
-distribution maps (SDMs) from three-dimensional atom probe data with the
-option to rectify the SDMs (and the atomic positions).
+This module provides some generic functions for the creation of SDMs from
+three-dimensional APT data with the option to rectify the SDMs (and the atomic
+positions).
 
 The following methods are provided:
 
@@ -209,6 +211,13 @@ def rdf_lateral(data, min, max, w, dir_key, r_0, δ):
     r_0 + \\frac{\delta}{2}`, i.e. all pairs are chosen which fall in a narrow
     distance window centered at :math:`r_0` in normal direction.
 
+    The lateral RDF may reveal peaks for highly precise atomic positions, but
+    this is unlikely for APT data and rather applies to simulation data. The
+    problem with the lateral RDF is that all angular, local in-plane information
+    is averaged out, with the noise dominating the result. The idea behind the
+    SDMs is the exactly the point to keep this local angular information,
+    leading to distinct peaks in the SDMs, even with noisy data.
+
     Parameters
     ----------
     data : ndarray, shape (n, 3)
@@ -339,7 +348,7 @@ def rotate(data, angles, dir_key):
 
     Returns
     -------
-    r_data : ndarray, shape (n, 3)
+    data_r : ndarray, shape (n, 3)
         The *n* three-dimensional coordinates after rotation.
     """
     #
@@ -420,14 +429,14 @@ def lattice_vectors(data, angles, dir_key):
     rotation.
 
     If the lattice planes are not perfectly aligned in normal direction, the box
-    dimensions in lateral directions will not reflect the actual
-    cross-sectional area covered by the lattice planes due to the inclination.
+    dimensions in lateral directions do not reflect the actual cross-sectional
+    area covered by the lattice planes due to the inclination.
 
     This method accounts for this specific inclination and returns the vectors
     which span the lattice planes in lateral directions *before* and *after* the
-    angular alignment. These vectors can then be used to calculate the actual
-    cross-sectional area of the lattice planes with the aid of the
-    cross product.
+    angular alignment (see :meth:`optimize_alignment`). These vectors can then
+    be used to calculate the actual cross-sectional area of the lattice planes
+    with the aid of the cross product.
 
     Note that the value obtained by this correction may not differ significantly
     from the lateral box dimensions if the alignment of the lattice planes in
