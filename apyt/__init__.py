@@ -12,6 +12,7 @@ Package modules
 .. toctree::
    :maxdepth: 1
 
+   The APyT local composition module (apyt.locomp)<apyt.locomp>
    The APyT SDM module (apyt.sdm)<apyt.sdm>
 
 
@@ -20,5 +21,5 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['sdm']
+__all__ = ['locomp', 'sdm']
 from . import *
