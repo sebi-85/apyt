@@ -1,6 +1,6 @@
 """
-The APyT locomp module
-======================
+The APyT local composition module
+=================================
 
 
 Introduction
