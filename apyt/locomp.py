@@ -29,6 +29,7 @@ composition histograms.
 The following methods are provided:
 
 * :meth:`build_tree`: Build tree for neighbor search.
+* :meth:`calc_stats`: Calculate statistics.
 * :meth:`check_periodic_box`: .
 * :meth:`get_composition`: .
 * :meth:`get_query_points`: .
@@ -46,6 +47,7 @@ The following methods are provided:
 __version__ = '0.1.0'
 __all__ = [
     'build_tree',
+    'calc_stats',
     'check_periodic_box',
     'get_composition',
     'get_query_points',
@@ -77,6 +79,54 @@ def build_tree(coords, boxsize):
 #
 #
 #
+def calc_stats(data, **kwargs):
+    # get bin_width option
+    bin_width = kwargs.get('bin_width', None)
+    #
+    #
+    # set data properties
+    num      = len(data)
+    data_min = min(data)
+    data_max = max(data)
+    #
+    #
+    #
+    if bin_width is None:
+        bins = np.linspace(data_min - 0.5, data_max + 0.5, data_max - data_min + 2)
+        bin_centers = np.arange(data_min, data_max + 1)
+        #
+        # calculate histogram data
+        counts, bin_edges = np.histogram(data, bins = bins)
+    elif bin_width == 'auto':
+        # calculate histogram data
+        counts, bin_edges = np.histogram(data, bins = 'auto')
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    #
+    #
+    # normalize histogram
+    counts_norm = counts / (num * (bin_edges[1:] - bin_edges[:-1]))
+    #
+    #
+    # calculate moments
+    mu       = sum(counts *  bin_centers)          / num
+    var      = sum(counts * (bin_centers - mu)**2) / num
+    moment_4 = sum(counts * (bin_centers - mu)**4) / num
+    #
+    #
+    # calulate statistical errors
+    delta_mu    = np.sqrt(var / num)
+    delta_var   = 2.0 / np.sqrt(num) * np.sqrt(moment_4);
+    delta_var_r = 1.0 / (mu * np.sqrt(num)) * \
+                  np.sqrt(4.0 * moment_4 + var**3 / mu**2)
+    #
+    #
+    # return histogram data and statistics
+    return (counts, bin_edges, bin_centers, counts_norm), \
+           (mu, delta_mu, var, delta_var, var / mu, delta_var_r)
+#
+#
+#
+#
 def check_periodic_box(comment):
     box = None
     try:
@@ -103,7 +153,7 @@ def check_periodic_box(comment):
 #
 #
 def get_composition(data, indices):
-    partial_func = partial(_get_composition, data = data)
+    partial_func = partial(_get_composition, types = data[:, 0].astype(int))
     
     pool = multiprocessing.Pool()
     return np.asarray(pool.map(partial_func, indices))
@@ -151,7 +201,7 @@ def query_nearest_neighbors(tree, query_points, neighbors):
 # private module-level functions
 #
 ################################################################################
-def _get_composition(indices, data):
-    # select atomic subset, then sum type column (subtraction of 1 effectively
+def _get_composition(indices, types):
+    # select atomic subset, then sum types (subtraction of 1 effectively
     # counts only atoms of type 2
-    return sum(data[indices][:, 0] - 1)
+    return sum(types[indices] - 1)
