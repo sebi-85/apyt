@@ -50,8 +50,7 @@ __all__ = [
     'calc_stats',
     'check_periodic_box',
     'get_composition',
-    'get_query_points',
-    'query_nearest_neighbors'
+    'get_query_points'
 ]
 #
 #
@@ -63,6 +62,7 @@ import numpy as np
 #
 # import some special functions
 from functools import partial
+from psutil import virtual_memory
 from scipy.spatial import cKDTree
 #
 #
@@ -152,11 +152,63 @@ def check_periodic_box(comment):
 #
 #
 #
-def get_composition(data, indices):
-    partial_func = partial(_get_composition, types = data[:, 0].astype(int))
-    
-    pool = multiprocessing.Pool()
-    return np.asarray(pool.map(partial_func, indices))
+def get_composition(data, tree, query_points, neighbors):
+    # set approximate maximum amount of available memory to use
+    mem_threshold = 0.50
+    #
+    #
+    # set atomic types
+    types = data[:, 0].astype(int)
+    #
+    #
+    # estimated memory in GB (factor two accounts for indices and distances)
+    mem_estimated = len(query_points) * neighbors * 2 * 8 * 1e-9
+    #
+    # get available memory
+    mem_available = virtual_memory().available * 1e-9
+    #
+    #
+    #
+    #
+    # we may require at least 2 GB of available memory
+    if mem_available < 2.0:
+        print('Found only {0:.2f} GB of available memory. This may not be '
+              'sufficient for calculations.\nExiting...'.format(mem_available))
+        exit(1)
+    #
+    #
+    # test for sufficient available memory
+    if mem_estimated > mem_threshold * mem_available:
+        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
+              'available memory ({2:.2f} GB).'
+              .format(mem_estimated, int(mem_threshold * 100), mem_available))
+        #
+        # set number of chunks
+        chunks = int(np.ceil(mem_estimated / (mem_threshold * mem_available)))
+        print('      Splitting problem into {0:d} chunks. (This may cause '
+              'overhead.)'.format(chunks))
+        #
+        #
+        # initialize empty arrays
+        dists   = np.array([], dtype = float)
+        indices = np.array([], dtype = int)
+        #
+        # split query points into smaller chunks
+        for query_points_partial in np.array_split(query_points, chunks):
+            #
+            # get partial results
+            dists_partial, indices_partial = _query_nearest_neighbors(
+                tree, query_points_partial, neighbors, types)
+            #
+            # append partial results
+            dists   = np.append(dists, dists_partial)
+            indices = np.append(indices, indices_partial)
+        #
+        # return complete results
+        return dists, indices
+    else:
+        # search all neighbors at once
+        return _query_nearest_neighbors(tree, query_points, neighbors, types)
 #
 #
 #
@@ -190,12 +242,6 @@ def get_query_points(coords, distance):
 #
 #
 #
-def query_nearest_neighbors(tree, query_points, neighbors):
-    return tree.query(query_points, k = neighbors, n_jobs = -1)
-#
-#
-#
-#
 ################################################################################
 #
 # private module-level functions
@@ -205,3 +251,38 @@ def _get_composition(indices, types):
     # select atomic subset, then sum types (subtraction of 1 effectively
     # counts only atoms of type 2
     return sum(types[indices] - 1)
+#
+#
+#
+#
+def _query_nearest_neighbors(tree, query_points, neighbors, types):
+    # query neighbors
+    dists, indices = tree.query(query_points, k = neighbors, n_jobs = -1)
+    #
+    #
+    # distances are sorted, so maximum distance is last entry;
+    # create copy of maximum distances to allow freeing of full distance array
+    r_sphere = np.copy(dists[:, -1])
+    dists = None
+    #
+    #
+    # we need to call _get_composition with a second argument, so we create a
+    # partial object
+    get_composition_partial_obj = partial(_get_composition, types = types)
+    #
+    #
+    # calculate compositions in parallel
+    pool = multiprocessing.Pool()
+    n_2 = np.asarray(pool.map(get_composition_partial_obj, indices, 10000))
+    pool.close()
+    pool.join()
+    #
+    # free full index array
+    indices = None
+    #
+    #
+    # return maximum radii and compositions
+    return r_sphere, n_2
+  
+    #chunk_size = int(len(indices) / multiprocessing.cpu_count())
+    #return np.asarray(list(pool.map(partial_func, indices, 10000)))
