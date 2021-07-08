@@ -273,7 +273,9 @@ def _query_nearest_neighbors(tree, query_points, neighbors, types):
     #
     # calculate compositions in parallel
     pool = multiprocessing.Pool()
-    n_2 = np.asarray(pool.map(get_composition_partial_obj, indices, 10000))
+    # (setting an explicit value for the chunk size in pool.map() may reduce
+    # memory usage)
+    n_2 = np.asarray(pool.map(get_composition_partial_obj, indices))
     pool.close()
     pool.join()
     #
@@ -283,6 +285,3 @@ def _query_nearest_neighbors(tree, query_points, neighbors, types):
     #
     # return maximum radii and compositions
     return r_sphere, n_2
-  
-    #chunk_size = int(len(indices) / multiprocessing.cpu_count())
-    #return np.asarray(list(pool.map(partial_func, indices, 10000)))
