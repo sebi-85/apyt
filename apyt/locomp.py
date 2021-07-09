@@ -46,7 +46,6 @@ The following methods are provided:
 #
 __version__ = '0.1.0'
 __all__ = [
-    'build_tree',
     'calc_stats',
     'check_periodic_box',
     'get_composition',
@@ -64,6 +63,18 @@ import numpy as np
 from functools import partial
 from psutil import virtual_memory
 from scipy.spatial import cKDTree
+from sys import getsizeof
+#
+#
+#
+#
+################################################################################
+#
+# private module-level variables
+#
+################################################################################
+# set approximate maximum amount of available memory to use
+_mem_threshold = 0.50
 #
 #
 #
@@ -73,12 +84,6 @@ from scipy.spatial import cKDTree
 # public functions
 #
 ################################################################################
-def build_tree(coords, boxsize):
-    return cKDTree(coords, boxsize = boxsize)
-#
-#
-#
-#
 def calc_stats(data, **kwargs):
     # get bin_width option
     bin_width = kwargs.get('bin_width', None)
@@ -152,63 +157,29 @@ def check_periodic_box(comment):
 #
 #
 #
-def get_composition(data, tree, query_points, neighbors):
-    # set approximate maximum amount of available memory to use
-    mem_threshold = 0.50
-    #
-    #
+def get_composition(data, box, query_points, query):
     # set atomic types
     types = data[:, 0].astype(int)
     #
     #
-    # estimated memory in GB (factor two accounts for indices and distances)
-    mem_estimated = len(query_points) * neighbors * 2 * 8 * 1e-9
-    #
-    # get available memory
-    mem_available = virtual_memory().available * 1e-9
-    #
-    #
+    # build tree
+    print('Building tree ...')
+    tree = cKDTree(data[:, 1:4], boxsize = box)
     #
     #
     # we may require at least 2 GB of available memory
+    mem_available = virtual_memory().available * 1e-9
     if mem_available < 2.0:
         print('Found only {0:.2f} GB of available memory. This may not be '
               'sufficient for calculations.\nExiting...'.format(mem_available))
         exit(1)
     #
     #
-    # test for sufficient available memory
-    if mem_estimated > mem_threshold * mem_available:
-        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
-              'available memory ({2:.2f} GB).'
-              .format(mem_estimated, int(mem_threshold * 100), mem_available))
-        #
-        # set number of chunks
-        chunks = int(np.ceil(mem_estimated / (mem_threshold * mem_available)))
-        print('      Splitting problem into {0:d} chunks. (This may cause '
-              'overhead.)'.format(chunks))
-        #
-        #
-        # initialize empty arrays
-        dists   = np.array([], dtype = float)
-        indices = np.array([], dtype = int)
-        #
-        # split query points into smaller chunks
-        for query_points_partial in np.array_split(query_points, chunks):
-            #
-            # get partial results
-            dists_partial, indices_partial = _query_nearest_neighbors(
-                tree, query_points_partial, neighbors, types)
-            #
-            # append partial results
-            dists   = np.append(dists, dists_partial)
-            indices = np.append(indices, indices_partial)
-        #
-        # return complete results
-        return dists, indices
-    else:
-        # search all neighbors at once
-        return _query_nearest_neighbors(tree, query_points, neighbors, types)
+    # call respective wrapper for neighbor search
+    if query['type'] == 'neighbors':
+        return _query_nearest(tree, query_points, query, types)
+    elif query['type'] == 'volume':
+        return _query_volume(tree, query_points, query, types)
 #
 #
 #
@@ -255,15 +226,26 @@ def _get_composition(indices, types):
 #
 #
 #
-def _query_nearest_neighbors(tree, query_points, neighbors, types):
-    # query neighbors
-    dists, indices = tree.query(query_points, k = neighbors, n_jobs = -1)
+def _query(tree, query_points, query, types):
+    # depending on the invocation mode, we need to search neighbors differently,
+    # i.e. constant number or constant volume
+    if query['type'] == 'neighbors':
+        # query neighbors
+        dists, indices = tree.query(
+            query_points, k = query['param'], n_jobs = -1)
+        #
+        #
+        # distances are sorted, so maximum distance is last entry;
+        # create copy of maximum distances to allow freeing of full distance
+        # array
+        r_sphere = np.copy(dists[:, -1])
+        dists    = None
+    elif query['type'] == 'volume':
+        # query neighbors
+        indices = tree.query_ball_point(
+            query_points, query['param'], n_jobs = -1)
     #
     #
-    # distances are sorted, so maximum distance is last entry;
-    # create copy of maximum distances to allow freeing of full distance array
-    r_sphere = np.copy(dists[:, -1])
-    dists = None
     #
     #
     # we need to call _get_composition with a second argument, so we create a
@@ -276,6 +258,11 @@ def _query_nearest_neighbors(tree, query_points, neighbors, types):
     # (setting an explicit value for the chunk size in pool.map() may reduce
     # memory usage)
     n_2 = np.asarray(pool.map(get_composition_partial_obj, indices))
+    #
+    # in volume mode, we also need to evaluate the number of neighbors
+    if query['type'] == 'volume':
+        neighbor_counts = np.asarray(pool.map(len, indices))
+    #
     pool.close()
     pool.join()
     #
@@ -283,5 +270,109 @@ def _query_nearest_neighbors(tree, query_points, neighbors, types):
     indices = None
     #
     #
+    #
+    #
+    # return maximum neighbor counts and compositions
+    if query['type'] == 'volume':
+        return neighbor_counts, n_2
     # return maximum radii and compositions
-    return r_sphere, n_2
+    elif query['type'] == 'neighbors':
+        return r_sphere, n_2
+#
+#
+#
+#
+def _query_nearest(tree, query_points, query, types):
+    # estimated memory in GB (factor two accounts for indices and distances)
+    mem_estimated = len(query_points) * query['param'] * 2 * 8 * 1e-9
+    #
+    # get available memory
+    mem_available = virtual_memory().available * 1e-9
+    #
+    #
+    # test for sufficient available memory
+    if mem_estimated > _mem_threshold * mem_available:
+        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
+              'available memory ({2:.2f} GB).'
+              .format(mem_estimated, int(_mem_threshold * 100), mem_available))
+        #
+        # set number of chunks
+        chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
+        print('      Splitting problem into {0:d} chunks. (This may cause '
+              'overhead.)'.format(chunks))
+        #
+        #
+        # initialize empty arrays
+        dists        = np.array([], dtype = float)
+        compositions = np.array([], dtype = int)
+        #
+        # split query points into smaller chunks
+        for query_points_partial in np.array_split(query_points, chunks):
+            #
+            # get partial results
+            dists_partial, compositions_partial = _query(
+                tree, query_points_partial, query, types)
+            #
+            # append partial results
+            dists        = np.append(dists,        dists_partial)
+            compositions = np.append(compositions, compositions_partial)
+        #
+        # return complete results
+        return dists, compositions
+    else:
+        # search all neighbors at once
+        return _query(tree, query_points, query, types)
+#
+#
+#
+#
+def _query_volume(tree, query_points, query, types):
+    # in order to estimate memory usage, we have to obtain the approximate
+    # number of neighbors first with a sample set
+    samples = min(1000, len(query_points))
+    neighbor_list = tree.query_ball_point(
+         query_points[0:samples], query['param'])
+    #
+    # estimated memory in GB (factor eight accounts for weird memory
+    # over-allocation)
+    mem_estimated = 8 * 1e-9 * len(query_points) / samples * \
+        (getsizeof(neighbor_list) + sum(map(getsizeof, neighbor_list)))
+    samples = None
+    #
+    #
+    # get available memory
+    mem_available = virtual_memory().available * 1e-9
+    #
+    #
+    # test for sufficient available memory
+    if mem_estimated > _mem_threshold * mem_available:
+        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
+              'available memory ({2:.2f} GB).'
+              .format(mem_estimated, int(_mem_threshold * 100), mem_available))
+        #
+        # set number of chunks
+        chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
+        print('      Splitting problem into {0:d} chunks. (This may cause '
+              'overhead.)'.format(chunks))
+        #
+        #
+        # initialize empty arrays
+        neighbors    = np.array([], dtype = int)
+        compositions = np.array([], dtype = int)
+        #
+        # split query points into smaller chunks
+        for query_points_partial in np.array_split(query_points, chunks):
+            #
+            # get partial results
+            neighbors_partial, compositions_partial = _query(
+                tree, query_points_partial, query, types)
+            #
+            # append partial results
+            neighbors    = np.append(neighbors, neighbors_partial)
+            compositions = np.append(compositions, compositions_partial)
+        #
+        # return complete results
+        return neighbors, compositions
+    else:
+        # search all neighbors at once
+        return _query(tree, query_points, query, types)
