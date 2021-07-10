@@ -28,12 +28,10 @@ composition histograms.
 
 The following methods are provided:
 
-* :meth:`build_tree`: Build tree for neighbor search.
 * :meth:`calc_stats`: Calculate statistics.
 * :meth:`check_periodic_box`: .
 * :meth:`get_composition`: .
 * :meth:`get_query_points`: .
-* :meth:`query_nearest_neighbors`: .
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -157,14 +155,19 @@ def check_periodic_box(comment):
 #
 #
 #
-def get_composition(data, box, query_points, query):
+def get_composition(data, query_points, query, **kwargs):
+    # set verbosity
+    verbose = kwargs.get('verbose', False)
+    #
+    #
     # set atomic types
     types = data[:, 0].astype(int)
     #
     #
     # build tree
-    print('Building tree ...')
-    tree = cKDTree(data[:, 1:4], boxsize = box)
+    if verbose == True:
+        print('Building tree ...')
+    tree = cKDTree(data[:, 1:4], boxsize = kwargs.get('box', None))
     #
     #
     # we may require at least 2 GB of available memory
@@ -176,10 +179,12 @@ def get_composition(data, box, query_points, query):
     #
     #
     # call respective wrapper for neighbor search
-    if query['type'] == 'neighbors':
-        return _query_nearest(tree, query_points, query, types)
+    if query['type'] == 'neighbor':
+        return _query_nearest(tree, query_points, query, types,
+                              verbose = verbose)
     elif query['type'] == 'volume':
-        return _query_volume(tree, query_points, query, types)
+        return _query_volume(tree, query_points, query, types,
+                             verbose = verbose)
 #
 #
 #
@@ -229,7 +234,7 @@ def _get_composition(indices, types):
 def _query(tree, query_points, query, types):
     # depending on the invocation mode, we need to search neighbors differently,
     # i.e. constant number or constant volume
-    if query['type'] == 'neighbors':
+    if query['type'] == 'neighbor':
         # query neighbors
         dists, indices = tree.query(
             query_points, k = query['param'], n_jobs = -1)
@@ -276,13 +281,17 @@ def _query(tree, query_points, query, types):
     if query['type'] == 'volume':
         return neighbor_counts, n_2
     # return maximum radii and compositions
-    elif query['type'] == 'neighbors':
+    elif query['type'] == 'neighbor':
         return r_sphere, n_2
 #
 #
 #
 #
-def _query_nearest(tree, query_points, query, types):
+def _query_nearest(tree, query_points, query, types, **kwargs):
+    # set verbosity
+    verbose = kwargs.get('verbose', False)
+    #
+    #
     # estimated memory in GB (factor two accounts for indices and distances)
     mem_estimated = len(query_points) * query['param'] * 2 * 8 * 1e-9
     #
@@ -292,14 +301,16 @@ def _query_nearest(tree, query_points, query, types):
     #
     # test for sufficient available memory
     if mem_estimated > _mem_threshold * mem_available:
-        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
-              'available memory ({2:.2f} GB).'
-              .format(mem_estimated, int(_mem_threshold * 100), mem_available))
+        if verbose == True:
+            print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
+                  'available memory ({2:.2f} GB).'.format(
+                      mem_estimated, int(_mem_threshold * 100), mem_available))
         #
         # set number of chunks
         chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
-        print('      Splitting problem into {0:d} chunks. (This may cause '
-              'overhead.)'.format(chunks))
+        if verbose == True:
+            print('      Splitting problem into {0:d} chunks. (This may cause '
+                  'overhead.)'.format(chunks))
         #
         #
         # initialize empty arrays
@@ -307,7 +318,12 @@ def _query_nearest(tree, query_points, query, types):
         compositions = np.array([], dtype = int)
         #
         # split query points into smaller chunks
+        if verbose == True:
+            print('Searching neighbors and evaluating compositions ',
+                  end = '', flush = True)
         for query_points_partial in np.array_split(query_points, chunks):
+            if verbose == True:
+                print('.', end = '', flush = True)
             #
             # get partial results
             dists_partial, compositions_partial = _query(
@@ -316,17 +332,25 @@ def _query_nearest(tree, query_points, query, types):
             # append partial results
             dists        = np.append(dists,        dists_partial)
             compositions = np.append(compositions, compositions_partial)
+        if verbose == True:
+            print('')
         #
         # return complete results
         return dists, compositions
     else:
         # search all neighbors at once
+        if verbose == True:
+            print('Searching neighbors and evaluating compositions ...')
         return _query(tree, query_points, query, types)
 #
 #
 #
 #
-def _query_volume(tree, query_points, query, types):
+def _query_volume(tree, query_points, query, types, **kwargs):
+    # set verbosity
+    verbose = kwargs.get('verbose', False)
+    #
+    #
     # in order to estimate memory usage, we have to obtain the approximate
     # number of neighbors first with a sample set
     samples = min(1000, len(query_points))
@@ -346,14 +370,16 @@ def _query_volume(tree, query_points, query, types):
     #
     # test for sufficient available memory
     if mem_estimated > _mem_threshold * mem_available:
-        print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
-              'available memory ({2:.2f} GB).'
-              .format(mem_estimated, int(_mem_threshold * 100), mem_available))
+        if verbose == True:
+            print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
+                  'available memory ({2:.2f} GB).'
+                  .format(mem_estimated, int(_mem_threshold * 100), mem_available))
         #
         # set number of chunks
         chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
-        print('      Splitting problem into {0:d} chunks. (This may cause '
-              'overhead.)'.format(chunks))
+        if verbose == True:
+            print('      Splitting problem into {0:d} chunks. (This may cause '
+                  'overhead.)'.format(chunks))
         #
         #
         # initialize empty arrays
@@ -361,7 +387,12 @@ def _query_volume(tree, query_points, query, types):
         compositions = np.array([], dtype = int)
         #
         # split query points into smaller chunks
+        if verbose == True:
+            print('Searching neighbors and evaluating compositions ',
+                  end = '', flush = True)
         for query_points_partial in np.array_split(query_points, chunks):
+            if verbose == True:
+                print('.', end = '', flush = True)
             #
             # get partial results
             neighbors_partial, compositions_partial = _query(
@@ -370,9 +401,13 @@ def _query_volume(tree, query_points, query, types):
             # append partial results
             neighbors    = np.append(neighbors, neighbors_partial)
             compositions = np.append(compositions, compositions_partial)
+        if verbose == True:
+            print('')
         #
         # return complete results
         return neighbors, compositions
     else:
         # search all neighbors at once
+        if verbose == True:
+            print('Searching neighbors and evaluating compositions ...')
         return _query(tree, query_points, query, types)
