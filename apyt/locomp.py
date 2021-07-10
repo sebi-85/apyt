@@ -189,31 +189,70 @@ def get_composition(data, query_points, query, **kwargs):
 #
 #
 #
-def get_query_points(coords, distance, **kwargs):
-    # set periodic flag
+def get_query_points(coords, **kwargs):
+    # get optional keyword arguments
+    distance    = kwargs.get('distance', None)
     is_periodic = (kwargs.get('box', None) is not None)
+    margin      = kwargs.get('margin', None)
+    #
+    #
+    # do some error checking for non-reasonable combination of options
+    if is_periodic and margin is not None:
+        print('ERROR: You cannot use the "--margin" option with periodic '
+              'boundary conditions.')
+        exit(1)
+    if is_periodic == False and margin is None:
+        print('ERROR: You must use the "--margin" option to exclude surface '
+              'artifacts. (See "--help" for details.)')
+        exit(1)
+    #
+    #
+    #
+    #
+    # filter margin region if requested
+    if margin is not None:
+        coords = _filter_margin(coords, margin)
+    #
+    #
     #
     #
     # construct 3d grid if requested
     if distance is not None:
         if distance <= 0.0:
-            print('Distance ({0:.3f}) must be positive.'.format(distance))
+            print('ERROR: Distance ({0:.3f}) must be positive.'
+                  .format(distance))
             exit(1)
-        # get maximum positions for each direction
-        max_pos = np.amax(coords, axis = 0)
-        grid = []
+        #
+        #
+        # get minimum and maximum positions for each direction
+        if is_periodic:
+            min_pos = [0.0, 0.0, 0.0]
+            max_pos = kwargs.get('box')
+        else:
+            min_pos = np.amin(coords, axis = 0)
+            max_pos = np.amax(coords, axis = 0)
+        #
+        #
         # construct 1d grid for each direction
+        grid = []
         for i in range(0, 3):
             # number of grid points
-            n_grid = int(max_pos[i] / distance) - 1
+            n_grid = int((max_pos[i] - min_pos[i]) / distance) + 1
+            if n_grid <= 1:
+                print('ERROR: Cannot construct grid. Separation too big?')
+                exit(1)
+            #
             # separation between grid points
-            delta = max_pos[i] / (n_grid + 1)
+            delta = (max_pos[i] - min_pos[i]) / (n_grid - 1)
             #
             # construct grid
             if is_periodic:
-                grid.append(np.linspace(0.0, n_grid * delta, num = n_grid + 1))
+                # exclude end point
+                grid.append(np.linspace(
+                    min_pos[i], max_pos[i] - delta, num = n_grid - 1))
             else:
-                grid.append(np.linspace(delta, n_grid * delta, num = n_grid))
+                # include start and end point
+                grid.append(np.linspace(min_pos[i], max_pos[i], num = n_grid))
         # construct 3d grid out of 1d grids
         return np.vstack(
                    np.meshgrid(grid[0], grid[1], grid[2], indexing = 'ij')
@@ -230,6 +269,27 @@ def get_query_points(coords, distance, **kwargs):
 # private module-level functions
 #
 ################################################################################
+def _filter_margin(coords, margin):
+    if margin <= 0.0:
+        print('ERROR: Margin ({0:.3f}) must be positive.'.format(margin))
+        exit(1)
+    #
+    # set minimum and maximum positions
+    min_pos = np.amin(coords, axis = 0)
+    max_pos = np.amax(coords, axis = 0)
+    #
+    # filter query points
+    return coords[
+        (coords[:, 0] > min_pos[0] + margin) &
+        (coords[:, 1] > min_pos[1] + margin) &
+        (coords[:, 2] > min_pos[2] + margin) &
+        (coords[:, 0] < max_pos[0] - margin) &
+        (coords[:, 1] < max_pos[1] - margin) &
+        (coords[:, 2] < max_pos[2] - margin)]
+#
+#
+#
+#
 def _get_composition(indices, types):
     # select atomic subset, then sum types (subtraction of 1 effectively
     # counts only atoms of type 2
