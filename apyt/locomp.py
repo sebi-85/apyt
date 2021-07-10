@@ -131,6 +131,7 @@ def calc_stats(data, **kwargs):
 #
 #
 def check_periodic_box(comment):
+    comment = comment.split()
     box = None
     try:
         pbc_index = comment.index('pbc')
