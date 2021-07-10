@@ -189,7 +189,11 @@ def get_composition(data, query_points, query, **kwargs):
 #
 #
 #
-def get_query_points(coords, distance):
+def get_query_points(coords, distance, **kwargs):
+    # set periodic flag
+    is_periodic = (kwargs.get('box', None) is not None)
+    #
+    #
     # construct 3d grid if requested
     if distance is not None:
         if distance <= 0.0:
@@ -201,12 +205,15 @@ def get_query_points(coords, distance):
         # construct 1d grid for each direction
         for i in range(0, 3):
             # number of grid points
-            n_grid = int(max_pos[i] / distance)
+            n_grid = int(max_pos[i] / distance) - 1
             # separation between grid points
-            delta = max_pos[i] / n_grid
+            delta = max_pos[i] / (n_grid + 1)
+            #
             # construct grid
-            grid.append(
-                np.linspace(delta, (n_grid - 1) * delta, num = n_grid - 1))
+            if is_periodic:
+                grid.append(np.linspace(0.0, n_grid * delta, num = n_grid + 1))
+            else:
+                grid.append(np.linspace(delta, n_grid * delta, num = n_grid))
         # construct 3d grid out of 1d grids
         return np.vstack(
                    np.meshgrid(grid[0], grid[1], grid[2], indexing = 'ij')
