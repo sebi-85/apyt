@@ -61,7 +61,7 @@ import numpy as np
 from functools import partial
 from psutil import virtual_memory
 from scipy.spatial import cKDTree
-from sys import getsizeof
+from sys import getsizeof, stderr
 #
 #
 #
@@ -199,11 +199,11 @@ def get_query_points(coords, **kwargs):
     # do some error checking for non-reasonable combination of options
     if is_periodic and margin is not None:
         print('ERROR: You cannot use the "--margin" option with periodic '
-              'boundary conditions.')
+              'boundary conditions.', file = stderr)
         exit(1)
     if is_periodic == False and margin is None:
         print('ERROR: You must use the "--margin" option to exclude surface '
-              'artifacts. (See "--help" for details.)')
+              'artifacts. (See "--help" for details.)', file = stderr)
         exit(1)
     #
     #
@@ -220,7 +220,7 @@ def get_query_points(coords, **kwargs):
     if distance is not None:
         if distance <= 0.0:
             print('ERROR: Distance ({0:.3f}) must be positive.'
-                  .format(distance))
+                  .format(distance), file = stderr)
             exit(1)
         #
         #
@@ -239,7 +239,8 @@ def get_query_points(coords, **kwargs):
             # number of grid points
             n_grid = int((max_pos[i] - min_pos[i]) / distance) + 1
             if n_grid <= 1:
-                print('ERROR: Cannot construct grid. Separation too big?')
+                print('ERROR: Cannot construct grid. Separation too big?',
+                      file = stderr)
                 exit(1)
             #
             # separation between grid points
@@ -271,7 +272,8 @@ def get_query_points(coords, **kwargs):
 ################################################################################
 def _filter_margin(coords, margin):
     if margin <= 0.0:
-        print('ERROR: Margin ({0:.3f}) must be positive.'.format(margin))
+        print('ERROR: Margin ({0:.3f}) must be positive.'.format(margin),
+              file = stderr)
         exit(1)
     #
     # set minimum and maximum positions
