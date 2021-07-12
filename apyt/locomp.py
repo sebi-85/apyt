@@ -481,9 +481,8 @@ def _get_composition(indices, types):
     """
     #
     #
-    # select atomic subset, then sum types (subtraction of 1 effectively
-    # counts only atoms of type 2
-    return sum(types[indices] - 1)
+    # count type 2 atoms
+    return np.count_nonzero(types[indices] == 2)
 #
 #
 #
