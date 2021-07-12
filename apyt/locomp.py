@@ -28,10 +28,10 @@ composition histograms.
 
 The following methods are provided:
 
-* :meth:`calc_stats`: Calculate statistics.
-* :meth:`check_periodic_box`: .
-* :meth:`get_composition`: .
-* :meth:`get_query_points`: .
+* :meth:`calc_stats`: Calculate histogram and statistics.
+* :meth:`check_periodic_box`: Check periodic boundary conditions.
+* :meth:`get_composition`: Get local compositions for query points.
+* :meth:`get_query_points`: Get query points for neighbor search.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -83,8 +83,35 @@ _mem_threshold = 0.50
 #
 ################################################################################
 def calc_stats(data, **kwargs):
-    # get bin_width option
-    bin_width = kwargs.get('bin_width', None)
+    """Calculate histogram and evaluate histogram statistics.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n,)
+        The data over which to calculate the histogram.
+
+    Keyword Arguments
+    -----------------
+    bin_method : str
+         The method to use to determine the bin width for the histogram.
+         Possible values: ``auto``. Default: ``None``, which evaluates to a bin
+         width of ``1.0``.
+
+    Returns
+    -------
+    (hist, edges, centers, hist_norm) : tuple
+        The tuple containing the respective histogram counts *hist*, the bin
+        edges *edges*, the bin centers *centers*, and the normalized histogram
+        counts *hist_norm*, each of type *ndarray, shape (m,)* or
+        *shape (m+1,)*, respectively.
+    (μ, Δμ, Var, ΔVar, Var/μ, Δ(Var/μ)) : tuple
+        The statistical histogram data including error estimates, each of type
+        *float*.
+    """
+    #
+    #
+    # get binning_method
+    bin_method = kwargs.get('bin_method', None)
     #
     #
     # set data properties
@@ -93,16 +120,18 @@ def calc_stats(data, **kwargs):
     data_max = max(data)
     #
     #
-    #
-    if bin_width is None:
-        bins = np.linspace(data_min - 0.5, data_max + 0.5, data_max - data_min + 2)
+    # calculate histogram
+    if bin_method is None:
+        # use bin width of 1.0
+        bins = np.linspace(
+            data_min - 0.5, data_max + 0.5, data_max - data_min + 2)
         bin_centers = np.arange(data_min, data_max + 1)
         #
-        # calculate histogram data
         counts, bin_edges = np.histogram(data, bins = bins)
-    elif bin_width == 'auto':
-        # calculate histogram data
+    elif bin_method == 'auto':
+        # automatically determine best bin width
         counts, bin_edges = np.histogram(data, bins = 'auto')
+        #
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     #
     #
@@ -116,7 +145,7 @@ def calc_stats(data, **kwargs):
     moment_4 = sum(counts * (bin_centers - mu)**4) / num
     #
     #
-    # calulate statistical errors
+    # calculate statistical errors
     delta_mu    = np.sqrt(var / num)
     delta_var   = 2.0 / np.sqrt(num) * np.sqrt(moment_4);
     delta_var_r = 1.0 / (mu * np.sqrt(num)) * \
@@ -131,23 +160,48 @@ def calc_stats(data, **kwargs):
 #
 #
 def check_periodic_box(comment):
+    """Check periodic boundary conditions.
+
+    This method checks an OVITO comment line for the presence of the periodic
+    boundary flags. If found, this method returns the (periodic) box dimensions,
+    otherwise ``None`` is returned.
+
+    Parameters
+    ----------
+    comment : str
+        A valid OVITO comment line from a file in *xyz* format.
+
+    Returns
+    -------
+    box : ndarray, shape (3,) or ``None``
+        The box dimensions for periodic boundary conditions.
+    """
+    #
+    #
+    # split comment line into single tokens
     comment = comment.split()
+    #
+    # set default return value
     box = None
+    #
+    #
+    # check pbc flag
     try:
         pbc_index = comment.index('pbc')
         if comment[pbc_index + 1] == '1' and \
            comment[pbc_index + 2] == '1' and \
            comment[pbc_index + 3] == '1':
             #
-            # get box dimension
+            # get box dimensions
             box = np.zeros(3)
             for i in range(0, 3):
                 try:
+                    # look for dimension
                     pos = comment.index('cell_vec' + str(i + 1))
                     box[i] = comment[pos + i + 1]
                 except:
-                    print('Could not find box size for dimension {0:d}.'
-                    .format(i + 1))
+                    print('ERROR: Could not find box size for dimension {0:d}.'
+                    .format(i + 1), file = stderr)
                     exit(1)
     except:
         pass
@@ -157,6 +211,54 @@ def check_periodic_box(comment):
 #
 #
 def get_composition(data, query_points, query, **kwargs):
+    """Get local compositions for query points.
+
+    Depending on the value of ``type`` in the ``query`` dictionary argument,
+    either the nearest neighbors (``neighbor``) or neighbors within a fixed
+    distance/volume (``volume``) will be searched for the provided query points.
+    The composition in terms of number of type 2 particles will be returned for
+    each query point. In addition, either the sphere radii or the total number
+    of atoms in the spheres will be returned.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* types and three-dimensional coordinates of the atoms.
+    query_points: ndarray, shape (m, 3)
+        The *m* three-dimensional query points for the search.
+    query : dict
+        The dictionary containing the query type (``neighbor`` or ``volume``)
+        and the query parameter ``param`` (number of neighbors or neighbor
+        search cutoff).
+
+    Keyword Arguments
+    -----------------
+    box : ndarray, shape (3,) or None
+        The periodic box dimensions (if present).
+    verbose : bool
+        Whether to be verbose. Default: ``False``.
+
+    Returns
+    -------
+    r : ndarray, shape (m,)
+        The *m* sphere radii, i.e. the distance to the furthest neighbor for the
+        ``neighbor`` query type.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+
+
+    or
+
+    Returns
+    -------
+    n : ndarray, shape (m,)
+        The *m* numbers of total atoms in the spheres for the ``volume`` query
+        type.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+    """
+    #
+    #
     # set verbosity
     verbose = kwargs.get('verbose', False)
     #
@@ -174,8 +276,9 @@ def get_composition(data, query_points, query, **kwargs):
     # we may require at least 2 GB of available memory
     mem_available = virtual_memory().available * 1e-9
     if mem_available < 2.0:
-        print('Found only {0:.2f} GB of available memory. This may not be '
-              'sufficient for calculations.\nExiting...'.format(mem_available))
+        print('ERROR: Found only {0:.2f} GB of available memory. This may not '
+              'be sufficient for calculations.\nExiting...'
+              .format(mem_available), file = stderr)
         exit(1)
     #
     #
@@ -191,6 +294,36 @@ def get_composition(data, query_points, query, **kwargs):
 #
 #
 def get_query_points(coords, **kwargs):
+    """Get query points for neighbor search.
+
+    This method can be used to specify the query points for the neighbor search.
+    If no additional argument is provided, all atomic positions will be used as
+    query points. The ``margin`` keyword argument can be used to exclude surface
+    artifacts. With the ``distance`` keyword argument, a minimum separation
+    between the query poins is ensured. For periodic boxes, the box dimensions
+    should be passed using the ``box`` keyword argument.
+
+    Parameters
+    ----------
+    coords : ndarray, shape (n, 3)
+        The *n* three-dimensional coordinates.
+
+    Keyword Arguments
+    -----------------
+    box : ndarray, shape (3,) or None
+        The periodic box dimensions (if present).
+    distance : float
+        The (minimum) separation between the query points.
+    margin : float
+        The width of the margin region to exclude for the query points.
+
+    Returns
+    -------
+    query_points : ndarray, shape (m, 3)
+        The *m* three-dimensional query points for the neighbor search.
+    """
+    #
+    #
     # get optional keyword arguments
     distance    = kwargs.get('distance', None)
     is_periodic = (kwargs.get('box', None) is not None)
@@ -349,7 +482,7 @@ def _query(tree, query_points, query, types):
         The *m* three-dimensional query points for the search.
     query : dict
         The dictionary containing the query type and the query parameter (number
-        of atoms or neighbor search cutoff).
+        of neighbors or neighbor search cutoff).
     types : ndarray, shape(n,)
         The *n* atomic types.
 
@@ -445,14 +578,14 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
         The *m* three-dimensional query points for the search.
     query : dict
         The dictionary containing the query type (``neighbor``) and the query
-        parameter (number of atoms).
+        parameter (number of neighbors).
     types : ndarray, shape(n,)
         The *n* atomic types.
 
     Keyword Arguments
     -----------------
     verbose : bool
-         Whether to be verbose. Default: ``False``.
+        Whether to be verbose. Default: ``False``.
 
     Returns
     -------
@@ -545,7 +678,7 @@ def _query_volume(tree, query_points, query, types, **kwargs):
     Keyword Arguments
     -----------------
     verbose : bool
-         Whether to be verbose. Default: ``False``.
+        Whether to be verbose. Default: ``False``.
 
     Returns
     -------
