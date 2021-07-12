@@ -271,9 +271,26 @@ def get_query_points(coords, **kwargs):
 # private module-level functions
 #
 ################################################################################
-def _filter_margin(coords, margin):
-    if margin <= 0.0:
-        print('ERROR: Margin ({0:.3f}) must be positive.'.format(margin),
+def _filter_margin(coords, w):
+    """Filter coordinates which have a distance of lower than :math:`w` to the
+    boundaries.
+
+    Parameters
+    ----------
+    coords : ndarray, shape (n, 3)
+        The *n* three-dimensional coordinates.
+    w : float
+        The width :math:`w` of the margin region to exclude.
+
+    Returns
+    -------
+    coords_filtered : ndarray, shape (m, 3)
+        The *m* three-dimensional filtered coordinates.
+    """
+    #
+    #
+    if w <= 0.0:
+        print('ERROR: Margin ({0:.3f}) must be positive.'.format(w),
               file = stderr)
         exit(1)
     #
@@ -283,17 +300,33 @@ def _filter_margin(coords, margin):
     #
     # filter query points
     return coords[
-        (coords[:, 0] > min_pos[0] + margin) &
-        (coords[:, 1] > min_pos[1] + margin) &
-        (coords[:, 2] > min_pos[2] + margin) &
-        (coords[:, 0] < max_pos[0] - margin) &
-        (coords[:, 1] < max_pos[1] - margin) &
-        (coords[:, 2] < max_pos[2] - margin)]
+        (coords[:, 0] > min_pos[0] + w) &
+        (coords[:, 1] > min_pos[1] + w) &
+        (coords[:, 2] > min_pos[2] + w) &
+        (coords[:, 0] < max_pos[0] - w) &
+        (coords[:, 1] < max_pos[1] - w) &
+        (coords[:, 2] < max_pos[2] - w)]
 #
 #
 #
 #
 def _get_composition(indices, types):
+    """Evaluate composition within a neighbor list.
+
+    Parameters
+    ----------
+    indices: ndarray, shape (m,) or list of length m
+        The indices of the *m* neighbors, i.e. the neighbor list.
+    types : ndarray, shape(n,)
+        The *n* atomic types.
+
+    Returns
+    -------
+    n_2 : int
+        The number of type 2 atoms in the neighbor list.
+    """
+    #
+    #
     # select atomic subset, then sum types (subtraction of 1 effectively
     # counts only atoms of type 2
     return sum(types[indices] - 1)
@@ -302,6 +335,45 @@ def _get_composition(indices, types):
 #
 #
 def _query(tree, query_points, query, types):
+    """Query neighbors.
+
+    Depending on the value of ``type`` in the ``query`` dictionary argument,
+    either the nearest neighbors (``neighbor``) or neighbors within a fixed
+    distance/volume (``volume``) will be searched.
+
+    Parameters
+    ----------
+    tree : cKDTree
+        The cKDTree object.
+    query_points: ndarray, shape (m, 3)
+        The *m* three-dimensional query points for the search.
+    query : dict
+        The dictionary containing the query type and the query parameter (number
+        of atoms or neighbor search cutoff).
+    types : ndarray, shape(n,)
+        The *n* atomic types.
+
+    Returns
+    -------
+    r : ndarray, shape (m,)
+        The *m* sphere radii, i.e. the distance to the furthest neighbor for the
+        ``neighbor`` query type.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+
+
+    or
+
+    Returns
+    -------
+    n : ndarray, shape (m,)
+        The *m* numbers of total atoms in the spheres for the ``volume`` query
+        type.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+    """
+    #
+    #
     # depending on the invocation mode, we need to search neighbors differently,
     # i.e. constant number or constant volume
     if query['type'] == 'neighbor':
@@ -358,6 +430,39 @@ def _query(tree, query_points, query, types):
 #
 #
 def _query_nearest(tree, query_points, query, types, **kwargs):
+    """Query nearest neighbors.
+
+    Before the neighbor search is performed, this method estimates the amount of
+    memory needed for the search. If insufficient free memory is available, the
+    neighbor search is split into smaller chunks so that approximately only half
+    of the currently available memory is used.
+
+    Parameters
+    ----------
+    tree : cKDTree
+        The cKDTree object.
+    query_points: ndarray, shape (m, 3)
+        The *m* three-dimensional query points for the search.
+    query : dict
+        The dictionary containing the query type (``neighbor``) and the query
+        parameter (number of atoms).
+    types : ndarray, shape(n,)
+        The *n* atomic types.
+
+    Keyword Arguments
+    -----------------
+    verbose : bool
+         Whether to be verbose. Default: ``False``.
+
+    Returns
+    -------
+    r : ndarray, shape (m,)
+        The *m* sphere radii, i.e. the distance to the furthest neighbor.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+    """
+    #
+    #
     # set verbosity
     verbose = kwargs.get('verbose', False)
     #
@@ -417,6 +522,40 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
 #
 #
 def _query_volume(tree, query_points, query, types, **kwargs):
+    """Query neighbors within cutoff distance.
+
+    Before the neighbor search is performed, this method estimates the amount of
+    memory needed for the search. If insufficient free memory is available, the
+    neighbor search is split into smaller chunks. However, the
+    ``query_ball_point()`` method over-allocates memory in a weird way so that a
+    precise estimate is difficult. Here, a rather conservative approach is used.
+
+    Parameters
+    ----------
+    tree : cKDTree
+        The cKDTree object.
+    query_points: ndarray, shape (m, 3)
+        The *m* three-dimensional query points for the search.
+    query : dict
+        The dictionary containing the query type (``volume``) and the query
+        parameter (neighbor search cutoff).
+    types : ndarray, shape(n,)
+        The *n* atomic types.
+
+    Keyword Arguments
+    -----------------
+    verbose : bool
+         Whether to be verbose. Default: ``False``.
+
+    Returns
+    -------
+    n : ndarray, shape (m,)
+        The *m* numbers of total atoms in the spheres.
+    n_2 : ndarray, shape (m,)
+        The *m* numbers of type 2 atoms in the spheres.
+    """
+    #
+    #
     # set verbosity
     verbose = kwargs.get('verbose', False)
     #
@@ -443,7 +582,8 @@ def _query_volume(tree, query_points, query, types, **kwargs):
         if verbose == True:
             print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
                   'available memory ({2:.2f} GB).'
-                  .format(mem_estimated, int(_mem_threshold * 100), mem_available))
+                  .format(mem_estimated, int(_mem_threshold * 100),
+                          mem_available))
         #
         # set number of chunks
         chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
