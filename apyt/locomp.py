@@ -2,13 +2,26 @@
 The APyT local composition module
 =================================
 
+This module enables the evaluation of local compositions within spherical (sub-)
+volumes of any three-dimensional data set which includes additional information
+on the atomic types. In principle, there are two mutually excluding methods how
+to evaluate the local compositions:
 
-Introduction
-------------
+1. Using spheres with a constant number of particles/neighbors.
+2. Using spheres with a constant radius/volume.
 
+Either of these methods is supported and determined through a dictionary, which
+specifies the ``type`` (``"neighbor"`` or ``"volume"``) and the corresponding
+neighbor search parameter ``param`` which must be set to the number of neighbors
+or sphere radius, respectively.
 
-General procedure
------------------
+The spherical (sub-) volumes can be placed around every atom or the sphere
+centers can be arranged automatically to represent a three-dimensional regular
+grid, where a minimum separation between the grid points is ensured to exclude
+overlapping of the spheres (see :meth:`get_query_points` for details).
+
+Neighbor searches are preformed with the |SciPy_cKDTree| class from the SciPy
+package.
 
 
 Howto
@@ -32,6 +45,12 @@ The following methods are provided:
 * :meth:`check_periodic_box`: Check periodic boundary conditions.
 * :meth:`get_composition`: Get local compositions for query points.
 * :meth:`get_query_points`: Get query points for neighbor search.
+
+
+.. |SciPy_cKDTree| raw:: html
+
+    <a href="https://docs.scipy.org/doc/scipy/reference/generated/
+    scipy.spatial.cKDTree.html" target="_blank">cKDTree</a>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -71,8 +90,8 @@ from sys import getsizeof, stderr
 # private module-level variables
 #
 ################################################################################
-# set approximate maximum amount of available memory to use
 _mem_threshold = 0.50
+"""float : The approximate maximum amount of available memory to use."""
 #
 #
 #
@@ -173,7 +192,7 @@ def check_periodic_box(comment):
 
     Returns
     -------
-    box : ndarray, shape (3,) or ``None``
+    box : ndarray, shape (3,) or None
         The box dimensions for periodic boundary conditions.
     """
     #
@@ -213,12 +232,12 @@ def check_periodic_box(comment):
 def get_composition(data, query_points, query, **kwargs):
     """Get local compositions for query points.
 
-    Depending on the value of ``type`` in the ``query`` dictionary argument,
-    either the nearest neighbors (``neighbor``) or neighbors within a fixed
-    distance/volume (``volume``) will be searched for the provided query points.
-    The composition in terms of number of type 2 particles will be returned for
-    each query point. In addition, either the sphere radii or the total number
-    of atoms in the spheres will be returned.
+    Depending on the value of ``type`` in the **query** dictionary argument,
+    either the nearest neighbors (``"neighbor"``) or neighbors within a fixed
+    distance/volume (``"volume"``) will be searched for the provided query
+    points. The composition in terms of number of type 2 particles will be
+    returned for each query point. In addition, either the sphere radii or the
+    total number of atoms in the spheres will be returned.
 
     Parameters
     ----------
@@ -227,7 +246,8 @@ def get_composition(data, query_points, query, **kwargs):
     query_points: ndarray, shape (m, 3)
         The *m* three-dimensional query points for the search.
     query : dict
-        The dictionary containing the query type (``neighbor`` or ``volume``)
+        The dictionary containing the query type (``"neighbor"`` or
+        ``"volume"``)
         and the query parameter ``param`` (number of neighbors or neighbor
         search cutoff).
 
@@ -242,7 +262,7 @@ def get_composition(data, query_points, query, **kwargs):
     -------
     r : ndarray, shape (m,)
         The *m* sphere radii, i.e. the distance to the furthest neighbor for the
-        ``neighbor`` query type.
+        ``"neighbor"`` query type.
     n_2 : ndarray, shape (m,)
         The *m* numbers of type 2 atoms in the spheres.
 
@@ -252,7 +272,7 @@ def get_composition(data, query_points, query, **kwargs):
     Returns
     -------
     n : ndarray, shape (m,)
-        The *m* numbers of total atoms in the spheres for the ``volume`` query
+        The *m* numbers of total atoms in the spheres for the ``"volume"`` query
         type.
     n_2 : ndarray, shape (m,)
         The *m* numbers of type 2 atoms in the spheres.
@@ -300,7 +320,8 @@ def get_query_points(coords, **kwargs):
     If no additional argument is provided, all atomic positions will be used as
     query points. The ``margin`` keyword argument can be used to exclude surface
     artifacts. With the ``distance`` keyword argument, a minimum separation
-    between the query poins is ensured. For periodic boxes, the box dimensions
+    between the query points is ensured, which is achieved by the construction
+    of a regular three-dimensional grid. For periodic boxes, the box dimensions
     should be passed using the ``box`` keyword argument.
 
     Parameters
@@ -470,9 +491,9 @@ def _get_composition(indices, types):
 def _query(tree, query_points, query, types):
     """Query neighbors.
 
-    Depending on the value of ``type`` in the ``query`` dictionary argument,
-    either the nearest neighbors (``neighbor``) or neighbors within a fixed
-    distance/volume (``volume``) will be searched.
+    Depending on the value of ``type`` in the **query** dictionary argument,
+    either the nearest neighbors (``"neighbor"``) or neighbors within a fixed
+    distance/volume (``"volume"``) will be searched.
 
     Parameters
     ----------
@@ -490,7 +511,7 @@ def _query(tree, query_points, query, types):
     -------
     r : ndarray, shape (m,)
         The *m* sphere radii, i.e. the distance to the furthest neighbor for the
-        ``neighbor`` query type.
+        ``"neighbor"`` query type.
     n_2 : ndarray, shape (m,)
         The *m* numbers of type 2 atoms in the spheres.
 
@@ -500,7 +521,7 @@ def _query(tree, query_points, query, types):
     Returns
     -------
     n : ndarray, shape (m,)
-        The *m* numbers of total atoms in the spheres for the ``volume`` query
+        The *m* numbers of total atoms in the spheres for the ``"volume"`` query
         type.
     n_2 : ndarray, shape (m,)
         The *m* numbers of type 2 atoms in the spheres.
@@ -577,7 +598,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
     query_points: ndarray, shape (m, 3)
         The *m* three-dimensional query points for the search.
     query : dict
-        The dictionary containing the query type (``neighbor``) and the query
+        The dictionary containing the query type (``"neighbor"``) and the query
         parameter (number of neighbors).
     types : ndarray, shape(n,)
         The *n* atomic types.
@@ -670,7 +691,7 @@ def _query_volume(tree, query_points, query, types, **kwargs):
     query_points: ndarray, shape (m, 3)
         The *m* three-dimensional query points for the search.
     query : dict
-        The dictionary containing the query type (``volume``) and the query
+        The dictionary containing the query type (``"volume"``) and the query
         parameter (neighbor search cutoff).
     types : ndarray, shape(n,)
         The *n* atomic types.
