@@ -543,7 +543,7 @@ def _query(tree, query_points, query, types):
     elif query['type'] == 'volume':
         # query neighbors
         indices = tree.query_ball_point(
-            query_points, query['param'], n_jobs = -1)
+            query_points, query['param'], n_jobs = -1, return_sorted = False)
     #
     #
     #
