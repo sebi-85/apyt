@@ -43,6 +43,7 @@ The following methods are provided:
 
 * :meth:`calc_stats`: Calculate histogram and statistics.
 * :meth:`check_periodic_box`: Check periodic boundary conditions.
+* :meth:`emulate_efficiency`: Emulate detector efficiency for simulated data.
 * :meth:`get_composition`: Get local compositions for query points.
 * :meth:`get_query_points`: Get query points for neighbor search.
 
@@ -65,6 +66,7 @@ __version__ = '0.1.0'
 __all__ = [
     'calc_stats',
     'check_periodic_box',
+    'emulate_efficiency',
     'get_composition',
     'get_query_points'
 ]
@@ -225,6 +227,42 @@ def check_periodic_box(comment):
     except:
         pass
     return box
+#
+#
+#
+#
+def emulate_efficiency(data, p):
+    """Emulate detector efficiency for simulated data.
+
+    For data prior to evaporation and reconstruction, the limited detector
+    efficiency can be emulated for a simulated data set by randomly choosing
+    the particles with a certain probability which corresponds to the detection
+    efficiency ``p``.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* types and three-dimensional coordinates of the atoms.
+    p : float
+        The detector efficiency to emulate.
+
+    Returns
+    -------
+    data_r : ndarray, shape (m, 4)
+        The *m* types and three-dimensional coordinates of the randomly selected
+        atoms.
+    """
+    #
+    #
+    # initialize random number generator with specific seed to avoid correlated
+    # results for similar efficiencies
+    rng = np.random.default_rng(int(p * 100))
+    #
+    # draw random number for each particle
+    random_numbers = rng.random(len(data))
+    #
+    # return randomly selected particles
+    return data[(random_numbers <= p)]
 #
 #
 #
