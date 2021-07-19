@@ -114,9 +114,9 @@ def calc_stats(data, **kwargs):
     Keyword Arguments
     -----------------
     bin_method : str
-         The method to use to determine the bin width for the histogram.
-         Possible values: ``auto``. Default: ``None``, which evaluates to a bin
-         width of ``1.0``.
+         The method to use to determine the bin width for the histogram. This
+         argument will be passed through to the ``numpy.histogram()`` method.
+         Default: ``None``, which evaluates to a bin width of ``1.0``.
 
     Returns
     -------
@@ -149,9 +149,9 @@ def calc_stats(data, **kwargs):
         bin_centers = np.arange(data_min, data_max + 1)
         #
         counts, bin_edges = np.histogram(data, bins = bins)
-    elif bin_method == 'auto':
-        # automatically determine best bin width
-        counts, bin_edges = np.histogram(data, bins = 'auto')
+    elif isinstance(bin_method, str):
+        # pass through binning method
+        counts, bin_edges = np.histogram(data, bins = bin_method)
         #
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     #
