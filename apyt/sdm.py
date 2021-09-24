@@ -923,11 +923,14 @@ def _get_rdf_std_dev(angles, data, rdf_params, rdf_model_params):
     # initialize fit
     model = Model(rdf)
     params = model.make_params()
-    params['N']     = Parameter(value = rdf_model_params[0], vary = False)
-    params['n']     = Parameter(value = rdf_model_params[1], vary = False)
-    params['w']     = Parameter(value = rdf_model_params[2], vary = False)
-    params['sigma'] = Parameter(value = rdf_model_params[3])
-    params['d']     = Parameter(value = rdf_model_params[4])
+    params['N']     = Parameter(name = 'N', value = rdf_model_params[0],
+                                vary = False)
+    params['n']     = Parameter(name = 'n', value = rdf_model_params[1],
+                                vary = False)
+    params['w']     = Parameter(name = 'w', value = rdf_model_params[2],
+                                vary = False)
+    params['sigma'] = Parameter(name = 'sigma',value = rdf_model_params[3])
+    params['d']     = Parameter(name = 'd', value = rdf_model_params[4])
     #
     # perform fit
     rdf_fit = model.fit(rdf_data[1], r = rdf_data[0], params = params)
