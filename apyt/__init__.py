@@ -13,6 +13,7 @@ Package modules
    :maxdepth: 1
 
    The APyT local composition module (apyt.locomp)<apyt.locomp>
+   The APyT mass spectrum module (apyt.massspec)<apyt.massspec>
    The APyT SDM module (apyt.sdm)<apyt.sdm>
 
 
@@ -21,4 +22,4 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['locomp', 'sdm']
+__all__ = ['locomp', 'massspec', 'sdm']
