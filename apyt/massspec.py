@@ -53,6 +53,7 @@ __all__ = [
 #
 #
 # import modules
+import matplotlib.pyplot as plt
 import numpy as np
 #
 # import some special functions/modules
