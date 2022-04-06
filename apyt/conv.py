@@ -19,6 +19,7 @@ various file formats encountered in atom probe tomography.
 
 The following methods are provided:
 
+* :meth:`raw_concat`: Concatenate multiple raw files to a single one.
 * :meth:`raw_to_ascii`: Convert a raw measurement file to a human-readable ASCII
   file.
 
@@ -39,6 +40,7 @@ The following methods are provided:
 #
 __version__ = '0.1.0'
 __all__ = [
+    "raw_concat",
     "raw_to_ascii"
 ]
 #
@@ -70,6 +72,34 @@ _bin_fmt = "<ffffffiI"
 # public functions
 #
 ################################################################################
+def raw_concat(raw_files, out_file):
+    """Concatenate multiple raw files to a single one.
+
+    This function combines several raw files from a continuous measurement by
+    concatenating.
+
+    Parameters
+    ----------
+    raw_files : list
+        The list of the raw file names, each of type `str`.
+    out_file: str
+        The name of the output file.
+    """
+    #
+    #
+    # open output file for binary write
+    print("Concatenating files {0:s} ...".format(str(raw_files)))
+    with open(out_file, 'wb') as f_out:
+        # loop through list of raw files
+        for i in raw_files:
+            # open input file for binary read
+            with open(i, 'rb') as f_in:
+                # append input file to output file
+                f_out.write(f_in.read())
+#
+#
+#
+#
 def raw_to_ascii(raw_file, ascii_file):
     """Convert a raw measurement file to a human-readable ASCII file.
 
@@ -81,7 +111,7 @@ def raw_to_ascii(raw_file, ascii_file):
     Parameters
     ----------
     raw_file : str
-        The name of the raw file.
+        The name of the raw file
     ascii_file : str
         The name of ASCII file.
     """
