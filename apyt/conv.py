@@ -4,8 +4,8 @@ The APyT file format conversion module
 
 Typically, several data file layouts exist to describe the same set of measured
 data, possibly even decoded as ASCII or raw binary data. This module provides
-ease-to-use :ref:`methods<apyt.conv:List of methods>` to convert one file format to
-another.
+ease-to-use :ref:`methods<apyt.conv:List of methods>` to convert one file format
+to another.
 
 Raw file format
 ---------------
@@ -33,7 +33,6 @@ The usage of this module is demonstrated in an auxiliary script
 (``wrapper_scripts/apyt_conv.py``) which basically serves as a wrapper for this
 module. Detailed usage information can be obtained by invoking this script with
 the ``"--help"`` option.
-
 
 List of methods
 ---------------
@@ -140,7 +139,7 @@ def raw_to_ascii(raw_file, ascii_file):
     Parameters
     ----------
     raw_file : str
-        The name of the raw file
+        The name of the raw file.
     ascii_file : str
         The name of the ASCII file.
     """
@@ -155,7 +154,7 @@ def raw_to_ascii(raw_file, ascii_file):
     print("Writing ASCII file \"{0:s}\" ...".format(ascii_file))
     with open(ascii_file, 'w') as f:
         # write header
-        f.write("# U_base (V)\tU_pulse (V)\tU_reflectron (V)\t" \
+        f.write("# U_base (V)\tU_pulse (V)\tU_reflectron (V)\t"
                 "x_det (mm)\ty_det (mm)\ttof (ns)\tepoch\t\tpulse_num\n")
         #
         # set format string
@@ -232,10 +231,9 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     #
     # check whether all ids have been mapped
     if np.count_nonzero(id == -1) > 0:
-        print("ERROR: Unspecified id detected. Please check your id ranges to "
-              "cover all occuring ids ({0:d}, {1:d}).".format(
-                  int(data[:, 1].min()), int(data[:, 1].max())))
-        exit(1)
+        raise Exception("Unspecified id detected. Please check your id ranges "
+                        "to cover all occurring ids ({0:d}, {1:d}).".format(
+                            int(data[:, 1].min()), int(data[:, 1].max())))
     #
     #
     # set arbitrary timestamp required in raw file
