@@ -2,6 +2,30 @@
 The APyT file format conversion module
 ======================================
 
+Typically, several data file layouts exist to describe the same set of measured
+data, possibly even decoded as ASCII or raw binary data. This module provides
+ease-to-use :ref:`methods<apyt.conv:List of methods>` to convert one file format to
+another.
+
+Raw file format
+---------------
+The atom probe tomography (APT) group at University of Stuttgart use a binary
+file to record APT measurements, which contains the following information for
+each evaporation event:
+
+============  =========  =================================
+Field         Data type  Comment
+============  =========  =================================
+U_base        float32    base voltage (V)
+U_pulse       float32    pulse voltage (V)
+U_reflectron  float32    reflectron voltage (V)
+x_det         float32    `x` detector position (mm)
+y_det         float32    `y` detector position (mm)
+tof           float32    time of flight (ns)
+epoch         int32      epoch of the evaporation event
+pulse_num     uint32     pulse number of evaporation event
+============  =========  =================================
+
 Howto
 -----
 
@@ -22,7 +46,7 @@ The following methods are provided:
 * :meth:`raw_concat`: Concatenate multiple raw files to a single one.
 * :meth:`raw_to_ascii`: Convert a raw measurement file to a human-readable ASCII
   file.
-* :meth:`tapsim_to_raw`: Convert TAPSim ASCII file to raw file.
+* :meth:`tapsim_to_raw`: Convert |TAPSim| ASCII file to raw file.
 
 
 .. |TAPSim| raw:: html
@@ -32,7 +56,9 @@ The following methods are provided:
 
 
 .. sectionauthor:: Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
-.. moduleauthor:: Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
+.. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
+.. moduleauthor::  Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
+.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 
 """
 #
@@ -129,11 +155,11 @@ def raw_to_ascii(raw_file, ascii_file):
     print("Writing ASCII file \"{0:s}\" ...".format(ascii_file))
     with open(ascii_file, 'w') as f:
         # write header
-        f.write("# U_base (V)\tU_pulse (V)\tU_ref (V)\t" \
+        f.write("# U_base (V)\tU_pulse (V)\tU_reflectron (V)\t" \
                 "x_det (mm)\ty_det (mm)\ttof (ns)\tepoch\t\tpulse_num\n")
         #
         # set format string
-        fmt = "%9.3f\t%8.3f\t%7.1f\t\t%+10.6f\t%+10.6f\t%8.3f\t%d\t" \
+        fmt = "%9.3f\t%8.3f\t%7.1f\t\t\t%+11.6f\t%+11.6f\t%8.3f\t%d\t" \
               "%10d\n"
         #
         # convert binary data and write to file
@@ -155,20 +181,23 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
 
     The conversion is illustrated in the following table:
 
-    =========  =========  ====================  ================================
-    raw        data type  TAPSim                comment
-    =========  =========  ====================  ================================
-    U_base     float32    5000 V                constant
-    U_pulse    float32    0                     zero
-    U_ref      float32    0                     zero
-    x_det      float32    col. 7                conversion from m to mm
-    y_det      float32    col. 8                conversion from m to mm
-    tof        float32    constant per sepcies  constant for one species, \
-                                                separation 50 ns
-    epoch      int32      946681200             (2000-01-01 00:00:00) \
-                                                + 1 event/s
-    pulse_num  uint32     0, 1, 2, ...          corresponds to evaporation event
-    =========  =========  ====================  ================================
+    ============  =========  ====================  =============================
+    Raw file      Data type  TAPSim file           Comment
+    ============  =========  ====================  =============================
+    U_base        float32    5000 V                constant
+    U_pulse       float32    0                     zero
+    U_reflectron  float32    0                     zero
+    x_det         float32    col. 7                conversion from meter to \
+                                                   millimeter
+    y_det         float32    col. 8                conversion from meter to \
+                                                   millimeter
+    tof           float32    constant per species  constant for one species, \
+                                                   separation 50 ns
+    epoch         int32      946681200             (2000-01-01 00:00:00) \
+                                                   + 1 event/s
+    pulse_num     uint32     0, 1, 2, ...          corresponds to evaporation \
+                                                   event
+    ============  =========  ====================  =============================
 
     Parameters
     ----------
@@ -178,7 +207,7 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
         The name of the raw file.
     id_range_list: list
         The list of id ranges used for mapping the atomic species, each of type
-        `tuple` of length 2, specifing the respective minimum and maximum id.
+        `tuple` of length 2, specifying the respective minimum and maximum id.
     """
     #
     #

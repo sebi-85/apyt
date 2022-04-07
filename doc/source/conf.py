@@ -32,9 +32,13 @@ release = '0.1.0'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosectionlabel',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode'
 ]
+
+# Prefix each section label with the name of the document it is in
+autosectionlabel_prefix_document = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
