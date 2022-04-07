@@ -14,7 +14,7 @@ file to record APT measurements, which contains the following information for
 each evaporation event:
 
 ============  =========  =================================
-Field         Data type  Comment
+Field         Data type  Description
 ============  =========  =================================
 U_base        float32    base voltage (V)
 U_pulse       float32    pulse voltage (V)
@@ -22,7 +22,7 @@ U_reflectron  float32    reflectron voltage (V)
 x_det         float32    `x` detector position (mm)
 y_det         float32    `y` detector position (mm)
 tof           float32    time of flight (ns)
-epoch         int32      epoch of the evaporation event
+epoch         int32      epoch of evaporation event
 pulse_num     uint32     pulse number of evaporation event
 ============  =========  =================================
 
@@ -142,7 +142,7 @@ def raw_to_ascii(raw_file, ascii_file):
     raw_file : str
         The name of the raw file
     ascii_file : str
-        The name of ASCII file.
+        The name of the ASCII file.
     """
     #
     #
@@ -171,13 +171,14 @@ def raw_to_ascii(raw_file, ascii_file):
 def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     """Convert TAPSim ASCII file to raw file.
 
-    This function enables the conversion from a TAPSim ASCII file to a raw file
-    for further processing (e.g. reconstruction). A certain subset of columns is
-    imported from the TAPSim file, manipulated accordingly to match the raw file
-    format, and eventually written to a binary file. A constant base voltage
-    is used for all events, the time of flight is arranged such that it is
-    constant for one distinct species. The epoch is set to a constant time plus
-    1 event/s, the pulse number corresponds to the evaporation event.
+    This function enables the conversion from a |TAPSim| ASCII file to a raw
+    file for further processing (e.g. reconstruction). A certain subset of
+    columns is imported from the TAPSim file, manipulated accordingly to match
+    the :ref:`raw file format<apyt.conv:Raw file format>`, and eventually
+    written to a binary file. A constant base voltage is used for all events and
+    the time of flight is arranged such that it is constant for one distinct
+    species. The epoch is set to a constant time plus 1 event/s, the pulse
+    number corresponds to the evaporation event.
 
     The conversion is illustrated in the following table:
 
@@ -187,15 +188,15 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     U_base        float32    5000 V                constant
     U_pulse       float32    0                     zero
     U_reflectron  float32    0                     zero
-    x_det         float32    col. 7                conversion from meter to \
+    x_det         float32    col. 7                conversion from meter to
                                                    millimeter
-    y_det         float32    col. 8                conversion from meter to \
+    y_det         float32    col. 8                conversion from meter to
                                                    millimeter
-    tof           float32    constant per species  constant for one species, \
+    tof           float32    constant per species  constant for one species,
                                                    separation 50 ns
-    epoch         int32      946681200             (2000-01-01 00:00:00) \
-                                                   + 1 event/s
-    pulse_num     uint32     0, 1, 2, ...          corresponds to evaporation \
+    epoch         int32      946681200 + event     (2000-01-01 00:00:00) +
+                                                   1 event/s
+    pulse_num     uint32     0, 1, 2, ...          corresponds to evaporation
                                                    event
     ============  =========  ====================  =============================
 
