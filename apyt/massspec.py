@@ -221,8 +221,10 @@ def get_flight_correction(data, t_0, L_0, **kwargs):
     #
     #
     # check for valid peaks
-    if len(z) == 0:
-        raise Exception("No peaks detected for flight length correction.")
+    if len(z) < (deg + 1) * (deg + 2) // 2:
+        raise Exception("Insufficient number of peaks ({0:d}) detected for "
+                        "flight length correction (must be at least {1:d}).".
+                        format(len(z), (deg + 1) * (deg + 2) // 2))
     #
     #
     # fit correction function to peak positions
@@ -347,8 +349,10 @@ def get_voltage_correction(data, t_0, L_0, **kwargs):
     #
     #
     # check for valid peaks
-    if len(y) == 0:
-        raise Exception("No peaks detected for voltage correction.")
+    if len(y) <= deg:
+        raise Exception("Insufficient number of peaks ({0:d}) detected for "
+                        "voltage correction (must be at least {0:d}).".
+                        format(len(z), deg + 1))
     #
     #
     # fit correction function to peak positions
