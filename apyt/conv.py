@@ -11,7 +11,7 @@ Raw file format
 ---------------
 The atom probe tomography (APT) group at University of Stuttgart use a binary
 file to record APT measurements, which contains the following information for
-each evaporation event:
+each evaporation event (with **Little Endian** byte ordering):
 
 ============  =========  =================================
 Field         Data type  Description
