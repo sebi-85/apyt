@@ -203,9 +203,9 @@ def get_flight_correction(data, t_0, L_0, **kwargs):
                 #
                 # check for valid peaks (should not fail!)
                 if len(peaks) == 0:
-                    _error("No peaks detected for xy-range "
-                           "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
-                           format(x_low, x_high, y_low, y_high))
+                    raise Exception("No peaks detected for xy-range "
+                                    "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
+                                    format(x_low, x_high, y_low, y_high))
                 #
                 #
                 # add peak to plot if requested
@@ -222,7 +222,7 @@ def get_flight_correction(data, t_0, L_0, **kwargs):
     #
     # check for valid peaks
     if len(z) == 0:
-        _error("No peaks detected for flight length correction.")
+        raise Exception("No peaks detected for flight length correction.")
     #
     #
     # fit correction function to peak positions
@@ -331,8 +331,8 @@ def get_voltage_correction(data, t_0, L_0, **kwargs):
             #
             # check for valid peaks (should not fail!)
             if len(peaks) == 0:
-                _error("No peaks detected for voltage range "
-                       "({0:.1f}, {1:.1f})!". format(U_low, U_high))
+                raise Exception("No peaks detected for voltage range "
+                                "({0:.1f}, {1:.1f})!". format(U_low, U_high))
             #
             #
             # add peak to plot if requested
@@ -348,7 +348,7 @@ def get_voltage_correction(data, t_0, L_0, **kwargs):
     #
     # check for valid peaks
     if len(y) == 0:
-        _error("No peaks detected for voltage correction.")
+        raise Exception("No peaks detected for voltage correction.")
     #
     #
     # fit correction function to peak positions
@@ -392,7 +392,8 @@ def optimize_correction(mode, *args):
     elif mode == 'flight':
         return _optimize_flight_correction(*args)
     else:
-        _error("Unrecognized mode for minimization ({0:s}).".format(mode))
+        raise Exception("Unrecognized mode for minimization ({0:s}).".format(
+                        mode))
 #
 #
 #
@@ -411,16 +412,6 @@ def _debug(msg):
     frameinfo = getframeinfo(stack()[1].frame)
     print("[DEBUG] ({0:s}:{1:d}) {2:s}".format(
         frameinfo.function, frameinfo.lineno, msg), file = stderr)
-#
-#
-#
-#
-def _error(msg):
-    # print error message including function name and line number
-    frameinfo = getframeinfo(stack()[1].frame)
-    print("[ERROR] ({0:s}:{1:d}) {2:s}".format(
-        frameinfo.function, frameinfo.lineno, msg), file = stderr)
-    exit(1)
 #
 #
 #
@@ -546,7 +537,8 @@ def _peak_width(x, data, t_0, L_0, coeffs, mode):
         coeffs = (coeffs[0],
                   _poly2d_coeff_vec_to_mat(np.append(coeffs[1], x)))
     else:
-        _error("Unrecognized mode for minimization ({0:s}).".format(mode))
+        raise Exception("Unrecognized mode for minimization ({0:s}).".format(
+                        mode))
     #
     #
     # calculate histogram and bin centers
