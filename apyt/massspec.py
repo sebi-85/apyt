@@ -310,10 +310,12 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # print detected peaks if requested
     if _is_dbg == True:
         peak_str = "Peaks (#{0:d}) have been detected at:\n# U (V)\t\t  " \
-                   "events\t\tm/q (amu/e)\tm/q (amu/e) (corr.)".format(len(y))
-        for elem in list(zip(x, events, y, y * polyval(x, coeffs))):
-            peak_str += "\n{0:7.1f}\t\t{1:8d}\t\t{2:.3f}\t\t{3:.3f}".format(
-                            elem[0], elem[1], elem[2], elem[3])
+                   "events\trel_size\tm/q (amu/e)\tm/q (amu/e) (corr.)". \
+                   format(len(y))
+        for elem in list(zip(x, events, events / len(data) * 100, y,
+                             y * polyval(x, coeffs))):
+            peak_str += "\n{0:7.1f}\t\t{1:8d}\t{2:7.1f}%\t{3:.3f}\t\t{4:.3f}". \
+                        format(elem[0], elem[1], elem[2], elem[3], elem[4])
         _debug(peak_str)
     _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
            format(np.var(y)))
