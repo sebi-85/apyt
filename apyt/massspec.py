@@ -230,15 +230,14 @@ def get_flight_correction(data, spec_par, **kwargs):
 #
 def get_voltage_correction(data, spec_par, **kwargs):
     start = timer()
-    _debug("Performing voltage correction...")
+    print("Performing voltage correction...")
     #
     # get optional keyword arguments
-    deg      = kwargs.get('deg', 3)
-    hist_par = kwargs.get('hist', {})
-    plot     = kwargs.get('plot', False)
-    size     = kwargs.get('size', 0.3)
-    steps    = kwargs.get('steps', 40)
-    thres    = kwargs.get('thres', 0.9)
+    deg      = kwargs.get("deg", 3)
+    hist_par = kwargs.get("hist", {})
+    size     = kwargs.get("size", 0.3)
+    steps    = kwargs.get("steps", 20)
+    thres    = kwargs.get("thres", 0.9)
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -252,7 +251,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     _debug("Voltage range is ({0:.1f}, {1:.1f}) V "
            "(ΔU = {2:.3f} V, {3:d} steps).".format(U_min, U_max, ΔU, steps))
     _debug("Minimum required events per range are {0:d}.".
-           format(int(size * len(data))))
+           format(int(size * len(data) / steps)))
     #
     #
     # initialize fit data
@@ -275,12 +274,6 @@ def get_voltage_correction(data, spec_par, **kwargs):
             hist, bin_centers, _ = get_mass_spectrum(
                 data_cur, spec_par, hist = hist_par)
             #
-            # plot histogram if requested
-            if plot == True:
-                plt.plot(bin_centers, hist,
-                         label = "({0:7.1f}, {1:7.1f}) V, #{2:d}".
-                                 format(U_low, U_high, len(data_cur)))
-            #
             #
             # find histogram peaks (there may be multiple peaks close to one
             # another, so we will always pick the first one later)
@@ -293,11 +286,6 @@ def get_voltage_correction(data, spec_par, **kwargs):
                                 "({0:.1f}, {1:.1f})!".format(U_low, U_high))
             #
             #
-            # add peak to plot if requested
-            if plot == True:
-                plt.plot(bin_centers[peaks[0]], hist[peaks[0]], "x")
-            #
-            #
             # append fit data
             x = np.append(x, U_low + 0.5 * ΔU)
             y = np.append(y, bin_centers[peaks[0]])
@@ -307,21 +295,22 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # check for valid peaks
     if len(y) <= deg:
         raise Exception("Insufficient number of peaks ({0:d}) detected for "
-                        "voltage correction (must be at least {0:d}).".
-                        format(len(z), deg + 1))
+                        "voltage correction (must be at least {1:d}).".
+                        format(len(y), deg + 1))
     #
     #
     # fit correction function to peak positions
     _debug("Correcting voltage using polynomial of degree {0:d}.".format(deg))
+    peak_target = np.average(y, weights = events)
     coeffs = np.polynomial.polynomial.polyfit(
-        x, np.average(y, weights = events) / y, deg, w = events)
+        x, peak_target / y, deg, w = events)
     _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
     #
     #
     # print detected peaks if requested
     if _is_dbg == True:
-        peak_str = "Peaks have been detected at:\n# U (V)\t\t  events\t\t" \
-                   "m/q (amu/e)\tm/q (amu/e) (corr.)"
+        peak_str = "Peaks (#{0:d}) have been detected at:\n# U (V)\t\t  " \
+                   "events\t\tm/q (amu/e)\tm/q (amu/e) (corr.)".format(len(y))
         for elem in list(zip(x, events, y, y * polyval(x, coeffs))):
             peak_str += "\n{0:7.1f}\t\t{1:8d}\t\t{2:.3f}\t\t{3:.3f}".format(
                             elem[0], elem[1], elem[2], elem[3])
@@ -333,8 +322,18 @@ def get_voltage_correction(data, spec_par, **kwargs):
     #
     #
     # show plot if requested
-    if plot == True:
-        plt.legend(loc="upper left")
+    if kwargs.get("plot", False) == True:
+        plt.xlabel("Voltage (kV)")
+        plt.ylabel("Peak position (amu/e)")
+        plt.plot(0.001 * x, y, "-", label = "initial")
+        plt.plot(0.001 * x, y * polyval(x, coeffs), "-", label = "corrected")
+        plt.axhline(y = peak_target, color = "C2",
+                    label = "target")
+        plt.axhline(y = peak_target + hist_par.get("width", _default_bin_width),
+                    linestyle="--", color = "C2")
+        plt.axhline(y = peak_target - hist_par.get("width", _default_bin_width),
+                    linestyle="--", color = "C2")
+        plt.legend()
         plt.show()
     #
     #
