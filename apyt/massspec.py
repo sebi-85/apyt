@@ -77,6 +77,10 @@ from timeit import default_timer as timer
 ################################################################################
 _default_bin_width = 0.05
 "The default histogram bin width."
+_dtype = np.float32
+"""The type of the input data.
+
+This enforces memory-intensive arrays to be of the same data type."""
 _is_dbg = False
 "The global flag for debug output"
 _mc_conversion_factor = 2.0 * constants.value('elementary charge') / \
@@ -223,7 +227,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     # return coefficients for correction function
     end = timer()
     _debug("Flight correction took {0:.3f} seconds.".format(end - start))
-    return coeffs
+    return coeffs.astype(_dtype)
 #
 #
 #
@@ -342,7 +346,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # return coefficients for correction function
     end = timer()
     _debug("Voltage correction took {0:.3f} seconds.".format(end - start))
-    return coeffs
+    return coeffs.astype(_dtype)
 #
 #
 #
@@ -419,6 +423,12 @@ def _get_mass_to_charge_ratio(data, par):
     (t_0, L_0, (voltage_coeffs, flight_coeffs)) = par
     #
     #
+    # check for correct input data type
+    if data.dtype is not np.dtype(_dtype):
+        raise TypeError("Wrong type for raw input data ({0:s}). Must be "
+                        "'{1:s}'.".format(str(data.dtype),
+                                          str(np.dtype(_dtype))))
+
     # check for valid flight length
     if L_0 <= 0.0:
         raise Exception("Flight length ({0:.1f}) must be positive.".format(L_0))
@@ -429,14 +439,31 @@ def _get_mass_to_charge_ratio(data, par):
                (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * \
                _mc_conversion_factor
     #
+    #
     # apply voltage correction if provided
     if voltage_coeffs is not None:
+        if voltage_coeffs.dtype is not np.dtype(_dtype):
+            raise TypeError("Wrong type for voltage coefficients ({0:s}). Must "
+                            "be '{1:s}'.".format(str(voltage_coeffs.dtype),
+                                                 str(np.dtype(_dtype))))
         mc_ratio *= polyval(data[:, 0], voltage_coeffs)
+    #
+    #
     # apply positional correction if provided
     if flight_coeffs is not None:
+        if flight_coeffs.dtype is not np.dtype(_dtype):
+            raise TypeError("Wrong type for flight length coefficients "
+                            "({0:s}). Must be '{1:s}'.".format(
+                                str(flight_coeffs.dtype),
+                                str(np.dtype(_dtype))))
         mc_ratio *= polyval2d(data[:, 1], data[:, 2], flight_coeffs)
     #
+    #
     # return (corrected) mass-to-charge ratio
+    if mc_ratio.dtype is not np.dtype(_dtype):
+        raise TypeError("Wrong type for mass spectrum data ({0:s}). Must be "
+                        "'{1:s}'.".format(str(mc_ratio.dtype),
+                                          str(np.dtype(_dtype))))
     return mc_ratio
 #
 #
@@ -565,7 +592,7 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     #
     # return optimized coefficients for flight length correction
-    return flight_coeffs
+    return flight_coeffs.astype(_dtype)
 #
 #
 #
@@ -599,7 +626,7 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     #
     # return optimized coefficients for voltage correction
-    return voltage_coeffs
+    return voltage_coeffs.astype(_dtype)
 #
 #
 #
@@ -616,6 +643,9 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
     else:
         raise Exception("Unrecognized mode for minimization ({0:s}).".
                         format(mode))
+    #
+    # convert coefficients to required data type
+    coeffs = (coeffs[0].astype(_dtype), coeffs[1].astype(_dtype))
     #
     #
     # calculate histogram and bin centers
