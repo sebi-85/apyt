@@ -61,6 +61,9 @@ import warnings
 from inspect import getframeinfo, stack
 from numba import njit
 from numpy.polynomial.polynomial import polyval, polyval2d, polyvander2d
+from os import getpid
+from psutil import Process
+from resource import getrusage, RUSAGE_SELF
 from scipy import constants
 from scipy.optimize import minimize
 from scipy.signal import find_peaks, peak_widths
@@ -558,6 +561,20 @@ def _get_segment_peaks(data, spec_par, hist_par, thres_local, **kwargs):
     #
     # return peak position per sector
     return x, y, z, events
+#
+#
+#
+#
+def _mem():
+    # set debug message
+    msg = "Current memory usage is {0:.1f} MB (peak {1:.1f} MB).".format(
+              Process(getpid()).memory_info().rss / 1024**2,
+              getrusage(RUSAGE_SELF).ru_maxrss / 1024)
+    #
+    # print debug message
+    frameinfo = getframeinfo(stack()[1].frame)
+    print("[DEBUG] ({0:s}:{1:d}) {2:s}".
+          format(frameinfo.function, frameinfo.lineno, msg), file = stderr)
 #
 #
 #
