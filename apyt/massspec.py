@@ -135,7 +135,7 @@ def get_mass_spectrum(data, spec_par, **kwargs):
 #
 def get_flight_correction(data, spec_par, **kwargs):
     start = timer()
-    _debug("Performing flight length correction...")
+    print("Performing flight length correction...")
     #
     # get optional keyword arguments
     deg      = kwargs.get('deg', 2)
@@ -580,7 +580,7 @@ def _mem():
 #
 #
 def _optimize_flight_correction(data, spec_par, hist_par):
-    _debug("Optimizing flight length correction...")
+    print("Optimizing flight length correction...")
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
@@ -615,7 +615,7 @@ def _optimize_flight_correction(data, spec_par, hist_par):
 #
 #
 def _optimize_voltage_correction(data, spec_par, hist_par):
-    _debug("Optimizing voltage correction...")
+    print("Optimizing voltage correction...")
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
