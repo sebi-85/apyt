@@ -415,23 +415,26 @@ def _filter_range(data, col, low, high):
 #
 #
 def _get_mass_to_charge_ratio(data, par):
+    # unpack parameters for better readability
+    (t_0, L_0, (voltage_coeffs, flight_coeffs)) = par
+    #
+    #
     # check for valid flight length
-    if par[1] <= 0.0:
-        raise Exception("Flight length ({0:.1f}) must be positive.".
-                        format(par[1]))
+    if L_0 <= 0.0:
+        raise Exception("Flight length ({0:.1f}) must be positive.".format(L_0))
     #
     #
     # calculate mass-to-charge ratio
-    mc_ratio = data[:, 0] * (data[:, 3] - par[0])**2 / \
-               (par[1]**2 + data[:, 1]**2 + data[:, 2]**2) * \
+    mc_ratio = data[:, 0] * (data[:, 3] - t_0)**2 / \
+               (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * \
                _mc_conversion_factor
     #
     # apply voltage correction if provided
-    if par[2][0] is not None:
-        mc_ratio *= polyval(data[:, 0], par[2][0])
+    if voltage_coeffs is not None:
+        mc_ratio *= polyval(data[:, 0], voltage_coeffs)
     # apply positional correction if provided
-    if par[2][1] is not None:
-        mc_ratio *= polyval2d(data[:, 1], data[:, 2], par[2][1])
+    if flight_coeffs is not None:
+        mc_ratio *= polyval2d(data[:, 1], data[:, 2], flight_coeffs)
     #
     # return (corrected) mass-to-charge ratio
     return mc_ratio
