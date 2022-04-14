@@ -168,8 +168,10 @@ def get_flight_correction(data, spec_par, **kwargs):
         # fit correction function to peak positions
         _debug("Correcting flight length using polynomial of degree {0:d}.".
                format(deg))
-        coeffs = _polyfit2d(x, y, np.average(z, weights = events) / z, deg,
-                            weights = events)
+        peak_target = polyval2d(0.0, 0.0, _polyfit2d(
+            x, y, z, deg, weights = events))
+        _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
+        coeffs = _polyfit2d(x, y, peak_target / z, deg, weights = events)
         #
         # we set correction in the center of the detector to unity by definition
         coeffs = coeffs / coeffs[0, 0]
@@ -191,7 +193,7 @@ def get_flight_correction(data, spec_par, **kwargs):
         #
         # set variances before and after correction
         var_init = np.var(z)
-        var = np.var(z * np.polynomial.polynomial.polyval2d(x, y, coeffs))
+        var = np.var(z * polyval2d(x, y, coeffs))
         _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
                format(var_init))
         _debug("Variance of corrected peak positions: {0:.3f} amu/e.".
