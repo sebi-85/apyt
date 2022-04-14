@@ -429,7 +429,7 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     # if no range provided, use fixed width of 20 around maximum peak
     if data_range is None:
         _debug("Auto-detecting range...")
-        peaks, _ = find_peaks(hist, distance = np.iinfo(np.int16).max)
+        peaks, _ = find_peaks(hist, distance = np.iinfo(np.int32).max)
         _debug("Maximum peak is at {0:.1f} amu/e.".
                format(bin_centers[peaks[0]]))
         data_range = (bin_centers[peaks[0]] - 10, bin_centers[peaks[0]] + 10)
@@ -605,7 +605,7 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
         data, (t_0, L_0, coeffs), hist = hist_par)
     #
     # get maximum peak and its width
-    peaks, _   = find_peaks(hist, distance = np.iinfo(np.int16).max)
+    peaks, _   = find_peaks(hist, distance = np.iinfo(np.int32).max)
     width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
     #
     #
