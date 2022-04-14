@@ -60,7 +60,8 @@ import warnings
 # import some special functions/modules
 from inspect import getframeinfo, stack
 from numba import njit
-from numpy.polynomial.polynomial import polyval, polyval2d, polyvander2d
+from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
+                                        polyvander2d
 from os import getpid
 from psutil import Process
 from resource import getrusage, RUSAGE_SELF
@@ -330,22 +331,6 @@ def get_voltage_correction(data, spec_par, **kwargs):
            format(np.var(y)))
     _debug("Variance of corrected peak positions: {0:.3f} amu/e.".
            format(np.var(y * polyval(x, coeffs))))
-    #
-    #
-    # show plot if requested
-    if kwargs.get("plot", False) == True:
-        plt.xlabel("Voltage (kV)")
-        plt.ylabel("Peak position (amu/e)")
-        plt.plot(0.001 * x, y, "-", label = "initial")
-        plt.plot(0.001 * x, y * polyval(x, coeffs), "-", label = "corrected")
-        plt.axhline(y = peak_target, color = "C2",
-                    label = "target")
-        plt.axhline(y = peak_target + hist_par.get("width", _default_bin_width),
-                    linestyle="--", color = "C2")
-        plt.axhline(y = peak_target - hist_par.get("width", _default_bin_width),
-                    linestyle="--", color = "C2")
-        plt.legend()
-        plt.show()
     #
     #
     # return coefficients for correction function
