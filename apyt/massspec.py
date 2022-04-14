@@ -141,6 +141,8 @@ def get_flight_correction(data, spec_par, **kwargs):
     # get optional keyword arguments
     deg      = kwargs.get('deg', 2)
     hist_par = kwargs.get('hist', {})
+    size     = kwargs.get('size', 0.3)
+    steps    = kwargs.get('steps', 15)
     thres    = kwargs.get('thres', 0.9)
     #
     #
@@ -148,86 +150,115 @@ def get_flight_correction(data, spec_par, **kwargs):
     data = _filter_mass_to_charge_range(data, spec_par, hist_par)
     #
     #
+    # get detector position range
+    x_min, y_min = np.amin(data[:, 1:3], axis = 0)
+    x_max, y_max = np.amax(data[:, 1:3], axis = 0)
+    Δx = (x_max - x_min) / steps
+    Δy = (y_max - y_min) / steps
+    _debug("x-range is ({0:.2f}, {1:.2f}) mm (Δx = {2:.3f} mm, {3:d} steps).".
+           format(x_min, x_max, Δx, steps))
+    _debug("y-range is ({0:.2f}, {1:.2f}) mm (Δy = {2:.3f} mm, {3:d} steps).".
+           format(y_min, y_max, Δy, steps))
+    _debug("Minimum required events per range are {0:d}.".
+           format(int(size * len(data) / (steps * steps))))
     #
     #
-    # perform auto-tuning of peak threshold parameter
-    iteration = 1
-    iteration_max = 5
-    while True:
-        # get peak positions per detector segment
-        x, y, z, events = _get_segment_peaks(data, spec_par, hist_par, thres,
-                                             **kwargs)
+    # initialize fit data
+    x = np.array([])
+    y = np.array([])
+    z = np.array([])
+    events = np.array([], dtype = int)
+    #
+    # loop through x steps
+    for xi in range(0, steps):
+        # set x-range for current step
+        x_low  = x_min + xi * Δx
+        x_high = x_low + Δx
         #
-        # check for sufficient peaks
-        if len(z) < (deg + 1) * (deg + 2) // 2:
-            raise Exception("Insufficient number of peaks ({0:d}) detected for "
-                            "flight length correction "
-                            "(must be at least {1:d}).".
-                            format(len(z), (deg + 1) * (deg + 2) // 2))
-        #
-        #
-        # fit correction function to peak positions
-        _debug("Correcting flight length using polynomial of degree {0:d}.".
-               format(deg))
-        peak_target = polyval2d(0.0, 0.0, _polyfit2d(
-            x, y, z, deg, weights = events))
-        _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
-        coeffs = _polyfit2d(x, y, peak_target / z, deg, weights = events)
-        #
-        # we set correction in the center of the detector to unity by definition
-        coeffs = coeffs / coeffs[0, 0]
-        _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
+        # get data for current x-range
+        data_x_cur = _filter_range(data, 1, x_low, x_high)
         #
         #
-        # print detected peaks if requested
-        if _is_dbg == True:
-            peak_str = "Peaks have been detected at:\n# x (mm)\ty (mm)\t\t" \
-                       "  events\t\tm/q (amu/e)\tm/q (amu/e) (corr.)"
-            for elem in list(zip(x, y, events, z,
-                                 z * np.polynomial.polynomial.polyval2d(
-                                     x, y, coeffs))):
-                peak_str += "\n{0:+7.3f}\t\t{1:+7.3f}\t\t{2:8d}\t\t" \
-                            "{3:.3f}\t\t{4:.3f}".format(
-                                elem[0], elem[1], elem[2], elem[3], elem[4])
-            _debug(peak_str)
-        #
-        #
-        # set variances before and after correction
-        var_init = np.var(z)
-        var = np.var(z * polyval2d(x, y, coeffs))
-        _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
-               format(var_init))
-        _debug("Variance of corrected peak positions: {0:.3f} amu/e.".
-               format(var))
-        #
-        #
-        # check for sufficient reduction of variance after correction
-        if var >= 0.1 * var_init:
-            # check whether maximum number of iterations reached
-            if iteration == iteration_max:
-                raise Exception("Flight length correction with automatic "
-                                "parameter tuning failed.")
+        # loop through y steps
+        for yi in range(0, steps):
+            # set y-range for current step
+            y_low  = y_min + yi * Δy
+            y_high = y_low + Δy
             #
-            # reduce peak threshold for next iteration
-            warnings.warn("Insufficient reduction in variance detected "
-                          "(multiple peaks in range?). Reducing peak threshold "
-                          "from {0:.1f} to {1:.1f}.".format(thres, thres - 0.1))
-            thres = thres - 0.1
-        else:
-            # exit loop on success
-            break;
-        #
-        #
-        # increment iteration counter
-        iteration += 1
+            # get data for current xy-range
+            data_xy_cur = _filter_range(data_x_cur, 2, y_low, y_high)
+            #
+            #
+            # only use data if size is above threshold
+            if len(data_xy_cur) >= size * len(data) / (steps * steps):
+                # calculate histogram and bin centers for current data
+                hist, bin_centers, _ = get_mass_spectrum(
+                    data_xy_cur, spec_par, hist = hist_par)
+                #
+                #
+                # find histogram peaks (there may be multiple peaks close to one
+                # another, so we will always pick the first one later)
+                hist_max = hist.max()
+                peaks, _ = find_peaks(hist, height = thres * hist_max)
+                #
+                # check for valid peaks (should not fail!)
+                if len(peaks) == 0:
+                    raise Exception("No peaks detected for xy-range "
+                                    "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
+                                    format(x_low, x_high, y_low, y_high))
+                #
+                #
+                # append fit data
+                x = np.append(x, x_low + 0.5 * Δx)
+                y = np.append(y, y_low + 0.5 * Δy)
+                z = np.append(z, bin_centers[peaks[0]])
+                events = np.append(events, len(data_xy_cur))
     #
     #
+    # check for sufficient peaks
+    if len(z) < (deg + 1) * (deg + 2) // 2:
+        raise Exception("Insufficient number of peaks ({0:d}) detected for "
+                        "flight length correction (must be at least {1:d}).".
+                        format(len(z), (deg + 1) * (deg + 2) // 2))
     #
     #
-    # show plot if requested
-    if kwargs.get('plot', False) == True:
-        plt.legend(loc = "upper left")
-        plt.show()
+    # fit correction function to peak positions
+    _debug("Correcting flight length using polynomial of degree {0:d}.".
+           format(deg))
+    peak_target = polyval2d(0.0, 0.0, _polyfit2d(
+        x, y, z, deg, weights = events))
+    _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
+    coeffs = _polyfit2d(x, y, peak_target / z, deg, weights = events)
+    #
+    # we set correction in the center of the detector to unity by definition
+    coeffs = coeffs / coeffs[0, 0]
+    _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
+    #
+    #
+    # print detected peaks if requested
+    if _is_dbg == True:
+        peak_str = "Peaks have been detected at:\n# x (mm)\ty (mm)\t\t" \
+                   "  events\t\tm/q (amu/e)\tm/q (amu/e) (corr.)"
+        for elem in list(zip(x, y, events, z, z * polyval2d(x, y, coeffs))):
+            peak_str += "\n{0:+7.3f}\t\t{1:+7.3f}\t\t{2:8d}\t\t{3:.3f}\t\t" \
+                        "{4:.3f}".format(elem[0], elem[1], elem[2], elem[3],
+                                         elem[4])
+        _debug(peak_str)
+    #
+    #
+    # set variances before and after correction
+    var_init = np.var(z)
+    var = np.var(z * polyval2d(x, y, coeffs))
+    _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
+           format(var_init))
+    _debug("Variance of corrected peak positions: {0:.3f} amu/e.".format(var))
+    #
+    #
+    # check for sufficient reduction of variance after correction
+    if var >= 0.1 * var_init:
+        # reduce peak threshold for next iteration
+        warnings.warn("Insufficient reduction in variance detected (multiple "
+                      "peaks in range?). You may try to reduce the threshold.")
     #
     #
     # return coefficients for correction function
@@ -312,8 +343,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # fit correction function to peak positions
     _debug("Correcting voltage using polynomial of degree {0:d}.".format(deg))
     peak_target = np.average(y, weights = events)
-    coeffs = np.polynomial.polynomial.polyfit(
-        x, peak_target / y, deg, w = events)
+    coeffs = polyfit(x, peak_target / y, deg, w = events)
     _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
     #
     #
@@ -455,99 +485,6 @@ def _get_mass_to_charge_ratio(data, par):
                         "'{1:s}'.".format(str(mc_ratio.dtype),
                                           str(np.dtype(_dtype))))
     return mc_ratio
-#
-#
-#
-#
-def _get_segment_peaks(data, spec_par, hist_par, thres_local, **kwargs):
-    # get optional keyword arguments
-    plot  = kwargs.get('plot', False)
-    size  = kwargs.get('size', 0.3)
-    steps = kwargs.get('steps', 15)
-    #
-    #
-    # get detector position range
-    x_min, y_min = np.amin(data[:, 1:3], axis = 0)
-    x_max, y_max = np.amax(data[:, 1:3], axis = 0)
-    Δx = (x_max - x_min) / steps
-    Δy = (y_max - y_min) / steps
-    _debug("x-range is ({0:.2f}, {1:.2f}) mm "
-           "(Δx = {2:.3f} mm, {3:d} steps).".format(x_min, x_max, Δx, steps))
-    _debug("y-range is ({0:.2f}, {1:.2f}) mm "
-           "(Δy = {2:.3f} mm, {3:d} steps).".format(y_min, y_max, Δy, steps))
-    _debug("Minimum required events per range are {0:d}.".
-           format(int(size * len(data) / (steps * steps))))
-    #
-    #
-    #
-    #
-    # initialize fit data
-    x = np.array([])
-    y = np.array([])
-    z = np.array([])
-    events = np.array([], dtype = int)
-    #
-    # loop through x steps
-    for xi in range(0, steps):
-        # set x-range for current step
-        x_low  = x_min + xi * Δx
-        x_high = x_low + Δx
-        #
-        # get data for current x-range
-        data_x_cur = _filter_range(data, 1, x_low, x_high)
-        #
-        #
-        # loop through y steps
-        for yi in range(0, steps):
-            # set y-range for current step
-            y_low  = y_min + yi * Δy
-            y_high = y_low + Δy
-            #
-            # get data for current xy-range
-            data_xy_cur = _filter_range(data_x_cur, 2, y_low, y_high)
-            #
-            # only use data if size is above threshold
-            if len(data_xy_cur) >= size * len(data) / (steps * steps):
-                # calculate histogram and bin centers for current data
-                hist, bin_centers, _ = get_mass_spectrum(
-                    data_xy_cur, spec_par, hist = hist_par)
-                #
-                # plot histogram if requested
-                if plot == True:
-                    plt.plot(bin_centers, hist,
-                             label = "({0:+5.1f}, {1:+5.1f}) mm,"
-                                     "({2:+5.1f}, {3:+5.1f}) mm , #{4:d}".
-                                     format(x_low, x_low + Δx,
-                                            y_low, y_low + Δy,
-                                            len(data_xy_cur)))
-                #
-                #
-                # find histogram peaks (there may be multiple peaks close to one
-                # another, so we will always pick the first one later)
-                hist_max = hist.max()
-                peaks, _ = find_peaks(hist, height = thres_local * hist_max)
-                #
-                # check for valid peaks (should not fail!)
-                if len(peaks) == 0:
-                    raise Exception("No peaks detected for xy-range "
-                                    "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
-                                    format(x_low, x_high, y_low, y_high))
-                #
-                #
-                # add peak to plot if requested
-                if plot == True:
-                    plt.plot(bin_centers[peaks[0]], hist[peaks[0]], "x")
-                #
-                #
-                # append fit data
-                x = np.append(x, x_low + 0.5 * Δx)
-                y = np.append(y, y_low + 0.5 * Δy)
-                z = np.append(z, bin_centers[peaks[0]])
-                events = np.append(events, len(data_xy_cur))
-    #
-    #
-    # return peak position per sector
-    return x, y, z, events
 #
 #
 #
