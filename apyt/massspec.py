@@ -369,10 +369,15 @@ def get_voltage_correction(data, spec_par, **kwargs):
            format(np.var(y * polyval(x, coeffs))))
     #
     #
+    # construct xy-data obtained from fit
+    x_fit = np.linspace(U_min + 0.5 * ΔU, U_max - 0.5 * ΔU, steps)
+    xy_fit = (0.001 * x_fit, peak_target / polyval(x_fit, coeffs))
+    #
+    #
     # return coefficients for correction function
     end = timer()
     _debug("Voltage correction took {0:.3f} seconds.".format(end - start))
-    return coeffs.astype(_dtype)
+    return coeffs.astype(_dtype), (0.001 * x, y), events, xy_fit
 #
 #
 #
