@@ -261,10 +261,16 @@ def get_flight_correction(data, spec_par, **kwargs):
                       "peaks in range?). You may try to reduce the threshold.")
     #
     #
+    # construct wireframe data obtained from fit function
+    X = np.meshgrid(np.linspace(x_min + 0.5 * Δx, x_max - 0.5 * Δx, steps),
+                    np.linspace(y_min + 0.5 * Δy, y_max - 0.5 * Δy, steps))
+    wireframe = (*X, peak_target / polyval2d(*X, coeffs))
+    #
+    #
     # return coefficients for correction function
     end = timer()
     _debug("Flight correction took {0:.3f} seconds.".format(end - start))
-    return coeffs.astype(_dtype)
+    return coeffs.astype(_dtype), (x, y, z), events, wireframe
 #
 #
 #
