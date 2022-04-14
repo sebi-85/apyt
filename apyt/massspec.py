@@ -610,7 +610,7 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
     #
     #
     # return width of maximum peak
-    return width_half
+    return width_half * hist_par["width"]
 #
 #
 #
