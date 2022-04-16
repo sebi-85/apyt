@@ -222,16 +222,14 @@ def get_flight_correction(data, spec_par, **kwargs):
                         format(len(z), (deg + 1) * (deg + 2) // 2))
     #
     #
-    # fit correction function to peak positions
+    # fit correction function to peak positions (with fixed absolute offset)
     _debug("Correcting flight length using polynomial of degree {0:d}.".
            format(deg))
     peak_target = polyval2d(0.0, 0.0, _polyfit2d(
         x, y, z, deg, weights = events))
     _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
-    coeffs = _polyfit2d(x, y, peak_target / z, deg, weights = events)
-    #
-    # we set correction in the center of the detector to unity by definition
-    coeffs = coeffs / coeffs[0, 0]
+    coeffs = _polyfit2d(x, y, peak_target / z, deg,
+                        weights = events, offset = 1.0)
     _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
     #
     #
@@ -618,6 +616,7 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
 def _polyfit2d(x, y, f, deg, **kwargs):
     # get optional keyword arguments
     weights = kwargs.get('weights', np.ones_like(f))
+    offset  = kwargs.get('offset', None)
     #
     # create pseudo-Vandermonde matrix
     vander = polyvander2d(x, y, [deg, deg])
@@ -627,9 +626,23 @@ def _polyfit2d(x, y, f, deg, **kwargs):
     mask = np.rot90(np.tri(deg + 1, dtype = bool), k = -1).reshape(-1)
     vander = vander[:, mask]
     #
+    #
+    # if constant offset is provided, exclude absolute term from least-squares
+    # fit
+    if offset is not None:
+        vander = vander[:, 1:]
+        f = f - offset
+    #
+    #
     # perform least-squares fit (with weights)
     c = np.linalg.lstsq(vander * np.sqrt(weights[:, np.newaxis]),
                         f * np.sqrt(weights), rcond = None)[0]
+    #
+    #
+    # re-insert constant offset for complete coefficient vector
+    if offset is not None:
+        c = np.insert(c, 0, offset)
+    #
     #
     # return coefficient matrix which can directly be passed to polyval2d
     return _poly2d_coeff_vec_to_mat(c)
