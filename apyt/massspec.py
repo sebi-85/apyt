@@ -347,7 +347,8 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # fit correction function to peak positions
     _debug("Correcting voltage using polynomial of degree {0:d}.".format(deg))
     peak_target = np.average(y, weights = events)
-    coeffs = polyfit(x, peak_target / y, deg, w = events)
+    _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
+    coeffs = polyfit(x, x * (peak_target / y - 1.0), deg)
     _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
     #
     #
@@ -357,19 +358,20 @@ def get_voltage_correction(data, spec_par, **kwargs):
                    "events\trel_size\tm/q (amu/e)\tm/q (amu/e) (corr.)". \
                    format(len(y))
         for elem in list(zip(x, events, events / len(data) * 100, y,
-                             y * polyval(x, coeffs))):
+                             y * (1.0 + polyval(x, coeffs) / x))):
             peak_str += "\n{0:7.1f}\t\t{1:8d}\t{2:7.1f}%\t{3:.3f}\t\t{4:.3f}". \
                         format(elem[0], elem[1], elem[2], elem[3], elem[4])
         _debug(peak_str)
     _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
            format(np.var(y)))
     _debug("Variance of corrected peak positions: {0:.3f} amu/e.".
-           format(np.var(y * polyval(x, coeffs))))
+           format(np.var(y * (1.0 + polyval(x, coeffs) / x))))
     #
     #
     # construct xy-data obtained from fit
     x_fit = np.linspace(U_min + 0.5 * ΔU, U_max - 0.5 * ΔU, steps)
-    xy_fit = (0.001 * x_fit, peak_target / polyval(x_fit, coeffs))
+    xy_fit = (0.001 * x_fit,
+              peak_target / (1.0 + polyval(x_fit, coeffs) / x_fit))
     #
     #
     # return coefficients for correction function
@@ -449,7 +451,7 @@ def _filter_range(data, col, low, high):
 #
 def _get_mass_to_charge_ratio(data, par):
     # unpack parameters for better readability
-    (t_0, L_0, (voltage_coeffs, flight_coeffs)) = par
+    t_0, L_0, (voltage_coeffs, flight_coeffs) = par
     #
     #
     # check for correct input data type
@@ -457,25 +459,27 @@ def _get_mass_to_charge_ratio(data, par):
         raise TypeError("Wrong type for raw input data ({0:s}). Must be "
                         "'{1:s}'.".format(str(data.dtype),
                                           str(np.dtype(_dtype))))
-
     # check for valid flight length
     if L_0 <= 0.0:
         raise Exception("Flight length ({0:.1f}) must be positive.".format(L_0))
     #
     #
-    # calculate mass-to-charge ratio
-    mc_ratio = data[:, 0] * (data[:, 3] - t_0)**2 / \
-               (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * \
-               _mc_conversion_factor
-    #
-    #
     # apply voltage correction if provided
-    if voltage_coeffs is not None:
+    if voltage_coeffs is None:
+        # (this only creates a view)
+        U = data[:, 0]
+    else:
         if voltage_coeffs.dtype is not np.dtype(_dtype):
             raise TypeError("Wrong type for voltage coefficients ({0:s}). Must "
                             "be '{1:s}'.".format(str(voltage_coeffs.dtype),
                                                  str(np.dtype(_dtype))))
-        mc_ratio *= polyval(data[:, 0], voltage_coeffs)
+        U = data[:, 0] + polyval(data[:, 0], voltage_coeffs)
+    #
+    #
+    # calculate mass-to-charge ratio
+    mc_ratio = U * (data[:, 3] - t_0)**2 / \
+               (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * \
+               _mc_conversion_factor
     #
     #
     # apply positional correction if provided
