@@ -519,13 +519,16 @@ def _mem():
 def _optimize_flight_correction(data, spec_par, hist_par):
     print("Optimizing flight length correction...")
     #
+    #
+    # get initial peak position and width
+    peak_pos_init, peak_width_init = _peak_width(data, spec_par, hist_par)
+    _debug("Initial peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
+           format(peak_pos_init, peak_width_init))
+    #
+    #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
     flight_coeffs  = _poly2d_coeff_mat_to_vec(spec_par[2][1])
-    _debug("Initial width is {0:.3f} amu/e.".
-           format(_peak_width(flight_coeffs[1:], data, spec_par[0], spec_par[1],
-                              (voltage_coeffs, flight_coeffs[0]), hist_par,
-                              'flight')))
     #
     #
     # optimize flight length correction
@@ -539,8 +542,15 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     # re-assemble coefficients for flight length correction
     flight_coeffs = np.append(flight_coeffs[0], minimization_result.x)
-    flight_coeffs = _poly2d_coeff_vec_to_mat(flight_coeffs)
-    _debug("Optimized width is {0:.3f} amu/e.".format(minimization_result.fun))
+    flight_coeffs = _poly2d_coeff_vec_to_mat(flight_coeffs).astype(_dtype)
+    #
+    #
+    # get peak position and width for optimized coefficients
+    peak_pos_final, peak_width_final = _peak_width(
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
+        hist_par)
+    _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
+           format(peak_pos_final, peak_width_final))
     _debug("Optimized coefficients for flight length correction are {0:s}.".
            format(str(flight_coeffs)))
     #
@@ -554,27 +564,49 @@ def _optimize_flight_correction(data, spec_par, hist_par):
 def _optimize_voltage_correction(data, spec_par, hist_par):
     print("Optimizing voltage correction...")
     #
+    #
+    # get initial peak position and width
+    peak_pos_init, peak_width_init = _peak_width(data, spec_par, hist_par)
+    _debug("Initial peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
+           format(peak_pos_init, peak_width_init))
+    #
+    #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
     flight_coeffs  = spec_par[2][1]
-    _debug("Initial width is {0:.3f} amu/e.".
-           format(_peak_width(voltage_coeffs[1:], data, spec_par[0],
-                  spec_par[1], (voltage_coeffs[0], flight_coeffs), hist_par,
-                  'voltage')))
     #
     #
     # optimize voltage correction
     minimization_result = minimize(
-        _peak_width, voltage_coeffs[1:],
+        _peak_width_minimizer, voltage_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage'),
+                (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage',
+                {'peak_target': peak_pos_init}),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': True, 'maxiter': 100})
     #
     #
     # re-assemble coefficients for voltage correction
-    voltage_coeffs = np.append(voltage_coeffs[0], minimization_result.x)
-    _debug("Optimized width is {0:.3f} amu/e.".format(minimization_result.fun))
+    voltage_coeffs = np.append(voltage_coeffs[0],
+                               minimization_result.x.astype(_dtype))
+    #
+    #
+    # get peak position and width for optimized coefficients
+    peak_pos_final, peak_width_final = _peak_width(
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
+        hist_par)
+    #
+    #
+    # set correction factor to maintain initial peak position
+    alpha = peak_pos_init / peak_pos_final
+    _debug("Correction factor to maintain peak position is {0:.6f}.".
+           format(alpha))
+    #
+    # scale coefficients to maintain initial peak position
+    voltage_coeffs    *= alpha
+    voltage_coeffs[1] += alpha - 1.0
+    _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
+           format(peak_pos_final * alpha, peak_width_final * alpha))
     _debug("Optimized coefficients for voltage correction are {0:s}.".
            format(str(voltage_coeffs)))
     #
@@ -634,7 +666,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     #
     #
     # return width of maximum peak
-    return peak_width * hist_par["width"]
+    return peak_width
 #
 #
 #
