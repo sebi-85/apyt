@@ -585,7 +585,15 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
 #
 #
 #
-def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
+def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
+                dict_args = None):
+    # get arguments passed as optional dictionary (scipy.optimize.minimize does
+    # not allow for regular **kwargs as additional function arguments)
+    if dict_args is None:
+        dict_args = {'peak_target': None}
+    peak_target = dict_args.get('peak_target')
+    #
+    #
     # re-assemble complete set of coefficients for correction functions
     if mode == 'voltage':
         coeffs = (np.append(coeffs_stripped[0], x), coeffs_stripped[1])
@@ -609,6 +617,11 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode):
     # get maximum peak and its width
     peaks, _   = find_peaks(hist, distance = np.iinfo(np.int32).max)
     width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
+    #
+    #
+    # if target position for peak provided, scale peak widths accordingly
+    if peak_target is not None:
+        width_half *= peak_target / bin_centers[peaks[0]]
     #
     #
     # return width of maximum peak
