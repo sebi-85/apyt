@@ -530,7 +530,7 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     # optimize flight length correction
     minimization_result = minimize(
-        _peak_width, flight_coeffs[1:],
+        _peak_width_minimizer, flight_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
                 (voltage_coeffs, flight_coeffs[0]), hist_par, 'flight'),
         method = 'nelder-mead',
@@ -585,8 +585,22 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
 #
 #
 #
-def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
-                dict_args = None):
+def _peak_width(data, spec_par, hist_par):
+    # calculate histogram and bin centers
+    hist, bin_centers, _ = get_mass_spectrum(data, spec_par, hist = hist_par)
+    #
+    # get maximum peak and its width
+    peaks, _   = find_peaks(hist, distance = np.iinfo(np.int32).max)
+    width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
+    #
+    # return peak positions and widths
+    return bin_centers[peaks[0]], width_half * hist_par["width"]
+#
+#
+#
+#
+def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
+                          dict_args = None):
     # get arguments passed as optional dictionary (scipy.optimize.minimize does
     # not allow for regular **kwargs as additional function arguments)
     if dict_args is None:
@@ -610,22 +624,17 @@ def _peak_width(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     coeffs = (coeffs[0].astype(_dtype), coeffs[1].astype(_dtype))
     #
     #
-    # calculate histogram and bin centers
-    hist, bin_centers, _ = get_mass_spectrum(
-        data, (t_0, L_0, coeffs), hist = hist_par)
-    #
     # get maximum peak and its width
-    peaks, _   = find_peaks(hist, distance = np.iinfo(np.int32).max)
-    width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
+    peak_pos, peak_width = _peak_width(data, (t_0, L_0, coeffs), hist_par)
     #
     #
     # if target position for peak provided, scale peak widths accordingly
     if peak_target is not None:
-        width_half *= peak_target / bin_centers[peaks[0]]
+        peak_width *= peak_target / peak_pos
     #
     #
     # return width of maximum peak
-    return width_half * hist_par["width"]
+    return peak_width * hist_par["width"]
 #
 #
 #
