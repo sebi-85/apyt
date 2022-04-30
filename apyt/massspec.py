@@ -159,8 +159,9 @@ def get_flight_correction(data, spec_par, **kwargs):
            format(x_min, x_max, Δx, steps))
     _debug("y-range is ({0:.2f}, {1:.2f}) mm (Δy = {2:.3f} mm, {3:d} steps).".
            format(y_min, y_max, Δy, steps))
-    _debug("Minimum required events per range are {0:d}.".
-           format(int(size * len(data) / (steps * steps))))
+    _debug("Minimum required events per range are {0:d} ({1:.2f}%).".
+           format(int(size * len(data) / (steps * steps)),
+                  size / (steps * steps) * 100))
     #
     #
     # initialize fit data
@@ -299,8 +300,8 @@ def get_voltage_correction(data, spec_par, **kwargs):
     ΔU = (U_max - U_min) / steps
     _debug("Voltage range is ({0:.1f}, {1:.1f}) V "
            "(ΔU = {2:.3f} V, {3:d} steps).".format(U_min, U_max, ΔU, steps))
-    _debug("Minimum required events per range are {0:d}.".
-           format(int(size * len(data) / steps)))
+    _debug("Minimum required events per range are {0:d} ({1:.2f}%).".
+           format(int(size * len(data) / steps), size / steps * 100))
     #
     #
     # initialize fit data
@@ -437,11 +438,16 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
         _debug("Maximum peak is at {0:.1f} amu/e.".
                format(bin_centers[peaks[0]]))
         data_range = (bin_centers[peaks[0]] - 10, bin_centers[peaks[0]] + 10)
-    _debug("Using range ({0:.1f}, {1:.1f}) amu/e.".
-           format(data_range[0], data_range[1]))
+    #
+    #
+    # filter range
+    data = data[(data_range[0] <= mc_ratio) & (mc_ratio <= data_range[1])]
+    _debug("Using range ({0:.1f}, {1:.1f}) amu/e ({2:d} events).".
+           format(data_range[0], data_range[1], len(data)))
+    #
     #
     # return filtered data
-    return data[(data_range[0] <= mc_ratio) & (mc_ratio <= data_range[1])]
+    return data
 #
 #
 #
