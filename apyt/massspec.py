@@ -460,21 +460,21 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
 #
 #
 #
-@numba.njit(parallel = True)
+@numba.njit("f4[:, :](f4[:, :], UniTuple(f8, 2), f4[:])", parallel = True)
 def __filter_mass_to_charge_range(data, range, mc_ratio):
     return data[(range[0] <= mc_ratio) & (mc_ratio <= range[1])]
 #
 #
 #
 #
-@numba.njit(parallel = True)
+@numba.njit("f4[:, :](f4[:, :], i8, f4, f4)", parallel = True)
 def _filter_range(data, col, low, high):
     return data[(low < data[:, col]) & (data[:, col] <= high)]
 #
 #
 #
 #
-@numba.njit(parallel = True)
+@numba.njit("f4[:](f4[:, :], f4[:], f4, f4)", parallel = True)
 def __get_mass_to_charge_ratio(data, U, t_0, L_0):
     return U * (data[:, 3] - t_0)**2 / \
            (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * _mc_conversion_factor
