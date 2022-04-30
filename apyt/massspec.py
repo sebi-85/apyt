@@ -244,19 +244,20 @@ def get_flight_correction(data, spec_par, **kwargs):
         _debug(peak_str)
     #
     #
-    # set variances before and after correction
-    var_init = np.var(z)
-    var = np.var(z * polyval2d(x, y, coeffs))
-    _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
-           format(var_init))
-    _debug("Variance of corrected peak positions: {0:.3f} amu/e.".format(var))
+    # set standard deviation before and after correction
+    std_init = np.std(z)
+    std = np.std(z * polyval2d(x, y, coeffs))
+    _debug("Standard deviation of initial peak positions:   {0:.3f} amu/e.".
+           format(std_init))
+    _debug("Standard deviation of corrected peak positions: {0:.3f} amu/e.".
+           format(std))
     #
     #
-    # check for sufficient reduction of variance after correction
-    if var >= 0.1 * var_init:
-        # reduce peak threshold for next iteration
-        warnings.warn("Insufficient reduction in variance detected (multiple "
-                      "peaks in range?). You may try to reduce the threshold.")
+    # check for sufficient reduction in standard deviation after correction
+    if std >= 0.3 * std_init:
+        warnings.warn("Insufficient reduction in standard deviation detected "
+                      "(multiple peaks in range?). You may try to reduce the "
+                      "threshold.")
     #
     #
     # construct wireframe data obtained from fit function
@@ -362,10 +363,10 @@ def get_voltage_correction(data, spec_par, **kwargs):
             peak_str += "\n{0:7.1f}\t\t{1:8d}\t{2:7.1f}%\t{3:.3f}\t\t{4:.3f}". \
                         format(elem[0], elem[1], elem[2], elem[3], elem[4])
         _debug(peak_str)
-    _debug("Variance of initial peak positions:   {0:.3f} amu/e.".
-           format(np.var(y)))
-    _debug("Variance of corrected peak positions: {0:.3f} amu/e.".
-           format(np.var(y * (1.0 + polyval(x, coeffs) / x))))
+    _debug("Standard deviation of initial peak positions:   {0:.3f} amu/e.".
+           format(np.std(y)))
+    _debug("Standard deviation of corrected peak positions: {0:.3f} amu/e.".
+           format(np.std(y * (1.0 + polyval(x, coeffs) / x))))
     #
     #
     # construct xy-data obtained from fit
