@@ -94,8 +94,9 @@ _dtype = np.float32
 This enforces memory-intensive arrays to be of the same data type."""
 _is_dbg = False
 "The global flag for debug output"
-_mc_conversion_factor = 2.0 * constants.value('elementary charge') / \
-                        constants.value('atomic mass constant') * 1.0e-12
+_mc_conversion_factor = np.float32(
+    2.0 * constants.value('elementary charge') /
+    constants.value('atomic mass constant') * 1.0e-12)
 "The internal constant conversion factor for the mass spectrum."
 #
 #
@@ -473,6 +474,14 @@ def _filter_range(data, col, low, high):
 #
 #
 #
+@numba.njit(parallel = True)
+def __get_mass_to_charge_ratio(data, U, t_0, L_0):
+    return U * (data[:, 3] - t_0)**2 / \
+           (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * _mc_conversion_factor
+#
+#
+#
+#
 def _get_mass_to_charge_ratio(data, par):
     # unpack parameters for better readability
     t_0, L_0, (voltage_coeffs, flight_coeffs) = par
@@ -501,9 +510,7 @@ def _get_mass_to_charge_ratio(data, par):
     #
     #
     # calculate mass-to-charge ratio
-    mc_ratio = U * (data[:, 3] - t_0)**2 / \
-               (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * \
-               _mc_conversion_factor
+    mc_ratio = __get_mass_to_charge_ratio(data, U, t_0, L_0)
     #
     #
     # apply positional correction if provided
