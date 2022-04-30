@@ -54,12 +54,12 @@ __all__ = [
 #
 # import modules
 import matplotlib.pyplot as plt
+import numba
 import numpy as np
 import warnings
 #
 # import some special functions/modules
 from inspect import getframeinfo, stack
-from numba import njit
 from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
                                         polyvander2d
 from os import getpid
@@ -70,6 +70,13 @@ from scipy.optimize import minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
+#
+#
+#
+#
+# set numba configuration for parallelization
+numba.config.THREADING_LAYER = 'omp'
+numba.set_num_threads(4)
 #
 #
 #
@@ -452,7 +459,7 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
 #
 #
 #
-@njit
+@numba.njit(parallel = True)
 def _filter_range(data, col, low, high):
     return data[(low < data[:, col]) & (data[:, col] <= high)]
 #
