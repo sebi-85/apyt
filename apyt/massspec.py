@@ -235,12 +235,15 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     # print detected peaks if requested
     if _is_dbg == True:
-        peak_str = "Peaks have been detected at:\n# x (mm)\ty (mm)\t\t" \
-                   "  events\t\tm/q (amu/e)\tm/q (amu/e) (corr.)"
-        for elem in list(zip(x, y, events, z, z * polyval2d(x, y, coeffs))):
-            peak_str += "\n{0:+7.3f}\t\t{1:+7.3f}\t\t{2:8d}\t\t{3:.3f}\t\t" \
-                        "{4:.3f}".format(elem[0], elem[1], elem[2], elem[3],
-                                         elem[4])
+        peak_str = "Peaks (#{0:d}) have been detected at:\n" \
+                   "# x (mm)\t  y (mm)\t  events\trel_size\tm/q (amu/e)\t" \
+                   "m/q (amu/e) (corr.)".format(len(z))
+        for elem in list(zip(x, y, events, events / len(data) * 100, z,
+                             z * polyval2d(x, y, coeffs))):
+            peak_str += "\n{0:+8.3f}\t{1:+8.3f}\t{2:8d}\t{3:7.1f}%\t" \
+                        "{4:.3f}\t\t{5:.3f}". \
+                        format(elem[0], elem[1], elem[2], elem[3], elem[4],
+                               elem[5])
         _debug(peak_str)
     #
     #
