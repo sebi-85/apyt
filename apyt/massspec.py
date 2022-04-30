@@ -448,13 +448,20 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     #
     #
     # filter range
-    data = data[(data_range[0] <= mc_ratio) & (mc_ratio <= data_range[1])]
+    data = __filter_mass_to_charge_range(data, data_range, mc_ratio)
     _debug("Using range ({0:.1f}, {1:.1f}) amu/e ({2:d} events).".
            format(data_range[0], data_range[1], len(data)))
     #
     #
     # return filtered data
     return data
+#
+#
+#
+#
+@numba.njit(parallel = True)
+def __filter_mass_to_charge_range(data, range, mc_ratio):
+    return data[(range[0] <= mc_ratio) & (mc_ratio <= range[1])]
 #
 #
 #
