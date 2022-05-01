@@ -38,6 +38,11 @@ The following methods are provided:
 """
 #
 #
+# TODO: check DOF for voltage correction
+# TODO: check consistent use of float32
+# TODO: improve speed of optimization
+#
+#
 #
 #
 __version__ = '0.1.0'
