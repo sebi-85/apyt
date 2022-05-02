@@ -30,6 +30,7 @@ The following methods are provided:
   correction.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
+* :meth:`write_xml`: Write XML file for subsequent usage.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -51,7 +52,8 @@ __all__ = [
     'get_mass_spectrum',
     'get_flight_correction',
     'get_voltage_correction',
-    'optimize_correction'
+    'optimize_correction',
+    'write_xml'
 ]
 #
 #
@@ -62,8 +64,10 @@ import matplotlib.pyplot as plt
 import numba
 import numpy as np
 import warnings
+import xml.etree.ElementTree as ET
 #
 # import some special functions/modules
+from datetime import datetime
 from inspect import getframeinfo, stack
 from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
                                         polyvander2d
@@ -75,6 +79,7 @@ from scipy.optimize import minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
+from xml.dom import minidom
 #
 #
 #
@@ -412,6 +417,112 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     else:
         raise Exception("Unrecognized mode for minimization ({0:s}).".
                         format(mode))
+#
+#
+#
+#
+def write_xml(file, data, spec_par, steps):
+    # check for valid correction coefficients
+    if spec_par[2][0] is None or spec_par[2][1] is None:
+        raise Exception("Correction coefficients have not been set.")
+    #
+    #
+    #
+    #
+    # set minimum and maximum voltage
+    U_min = data[:, 0].min()
+    if U_min <= 0.0:
+        U_min = 1.0
+    U_max = data[:, 0].max()
+    #
+    # set voltage grid points
+    U = np.linspace(U_min, U_max, steps[0])
+    _debug("Voltage grid points are:\n" + str(U))
+    #
+    # set voltage correction points
+    U_corr = 1.0 + 1.0 / U * polyval(U, spec_par[2][0])
+    _debug("Voltage correction values are:\n" + str(U_corr))
+    #
+    #
+    #
+    #
+    # set detector diameter based on absolute maximum hit position
+    diameter = 2.0 * max(
+        abs(data[:, 1].min()), abs(data[:, 1].max()),
+        abs(data[:, 2].min()), abs(data[:, 2].max()))
+    _debug("Detector diameter is {0:.3f} mm.".format(diameter))
+    #
+    # create meshgrid for evaluation of detector correction points
+    X, Y = np.meshgrid(
+        np.linspace(-diameter / 2, diameter / 2, steps[1]),
+        np.linspace(-diameter / 2, diameter / 2, steps[1]))
+    _debug("Detector grid points are:\n" +
+           str(np.vstack(list(map(np.ravel, (X, Y)))).T))
+    #
+    # set detector position correction points
+    det_corr = polyval2d(X, Y, spec_par[2][1]).flatten()
+    _debug("Detector correction values are:\n" + str(det_corr))
+    #
+    #
+    #
+    #
+    # create xml document root
+    root = ET.Element("TAP-Parameters")
+    root.insert(0, ET.Comment(
+        " Automatically created by the massspec module from the APyT package "
+        "({0:s}). ".format(str(datetime.now()))))
+    root.insert(1, ET.Comment(
+        " Information available at: "
+        "https://apyt.mp.imw.uni-stuttgart.de/apyt.massspec.html "))
+    #
+    #
+    # create flight length and time offset elements
+    ET.SubElement(root, "item", {
+        "description": "Flightlength",
+        "unit": "mm"}
+    ).text = "{0:.3f}".format(spec_par[1])
+    ET.SubElement(root, "item", {
+        "description": "Time-of-flight offset",
+        "unit": "ns"}
+    ).text = "{0:.3f}".format(spec_par[0])
+    #
+    #
+    # create voltage correction element
+    ET.SubElement(root, "voltage-correction", {
+        "delta": "{0:.6f}".format((U_max - U_min) / (steps[0] - 1)),
+        "max":   "{0:.6f}".format(U_max),
+        "min":   "{0:.6f}".format(U_min),
+        "size":  "{0:d}".format(steps[0])}
+    ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
+    #
+    #
+    # create detector correction element
+    ET.SubElement(root, "flightlength-correction", {
+        "height":       "{0:.6f}".format(diameter),
+        "height_delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
+        "height_size":  "{0:d}".format(steps[1]),
+        "width":        "{0:.6f}".format(diameter),
+        "width_delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
+        "width_size":   "{0:d}".format(steps[1])}
+    ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
+    #
+    #
+    #
+    #
+    # create xml tree
+    tree = ET.ElementTree(root)
+    #
+    #
+    #
+    # indentation for ElementTree requires Python 3.9 or higher; use minidom
+    # for pretty indentaion
+    xmlstr = minidom.parseString(ET.tostring(root, encoding = 'ISO-8859-1')). \
+             toprettyxml(encoding = 'ISO-8859-1')
+    #
+    #
+    # write xml file
+    with open(file, "wb") as f:
+        f.write(xmlstr)
 #
 #
 #
