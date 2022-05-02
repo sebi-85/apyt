@@ -387,7 +387,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     #
     #
     # construct xy-data obtained from fit
-    x_fit = np.linspace(U_min + 0.5 * ΔU, U_max - 0.5 * ΔU, steps)
+    x_fit = np.linspace(U_min + 0.5 * ΔU, U_max - 0.5 * ΔU, 100)
     xy_fit = (0.001 * x_fit,
               peak_target / (1.0 + polyval(x_fit, coeffs) / x_fit))
     #
