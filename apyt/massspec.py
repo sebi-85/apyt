@@ -516,7 +516,7 @@ def write_xml(file, data, spec_par, steps):
     #
     # indentation for ElementTree requires Python 3.9 or higher; use minidom
     # for pretty indentaion
-    xmlstr = minidom.parseString(ET.tostring(root, encoding = 'ISO-8859-1')). \
+    xmlstr = minidom.parseString(ET.tostring(root)). \
              toprettyxml(encoding = 'ISO-8859-1')
     #
     #
