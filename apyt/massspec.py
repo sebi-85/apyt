@@ -154,7 +154,7 @@ def get_mass_spectrum(data, spec_par, **kwargs):
 #
 def get_flight_correction(data, spec_par, **kwargs):
     start = timer()
-    print("Performing flight length correction...")
+    print("Performing hit position correction...")
     #
     # get optional keyword arguments
     deg      = kwargs.get('deg', 2)
@@ -236,13 +236,13 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     # check for sufficient peaks
     if len(z) < (deg + 1) * (deg + 2) // 2:
-        raise Exception("Insufficient number of peaks ({0:d}) detected for "
-                        "flight length correction (must be at least {1:d}).".
+        raise Exception("Insufficient number of peaks ({0:d}) detected for hit "
+                        "position correction (must be at least {1:d}).".
                         format(len(z), (deg + 1) * (deg + 2) // 2))
     #
     #
     # fit correction function to peak positions (with fixed absolute offset)
-    _debug("Correcting flight length using polynomial of degree {0:d}.".
+    _debug("Correcting hit position using polynomial of degree {0:d}.".
            format(deg))
     peak_target = polyval2d(0.0, 0.0, _polyfit2d(
         x, y, z, deg, weights = events))
@@ -289,8 +289,8 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     #
     # return coefficients for correction function
-    end = timer()
-    _debug("Flight correction took {0:.3f} seconds.".format(end - start))
+    print("Hit position correction took {0:.3f} seconds.".
+          format(timer() - start))
     return coeffs.astype(_dtype), (x, y, z), events, wireframe
 #
 #
@@ -398,8 +398,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     #
     #
     # return coefficients for correction function
-    end = timer()
-    _debug("Voltage correction took {0:.3f} seconds.".format(end - start))
+    print("Voltage correction took {0:.3f} seconds.".format(timer() - start))
     return coeffs.astype(_dtype), (0.001 * x, y), events, xy_fit
 #
 #
@@ -425,6 +424,7 @@ def write_xml(file, data, spec_par, steps):
     # check for valid correction coefficients
     if spec_par[2][0] is None or spec_par[2][1] is None:
         raise Exception("Correction coefficients have not been set.")
+    print("Writing parameter file \"{0:s}\".".format(file))
     #
     #
     #
@@ -664,7 +664,8 @@ def _mem():
 #
 #
 def _optimize_flight_correction(data, spec_par, hist_par):
-    print("Optimizing flight length correction...")
+    start = timer()
+    print("Optimizing hit position correction...")
     #
     #
     # get initial peak position and width
@@ -678,16 +679,16 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     flight_coeffs  = _poly2d_coeff_mat_to_vec(spec_par[2][1])
     #
     #
-    # optimize flight length correction
+    # optimize hit position correction
     minimization_result = minimize(
         _peak_width_minimizer, flight_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
                 (voltage_coeffs, flight_coeffs[0]), hist_par, 'flight'),
         method = 'nelder-mead',
-        options = {'fatol': 1e-2, 'disp': True, 'maxiter': 100})
+        options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
     #
-    # re-assemble coefficients for flight length correction
+    # re-assemble coefficients for hit position correction
     flight_coeffs = np.append(flight_coeffs[0], minimization_result.x)
     flight_coeffs = _poly2d_coeff_vec_to_mat(flight_coeffs).astype(_dtype)
     #
@@ -698,17 +699,22 @@ def _optimize_flight_correction(data, spec_par, hist_par):
         hist_par)
     _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
            format(peak_pos_final, peak_width_final))
-    _debug("Optimized coefficients for flight length correction are {0:s}.".
+    _debug("Optimized coefficients for hit position correction are {0:s}.".
            format(str(flight_coeffs)))
     #
     #
-    # return optimized coefficients for flight length correction
+    # return optimized coefficients for hit position correction
+    print("Optimization of hit position correction took {0:.3f} seconds.".
+          format(timer() - start))
+    print("Final peak width is {0:.3f} amu/u (initial: {1:.3f} amu/e).".
+          format(peak_width_final, peak_width_init))
     return flight_coeffs.astype(_dtype)
 #
 #
 #
 #
 def _optimize_voltage_correction(data, spec_par, hist_par):
+    start = timer()
     print("Optimizing voltage correction...")
     #
     #
@@ -730,7 +736,7 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
                 (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage',
                 {'peak_target': peak_pos_init}),
         method = 'nelder-mead',
-        options = {'fatol': 1e-2, 'disp': True, 'maxiter': 100})
+        options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
     #
     # re-assemble coefficients for voltage correction
@@ -759,6 +765,10 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     #
     # return optimized coefficients for voltage correction
+    print("Optimization of voltage correction took {0:.3f} seconds.".
+          format(timer() - start))
+    print("Final peak width is {0:.3f} amu/u (initial: {1:.3f} amu/e).".
+          format(peak_width_final, peak_width_init))
     return voltage_coeffs.astype(_dtype)
 #
 #
