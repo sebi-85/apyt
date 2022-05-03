@@ -499,11 +499,11 @@ def write_xml(file, data, spec_par, steps):
     # create detector correction element
     ET.SubElement(root, "flightlength-correction", {
         "height":       "{0:.6f}".format(diameter),
-        "height_delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
-        "height_size":  "{0:d}".format(steps[1]),
+        "height-delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
+        "height-size":  "{0:d}".format(steps[1]),
         "width":        "{0:.6f}".format(diameter),
-        "width_delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
-        "width_size":   "{0:d}".format(steps[1])}
+        "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
+        "width-size":   "{0:d}".format(steps[1])}
     ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
     #
     #
