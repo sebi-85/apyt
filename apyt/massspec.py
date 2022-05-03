@@ -41,7 +41,6 @@ The following methods are provided:
 #
 # TODO: check DOF for voltage correction
 # TODO: check consistent use of float32
-# TODO: improve speed of optimization
 #
 #
 #
@@ -407,6 +406,11 @@ def get_voltage_correction(data, spec_par, **kwargs):
 def optimize_correction(data, spec_par, mode, **kwargs):
     # get optional keyword arguments
     hist_par = kwargs.get('hist', {})
+    #
+    #
+    # filter range for faster processing
+    if 'range' in hist_par:
+        data = _filter_mass_to_charge_range(data, spec_par, hist_par)
     #
     #
     if mode == 'voltage':
