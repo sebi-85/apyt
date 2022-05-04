@@ -39,7 +39,6 @@ The following methods are provided:
 """
 #
 #
-# TODO: check DOF for voltage correction
 # TODO: check consistent use of float32
 #
 #
