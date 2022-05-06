@@ -157,16 +157,18 @@ numba.set_num_threads(4)
 #
 ################################################################################
 _default_bin_width = 0.05
-"The default histogram bin width."
+"The default histogram bin width (amu/e)."
 _dtype = np.float32
 """The type of the input data.
 
 This enforces memory-intensive arrays to be of the same data type and avoids
 implicit type casting."""
 _np_float = np.float32
-"The default float type for numpy scalars."
+"The function to be used to set the default float type of numpy scalars."
 _is_dbg = False
-"The global flag for debug output"
+"""The global flag for debug output.
+
+The flag can be set through the :meth:`enable_debug` function."""
 _mc_conversion_factor = _np_float(
     2.0 * constants.value('elementary charge') /
     constants.value('atomic mass constant') * 1.0e-12)
@@ -311,7 +313,8 @@ def get_hit_correction(data, spec_par, **kwargs):
         x_high = x_low + Δx
         #
         # get data for current x-range
-        data_x_cur = _filter_range(data, 1, _np_float(x_low), _np_float(x_high))
+        data_x_cur = __filter_range(data, 1,
+                                    _np_float(x_low), _np_float(x_high))
         #
         #
         # loop through y steps
@@ -321,7 +324,7 @@ def get_hit_correction(data, spec_par, **kwargs):
             y_high = y_low + Δy
             #
             # get data for current xy-range
-            data_xy_cur = _filter_range(data_x_cur, 2,
+            data_xy_cur = __filter_range(data_x_cur, 2,
                                         _np_float(y_low), _np_float(y_high))
             #
             #
@@ -575,7 +578,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
         U_high = U_low + ΔU
         #
         # get data for current range
-        data_cur = _filter_range(data, 0, _np_float(U_low), _np_float(U_high))
+        data_cur = __filter_range(data, 0, _np_float(U_low), _np_float(U_high))
         #
         # only use data if size is above threshold
         if len(data_cur) >= size * len(data) / steps:
@@ -842,6 +845,91 @@ def write_xml(file, data, spec_par, steps):
 # private module-level functions
 #
 ################################################################################
+@numba.njit("f4[:, :](f4[:, :], f4[:], f4, f4)", parallel = True)
+def __filter_mass_to_charge_range(data, mc_ratio, min, max):
+    """Filter data for specific mass-to-charge ratio range.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    mc_ratio : ndarray, shape (n,)
+        The calculated mass-to-charge ratio for each event.
+    min : float32
+        The minimum mass-to-charge ratio used for filtering.
+    max : float32
+        The maximum mass-to-charge ratio used for filtering.
+
+    Returns
+    -------
+    data_f : ndarray, shape (n, 4)
+        The filtered data.
+    """
+    #
+    #
+    return data[(min <= mc_ratio) & (mc_ratio <= max)]
+#
+#
+#
+#
+@numba.njit("f4[:, :](f4[:, :], i8, f4, f4)", parallel = True)
+def __filter_range(data, col, min, max):
+    """Filter data for specific range in column.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    col : int
+        The column of the input data used for filtering.
+    min : float32
+        The minimum value used for filtering.
+    max : float32
+        The maximum value used for filtering.
+
+    Returns
+    -------
+    data_f : ndarray, shape (n, 4)
+        The filtered data.
+    """
+    #
+    #
+    return data[(min < data[:, col]) & (data[:, col] <= max)]
+#
+#
+#
+#
+@numba.njit("f4[:](f4[:, :], f4[:], f4, f4)", parallel = True)
+def __get_mass_to_charge_ratio(data, U, t_0, L_0):
+    """Calculate mass-to-charge ratio for every event.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    U : ndarray, shape (n,)
+        The voltage for every event (with possible correction).
+    t_0 : float32
+        The time-of-flight offset.
+    L_0 : float32
+        The (nominal) distance between tip and detector.
+
+    Returns
+    -------
+    mc_ratio : ndarray, shape (n,)
+        The mass-to-charge ratio for every event.
+    """
+    #
+    #
+    return U * (data[:, 3] - t_0)**2 / \
+           (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * _mc_conversion_factor
+#
+#
+#
+#
 def _debug(msg):
     # do nothing in none-debug mode
     if _is_dbg == False:
@@ -875,35 +963,14 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     #
     #
     # filter range
-    data = __filter_mass_to_charge_range(data, data_range, mc_ratio)
+    data = __filter_mass_to_charge_range(
+        data, mc_ratio, _np_float(data_range[0]), _np_float(data_range[1]))
     _debug("Using range ({0:.1f}, {1:.1f}) amu/e ({2:d} events).".
            format(data_range[0], data_range[1], len(data)))
     #
     #
     # return filtered data
     return data
-#
-#
-#
-#
-@numba.njit("f4[:, :](f4[:, :], UniTuple(f8, 2), f4[:])", parallel = True)
-def __filter_mass_to_charge_range(data, range, mc_ratio):
-    return data[(range[0] <= mc_ratio) & (mc_ratio <= range[1])]
-#
-#
-#
-#
-@numba.njit("f4[:, :](f4[:, :], i8, f4, f4)", parallel = True)
-def _filter_range(data, col, low, high):
-    return data[(low < data[:, col]) & (data[:, col] <= high)]
-#
-#
-#
-#
-@numba.njit("f4[:](f4[:, :], f4[:], f4, f4)", parallel = True)
-def __get_mass_to_charge_ratio(data, U, t_0, L_0):
-    return U * (data[:, 3] - t_0)**2 / \
-           (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * _mc_conversion_factor
 #
 #
 #

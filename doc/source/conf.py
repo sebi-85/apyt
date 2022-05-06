@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'APyT'
-copyright = '2021, Sebastian M. Eich'
+copyright = '2022, Sebastian M. Eich'
 author = 'Sebastian M. Eich'
 
 # The full version, including alpha/beta/rc tags
@@ -36,6 +36,13 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode'
 ]
+
+# The default options for autodoc directives.
+# (uncomment to also generate documentation for private members)
+#autodoc_default_options = {
+#    'ignore-module-all': True,
+#    'private-members':   True
+#}
 
 # Prefix each section label with the name of the document it is in
 autosectionlabel_prefix_document = True
