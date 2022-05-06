@@ -72,8 +72,7 @@ from raw measurement data.
 The following methods are provided:
 
 * :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`get_flight_correction`: Obtain coefficients for flight length
-  correction.
+* :meth:`get_hit_correction`: Obtain coefficients for hit position correction.
 * :meth:`get_mass_spectrum`: Calculate mass spectrum.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
@@ -110,8 +109,8 @@ The following methods are provided:
 __version__ = '0.1.0'
 __all__ = [
     'enable_debug',
+    'get_hit_correction',
     'get_mass_spectrum',
-    'get_flight_correction',
     'get_voltage_correction',
     'optimize_correction',
     'write_xml'
@@ -197,7 +196,79 @@ def enable_debug(is_dbg):
 #
 #
 #
-def get_flight_correction(data, spec_par, **kwargs):
+def get_hit_correction(data, spec_par, **kwargs):
+    """Obtain coefficients for hit position correction.
+
+    In order to perform the hit position correction, the detector is first
+    divided into a regular grid and for each of the corresponding detector
+    segments, the position of the maximum peak is determined. By definition, the
+    peak position in the very center of the detector is used as the peak target
+    position for all detector segments. A 2d polynomial will then be used to map
+    all determined peak positions to the peak target position, resulting in the
+    hit position correction.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+
+    Keyword Arguments
+    -----------------
+    deg : int
+        The degree of the polynomial used for correction. Defaults to ``2``.
+    hist : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+    size : float
+        The minimum required size to take a certain detector segment into
+        account for correction. The size is given relative to the number of
+        events which would be expected for a homogeneous distribution. This
+        option effectively filters segments with a low number of events.
+        Defaults to ``0.3``.
+    steps : int
+        The number of segments (for both :math:`x`- and :math:`y`-direction)
+        into which the detector is divided. Defaults to ``15``.
+    thres : float
+        The threshold used to determine peaks (relative to the maximum peak). If
+        multiple peaks of similar height fall into the correction window,
+        different (maximum) peaks may be picked up for different detector
+        segments. By reducing the threshold for the peak detection, all of these
+        peaks with similar height will be picked up which are above the
+        specified threshold. In order to ensure consistent evaluation, always
+        the first of these peaks is then chosen for the correction. Defaults to
+        ``0.9``.
+
+    Returns
+    -------
+    coeffs : ndarray, shape (deg + 1,)
+        The polynomial coefficients obtained for correction (of type *float32*).
+    (x, y, peak_pos) : tuple
+        The tuple containing the data of the detected peak positions for every
+        detector segment, each of type *ndarray* with *shape (m,)*.
+    events : ndarray, shape (m,)
+        The number of events in each detector segment. Can be used for
+        color-coding.
+    wireframe : tuple
+        The :math:`(x, y, z)` data needed to construct a wireframe, as obtained
+        by the fit function. The result can be passed directly to the
+        |plot_wireframe| function from the *matplotlib* module.
+
+
+    .. |plot_wireframe| raw:: html
+
+        <a href="https://matplotlib.org/stable/api/_as_gen/
+        mpl_toolkits.mplot3d.axes3d.Axes3D.html
+        #mpl_toolkits.mplot3d.axes3d.Axes3D.plot_wireframe" target="_blank">
+        plot_wireframe()</a>
+    """
+    #
+    #
     start = timer()
     print("Performing hit position correction...")
     #
@@ -240,7 +311,7 @@ def get_flight_correction(data, spec_par, **kwargs):
         x_high = x_low + Δx
         #
         # get data for current x-range
-        data_x_cur = _filter_range(data, 1, x_low, x_high)
+        data_x_cur = _filter_range(data, 1, _np_float(x_low), _np_float(x_high))
         #
         #
         # loop through y steps
@@ -250,7 +321,8 @@ def get_flight_correction(data, spec_par, **kwargs):
             y_high = y_low + Δy
             #
             # get data for current xy-range
-            data_xy_cur = _filter_range(data_x_cur, 2, y_low, y_high)
+            data_xy_cur = _filter_range(data_x_cur, 2,
+                                        _np_float(y_low), _np_float(y_high))
             #
             #
             # only use data if size is above threshold
@@ -262,8 +334,7 @@ def get_flight_correction(data, spec_par, **kwargs):
                 #
                 # find histogram peaks (there may be multiple peaks close to one
                 # another, so we will always pick the first one later)
-                hist_max = hist.max()
-                peaks, _ = find_peaks(hist, height = thres * hist_max)
+                peaks, _ = find_peaks(hist, height = thres * hist.max())
                 #
                 # check for valid peaks (should not fail!)
                 if len(peaks) == 0:
@@ -342,7 +413,7 @@ def get_flight_correction(data, spec_par, **kwargs):
 #
 #
 def get_mass_spectrum(data, spec_par, **kwargs):
-    """Get mass spectrum.
+    """Calculate mass spectrum.
 
     Calculate the mass-to-charge spectrum of the input *data* using the
     ``numpy.histogram()`` function.
@@ -403,11 +474,75 @@ def get_mass_spectrum(data, spec_par, **kwargs):
 #
 #
 def get_voltage_correction(data, spec_par, **kwargs):
+    """Obtain coefficients for voltage correction.
+
+    In order to perform the voltage correction, the full voltage range is first
+    divided into several (equidistant) subranges and for each of the
+    corresponding ranges, the position of the maximum peak is determined. By
+    definition, the weighted average (with respect to the number of events in
+    the respective range) of all peak positions is used as the peak target
+    position for all voltage ranges. A 1d polynomial will then be used to map
+    all determined peak positions to the peak target position, resulting in the
+    voltage correction.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+
+    Keyword Arguments
+    -----------------
+    deg : int
+        The degree of the polynomial used for correction. Defaults to ``2``.
+    hist : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+    size : float
+        The minimum required size to take a certain voltage range into account
+        for correction. The size is given relative to the number of events which
+        would be expected for a homogeneous distribution. This option
+        effectively filters voltage ranges with a low number of events. Defaults
+        to ``0.3``.
+    steps : int
+        The number of steps into which the full voltage range is divided.
+        Defaults to ``20``.
+    thres : float
+        The threshold used to determine peaks (relative to the maximum peak). If
+        multiple peaks of similar height fall into the correction window,
+        different (maximum) peaks may be picked up for different voltage ranges.
+        By reducing the threshold for the peak detection, all of these peaks
+        with similar height will be picked up which are above the specified
+        threshold. In order to ensure consistent evaluation, always the first of
+        these peaks is then chosen for the correction. Defaults to ``0.9``.
+
+    Returns
+    -------
+    coeffs : ndarray, shape (deg + 1,)
+        The polynomial coefficients obtained for correction (of type *float32*).
+    (U, peak_pos) : tuple
+        The tuple containing the data of the detected peak positions for every
+        voltage range, each of type *ndarray* with *shape (m,)*.
+    events : ndarray, shape (m,)
+        The number of events in each voltage range. Can be used for
+        color-coding.
+    fit_data : tuple
+        Smooth data for the peak position in dependence on the voltage, as
+        obtained by the fit function (each of type *ndarray* with
+        *shape (100,)*).
+    """
+    #
+    #
     start = timer()
     print("Performing voltage correction...")
     #
     # get optional keyword arguments
-    deg      = kwargs.get("deg", 3)
+    deg      = kwargs.get("deg", 2)
     hist_par = kwargs.get("hist", {})
     size     = kwargs.get("size", 0.3)
     steps    = kwargs.get("steps", 20)
@@ -440,7 +575,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
         U_high = U_low + ΔU
         #
         # get data for current range
-        data_cur = _filter_range(data, 0, U_low, U_high)
+        data_cur = _filter_range(data, 0, _np_float(U_low), _np_float(U_high))
         #
         # only use data if size is above threshold
         if len(data_cur) >= size * len(data) / steps:
@@ -451,8 +586,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
             #
             # find histogram peaks (there may be multiple peaks close to one
             # another, so we will always pick the first one later)
-            hist_max = hist.max()
-            peaks, _ = find_peaks(hist, height = thres * hist_max)
+            peaks, _ = find_peaks(hist, height = thres * hist.max())
             #
             # check for valid peaks (should not fail!)
             if len(peaks) == 0:
@@ -511,6 +645,47 @@ def get_voltage_correction(data, spec_par, **kwargs):
 #
 #
 def optimize_correction(data, spec_par, mode, **kwargs):
+    """Automatically optimize correction coefficients.
+
+    This function can be used to fine-tune the coefficients used for the voltage
+    and hit position correction, respectively. The coefficients are varied
+    systematically (using the Nelder--Mead algorithm for the |scipy_minimize|
+    function from the *scipy.optimize* module) so that the width of the
+    maximum peak in the spectrum reaches maximum possible sharpness.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    mode : str
+        The string indicating which coefficients shall be optimized. Must be
+        either ``voltage`` or ``hit``.
+
+    Keyword Arguments
+    -----------------
+    hist : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    coeffs : ndarray, shape of input array
+        The optimized polynomial coefficients (of type *float32*).
+
+
+    .. |scipy_minimize| raw:: html
+
+        <a href="https://docs.scipy.org/doc/scipy/reference/generated/
+        scipy.optimize.minimize.html" target="_blank">minimize()</a>
+    """
+    #
+    #
     # get optional keyword arguments
     hist_par = kwargs.get('hist', {})
     #
@@ -522,8 +697,8 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     #
     if mode == 'voltage':
         return _optimize_voltage_correction(data, spec_par, hist_par)
-    elif mode == 'flight':
-        return _optimize_flight_correction(data, spec_par, hist_par)
+    elif mode == 'hit':
+        return _optimize_hit_correction(data, spec_par, hist_par)
     else:
         raise Exception("Unrecognized mode for minimization ({0:s}).".
                         format(mode))
@@ -532,6 +707,30 @@ def optimize_correction(data, spec_par, mode, **kwargs):
 #
 #
 def write_xml(file, data, spec_par, steps):
+    """Write XML file for subsequent usage.
+
+    This function generates an XML parameter file containing all relevant data
+    to obtain a high-quality mass spectrum without further adjustments. This
+    file can then be used for subsequent processing (e.g. reconstruction of ATP
+    data).
+
+    Parameters
+    ----------
+    file : str
+        The file name used for output.
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    steps : tuple
+        The number of (equidistant) steps used to construct the grid of support
+        points for the voltage and hit position correction.
+    """
+    #
+    #
     # check for valid correction coefficients
     if spec_par[2][0] is None or spec_par[2][1] is None:
         raise Exception("Correction coefficients have not been set.")
@@ -626,7 +825,7 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     # indentation for ElementTree requires Python 3.9 or higher; use minidom
-    # for pretty indentaion
+    # for pretty indentation
     xmlstr = minidom.parseString(ET.tostring(root)). \
              toprettyxml(encoding = 'ISO-8859-1')
     #
@@ -774,7 +973,7 @@ def _mem():
 #
 #
 #
-def _optimize_flight_correction(data, spec_par, hist_par):
+def _optimize_hit_correction(data, spec_par, hist_par):
     start = timer()
     print("Optimizing hit position correction...")
     #
