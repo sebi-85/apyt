@@ -101,9 +101,6 @@ The following methods are provided:
 """
 #
 #
-# TODO: check consistent use of float32
-#
-#
 #
 #
 __version__ = '0.1.0'
@@ -545,11 +542,11 @@ def get_voltage_correction(data, spec_par, **kwargs):
     print("Performing voltage correction...")
     #
     # get optional keyword arguments
-    deg      = kwargs.get("deg", 2)
-    hist_par = kwargs.get("hist", {})
-    size     = kwargs.get("size", 0.3)
-    steps    = kwargs.get("steps", 20)
-    thres    = kwargs.get("thres", 0.9)
+    deg      = kwargs.get('deg', 2)
+    hist_par = kwargs.get('hist', {})
+    size     = kwargs.get('size', 0.3)
+    steps    = kwargs.get('steps', 20)
+    thres    = kwargs.get('thres', 0.9)
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -834,7 +831,7 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     # write xml file
-    with open(file, "wb") as f:
+    with open(file, 'wb') as f:
         f.write(xmlstr)
 #
 #
@@ -845,7 +842,7 @@ def write_xml(file, data, spec_par, steps):
 # private module-level functions
 #
 ################################################################################
-@numba.njit("f4[:, :](f4[:, :], f4[:], f4, f4)", parallel = True)
+@numba.njit('f4[:, :](f4[:, :], f4[:], f4, f4)', parallel = True)
 def __filter_mass_to_charge_range(data, mc_ratio, min, max):
     """Filter data for specific mass-to-charge ratio range.
 
@@ -863,7 +860,7 @@ def __filter_mass_to_charge_range(data, mc_ratio, min, max):
 
     Returns
     -------
-    data_f : ndarray, shape (n, 4)
+    data_f : ndarray, shape (m, 4)
         The filtered data.
     """
     #
@@ -873,7 +870,7 @@ def __filter_mass_to_charge_range(data, mc_ratio, min, max):
 #
 #
 #
-@numba.njit("f4[:, :](f4[:, :], i8, f4, f4)", parallel = True)
+@numba.njit('f4[:, :](f4[:, :], i8, f4, f4)', parallel = True)
 def __filter_range(data, col, min, max):
     """Filter data for specific range in column.
 
@@ -891,7 +888,7 @@ def __filter_range(data, col, min, max):
 
     Returns
     -------
-    data_f : ndarray, shape (n, 4)
+    data_f : ndarray, shape (m, 4)
         The filtered data.
     """
     #
@@ -901,7 +898,7 @@ def __filter_range(data, col, min, max):
 #
 #
 #
-@numba.njit("f4[:](f4[:, :], f4[:], f4, f4)", parallel = True)
+@numba.njit('f4[:](f4[:, :], f4[:], f4, f4)', parallel = True)
 def __get_mass_to_charge_ratio(data, U, t_0, L_0):
     """Calculate mass-to-charge ratio for every event.
 
@@ -931,6 +928,15 @@ def __get_mass_to_charge_ratio(data, U, t_0, L_0):
 #
 #
 def _debug(msg):
+    """Print debug message to *stderr*.
+
+    Parameters
+    ----------
+    msg : str
+        The message to be written.
+    """
+    #
+    #
     # do nothing in none-debug mode
     if _is_dbg == False:
         return
@@ -944,6 +950,29 @@ def _debug(msg):
 #
 #
 def _filter_mass_to_charge_range(data, spec_par, hist_par):
+    """Wrapper function to filter mass-to-charge ratio range.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    hist_par : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    data_f : ndarray, shape (m, 4)
+        The filtered data.
+    """
+    #
+    #
     # get range from histogram parameter dictionary
     data_range = hist_par.get('range', None)
     #
@@ -975,9 +1004,28 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
 #
 #
 #
-def _get_mass_to_charge_ratio(data, par):
+def _get_mass_to_charge_ratio(data, spec_par):
+    """Wrapper function to calculate mass-to-charge ratio.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+
+    Returns
+    -------
+    mc_ratio : ndarray, shape (n,)
+        The mass-to-charge ratio for every event.
+    """
+    #
+    #
     # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, flight_coeffs) = par
+    t_0, L_0, (voltage_coeffs, hit_coeffs) = spec_par
     #
     #
     # check for correct input data type
@@ -1006,14 +1054,14 @@ def _get_mass_to_charge_ratio(data, par):
     mc_ratio = __get_mass_to_charge_ratio(data, U, t_0, L_0)
     #
     #
-    # apply positional correction if provided
-    if flight_coeffs is not None:
-        if flight_coeffs.dtype is not np.dtype(_dtype):
-            raise TypeError("Wrong type for flight length coefficients "
+    # apply hit position correction if provided
+    if hit_coeffs is not None:
+        if hit_coeffs.dtype is not np.dtype(_dtype):
+            raise TypeError("Wrong type for hit position coefficients "
                             "({0:s}). Must be '{1:s}'.".format(
-                                str(flight_coeffs.dtype),
+                                str(hit_coeffs.dtype),
                                 str(np.dtype(_dtype))))
-        mc_ratio *= polyval2d(data[:, 1], data[:, 2], flight_coeffs)
+        mc_ratio *= polyval2d(data[:, 1], data[:, 2], hit_coeffs)
     #
     #
     # return (corrected) mass-to-charge ratio
@@ -1027,6 +1075,9 @@ def _get_mass_to_charge_ratio(data, par):
 #
 #
 def _mem():
+    "Print current and peak memory usage to *stderr*."
+    #
+    #
     # set debug message
     msg = "Current memory usage is {0:.1f} MB (peak {1:.1f} MB).".format(
               Process(getpid()).memory_info().rss / 1024**2,
@@ -1041,6 +1092,30 @@ def _mem():
 #
 #
 def _optimize_hit_correction(data, spec_par, hist_par):
+    """Optimize coefficients for hit position correction.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    hist_par : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    coeffs : ndarray, shape of input array
+        The optimized coefficients for the hit position correction (of type
+        *float32*).
+    """
+    #
+    #
     start = timer()
     print("Optimizing hit position correction...")
     #
@@ -1053,31 +1128,31 @@ def _optimize_hit_correction(data, spec_par, hist_par):
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
-    flight_coeffs  = _poly2d_coeff_mat_to_vec(spec_par[2][1])
+    hit_coeffs     = _poly2d_coeff_mat_to_vec(spec_par[2][1])
     #
     #
     # optimize hit position correction
     minimization_result = minimize(
-        _peak_width_minimizer, flight_coeffs[1:],
+        _peak_width_minimizer, hit_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs, flight_coeffs[0]), hist_par, 'flight'),
+                (voltage_coeffs, hit_coeffs[0]), hist_par, 'hit'),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
     #
     # re-assemble coefficients for hit position correction
-    flight_coeffs = np.append(flight_coeffs[0], minimization_result.x)
-    flight_coeffs = _poly2d_coeff_vec_to_mat(flight_coeffs).astype(_dtype)
+    hit_coeffs = np.append(hit_coeffs[0], minimization_result.x.astype(_dtype))
+    hit_coeffs = _poly2d_coeff_vec_to_mat(hit_coeffs)
     #
     #
     # get peak position and width for optimized coefficients
     peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, hit_coeffs)),
         hist_par)
     _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
            format(peak_pos_final, peak_width_final))
     _debug("Optimized coefficients for hit position correction are {0:s}.".
-           format(str(flight_coeffs)))
+           format(str(hit_coeffs)))
     #
     #
     # return optimized coefficients for hit position correction
@@ -1085,12 +1160,36 @@ def _optimize_hit_correction(data, spec_par, hist_par):
           format(timer() - start))
     print("Final peak width is {0:.3f} amu/u (initial: {1:.3f} amu/e).".
           format(peak_width_final, peak_width_init))
-    return flight_coeffs.astype(_dtype)
+    return hit_coeffs.astype(_dtype)
 #
 #
 #
 #
 def _optimize_voltage_correction(data, spec_par, hist_par):
+    """Optimize coefficients for voltage correction.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    hist_par : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    coeffs : ndarray, shape of input array
+        The optimized coefficients for the voltage correction (of type
+        *float32*).
+    """
+    #
+    #
     start = timer()
     print("Optimizing voltage correction...")
     #
@@ -1103,14 +1202,14 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
-    flight_coeffs  = spec_par[2][1]
+    hit_coeffs     = spec_par[2][1]
     #
     #
     # optimize voltage correction
     minimization_result = minimize(
         _peak_width_minimizer, voltage_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage',
+                (voltage_coeffs[0], hit_coeffs), hist_par, 'voltage',
                 {'peak_target': peak_pos_init}),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
@@ -1123,7 +1222,7 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     # get peak position and width for optimized coefficients
     peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, hit_coeffs)),
         hist_par)
     #
     #
@@ -1152,6 +1251,31 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
 #
 #
 def _peak_width(data, spec_par, hist_par):
+    """Get position and width of maximum peak.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    hist_par : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    pos : float
+        The position of the maximum peak.
+    width : float
+        The width of the maximum peak.
+    """
+    #
+    #
     # calculate histogram and bin centers
     hist, bin_centers, _ = get_mass_spectrum(data, spec_par, hist = hist_par)
     #
@@ -1160,13 +1284,48 @@ def _peak_width(data, spec_par, hist_par):
     width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
     #
     # return peak positions and widths
-    return bin_centers[peaks[0]], width_half * hist_par["width"]
+    return bin_centers[peaks[0]], width_half * hist_par['width']
 #
 #
 #
 #
 def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
                           dict_args = None):
+    """The minimizer function for the calculation of the peak width.
+
+    Parameters
+    ----------
+    x : ndarray, shape (k,)
+        The correction coefficients to vary (excluding the absolute
+        coefficient).
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    t_0 : float32
+        The time-of-flight offset.
+    L_0 : float32
+        The (nominal) distance between tip and detector.
+    coeffs_stripped : tuple
+        The voltage and hit position correction coefficients in stripped form,
+        i.e. excluding the coefficients already given in *x*.
+    hist_par : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+    mode : str
+        The string indicating which coefficients shall be optimized. Must be
+        either ``voltage`` or ``hit``.
+    dict_args : dict
+        The optional dictionary arguments passed to this minimizer function,
+        consisting of the peak target position (``'peak_target'``).
+
+    Returns
+    -------
+    width : float
+        The width of the maximum peak.
+    """
+    #
+    #
     # get arguments passed as optional dictionary (scipy.optimize.minimize does
     # not allow for regular **kwargs as additional function arguments)
     if dict_args is None:
@@ -1177,7 +1336,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     # re-assemble complete set of coefficients for correction functions
     if mode == 'voltage':
         coeffs = (np.append(coeffs_stripped[0], x), coeffs_stripped[1])
-    elif mode == 'flight':
+    elif mode == 'hit':
         # coefficients are passed in vector form, but we need matrix
         # representation
         coeffs = (coeffs_stripped[0],
@@ -1205,7 +1364,106 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
 #
 #
 #
+def _poly2d_coeff_mat_to_vec(M):
+    """Convert 2d coefficient matrix to sparse vector representation.
+
+    Note that the 2d coefficient matrix contains zeros in the lower right corner
+    by definition.
+
+    Parameters
+    ----------
+    M : ndarray, shape (n, n)
+        The 2d coefficient matrix.
+
+    Returns
+    -------
+    v : ndarray, shape (n(n + 1) / 2,)
+        The sparse vector representation of the 2d coefficient matrix.
+    """
+    #
+    #
+    # get degree from matrix
+    deg = M.shape[0] - 1
+    #
+    # convert full coefficient matrix to vector
+    v = M.reshape(-1)
+    #
+    # create mask to filter higher-order terms
+    mask = np.rot90(np.tri(deg + 1, dtype = bool), k = -1).reshape(-1)
+    #
+    # return sparse coefficient vector
+    return v[mask]
+#
+#
+#
+#
+def _poly2d_coeff_vec_to_mat(v):
+    """Convert sparse vector representation to 2d coefficient matrix.
+
+    Note that the 2d coefficient matrix contains zeros in the lower right corner
+    by definition.
+
+    Parameters
+    ----------
+    v : ndarray, shape (n(n + 1) / 2,)
+        The sparse vector representation of the 2d coefficient matrix.
+
+    Returns
+    -------
+    M : ndarray, shape (n, n)
+        The 2d coefficient matrix.
+    """
+    #
+    #
+    # determine degree from length of vector representation
+    deg = np.rint(-3.0 / 2.0 + np.sqrt(1.0 / 4.0 + 2 * len(v))).astype(int)
+    #
+    # initialize coefficient matrix
+    M = np.zeros((deg + 1, deg + 1), dtype = v.dtype)
+    #
+    # set coefficients from sparse coefficient vector
+    M[np.mask_indices(deg + 1, lambda m, k : np.rot90(np.triu(m, k)))] = v
+    #
+    # return full coefficient matrix
+    return M
+#
+#
+#
+#
 def _polyfit2d(x, y, f, deg, **kwargs):
+    """Custom 2d fitting routine to allow for optional weights.
+
+    Note that only terms :math:`x^i y^j` with :math:`i + i \leq d` are used,
+    i.e. the returned 2d coefficient matrix will contain zeros in the lower
+    right corner.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n,)
+        The function arguments in the first dimension.
+    y : ndarray, shape (n,)
+        The function arguments in the second dimension.
+    f : ndarray, shape (n,)
+        The function values used for fitting.
+    deg : int
+        The polynomial degree used for fitting.
+
+    Keyword Arguments
+    -----------------
+    weights : ndarray, shape (n,)
+        The optional weights used for fitting. Default to ``1.0``.
+    offset : float
+        The optional fixed offset for the fit function (effectively keeps the
+        absolute term fixed at that value and reduces the degrees of freedom).
+        Defaults to ``None``.
+
+    Returns
+    -------
+    coeffs : ndarray, shape (deg + 1, deg + 1)
+        The coefficients obtained through fitting.
+    """
+    #
+    #
     # get optional keyword arguments
     weights = kwargs.get('weights', np.ones_like(f))
     offset  = kwargs.get('offset', None)
@@ -1238,35 +1496,3 @@ def _polyfit2d(x, y, f, deg, **kwargs):
     #
     # return coefficient matrix which can directly be passed to polyval2d
     return _poly2d_coeff_vec_to_mat(c)
-#
-#
-#
-#
-def _poly2d_coeff_mat_to_vec(M):
-    # get degree from matrix
-    deg = M.shape[0] - 1
-    #
-    # convert full coefficient matrix to vector
-    vec = M.reshape(-1)
-    #
-    # create mask to filter higher-order terms
-    mask = np.rot90(np.tri(deg + 1, dtype = bool), k = -1).reshape(-1)
-    #
-    # return sparse coefficient vector
-    return vec[mask]
-#
-#
-#
-#
-def _poly2d_coeff_vec_to_mat(v):
-    # determine degree from length of vector representation
-    deg = np.rint(-3.0 / 2.0 + np.sqrt(1.0 / 4.0 + 2 * len(v))).astype(int)
-    #
-    # initialize coefficient matrix
-    M = np.zeros((deg + 1, deg + 1))
-    #
-    # set coefficients from sparse coefficient vector
-    M[np.mask_indices(deg + 1, lambda m, k : np.rot90(np.triu(m, k)))] = v
-    #
-    # return full coefficient matrix
-    return M
