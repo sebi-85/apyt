@@ -35,7 +35,7 @@ The spectrum of the mass-to-charge ratio is calculated according to
 
 .. math::
     \\frac m q = \\frac{2 (U + \\varphi(U)) e (t - t_0)^2}
-                       {(L_0^2 + x^2 + y^2) \psi(x, y)},
+                       {(L_0^2 + x^2 + y^2)} \psi(x, y),
 
 where :math:`\\varphi(U)` is accounting for the correction of the measured
 voltage, :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal)
