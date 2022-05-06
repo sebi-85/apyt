@@ -3,7 +3,7 @@ The APyT mass spectrum module
 =============================
 
 This module enables the automatic evaluation of mass spectra from raw
-measurement data including optimizing routines to obtain peaks with maximum
+measurement data including optimization routines to obtain peaks with maximum
 possible sharpness.
 
 
@@ -16,6 +16,53 @@ this module. Detailed usage information can be obtained by invoking this script
 with the ``"--help"`` option.
 
 
+General function parameter description
+--------------------------------------
+
+Event data
+^^^^^^^^^^
+
+The data of the :math:`n` measured events are expected to be of type *ndarray*
+with shape *(n, 4)* and data type *float32*, where each event contains the
+measured voltage :math:`U` (in V), :math:`x` and :math:`y` detector hit position
+(in mm), and the time of flight :math:`t` (in ns). (See also raw file
+:ref:`format<apyt.conv:Raw file format>`.)
+
+Physical spectrum parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The spectrum of the mass-to-charge ratio is calculated according to
+
+.. math::
+    \\frac m q = \\frac{2 (U + \\varphi(U)) e (t - t_0)^2}
+                       {(L_0^2 + x^2 + y^2) \psi(x, y)},
+
+where :math:`\\varphi(U)` is accounting for the correction of the measured
+voltage, :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal)
+distance between tip and detector, and :math:`\psi(x, y)` accounts for the
+deviation of the actual flight length from Pythagoras, depending on the detector
+hit position :math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific
+machine parameters. :math:`\\varphi(U)` and :math:`\psi(x, y)` are given by 1d
+and 2d polynomials with coefficients as described in |polyval| and |polyval2d|
+from the *numpy* module, respectively. The spectrum parameters are expected to
+be a tuple with *(t_0, L_0, (voltage_coeffs, hit_coeffs))*, where the
+coefficients are expected to be an *ndarray*. If ``None`` is provided for the
+coefficients, no respective correction will be applied. Note that all values
+must be of type *float32*.
+
+
+Histogram parameters
+^^^^^^^^^^^^^^^^^^^^
+
+The mass-to-charge spectrum is calculated by the |numpy.histogram| function. The
+following parameters (given as a dictionary) can be passed through to that
+function:
+
+- ``range``: The lower and upper range of the bins.
+- ``width``: The desired bin width (will be translated into the ``bins``
+  parameter). Defaults to 0.05 amu/e.
+
+
 List of methods
 ---------------
 
@@ -25,12 +72,28 @@ from raw measurement data.
 The following methods are provided:
 
 * :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`get_mass_spectrum`: Calculate mass spectrum.
 * :meth:`get_flight_correction`: Obtain coefficients for flight length
   correction.
+* :meth:`get_mass_spectrum`: Calculate mass spectrum.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`write_xml`: Write XML file for subsequent usage.
+
+
+.. |polyval| raw:: html
+
+    <a href="https://numpy.org/doc/stable/reference/generated/
+    numpy.polynomial.polynomial.polyval.html" target="_blank">polyval</a>
+
+.. |polyval2d| raw:: html
+
+    <a href="https://numpy.org/doc/stable/reference/generated/
+    numpy.polynomial.polynomial.polyval2d.html" target="_blank">polyval2d</a>
+
+.. |numpy.histogram| raw:: html
+
+    <a href="https://numpy.org/doc/stable/reference/generated/
+    numpy.histogram.html" target="_blank">numpy.histogram</a>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -99,10 +162,13 @@ _default_bin_width = 0.05
 _dtype = np.float32
 """The type of the input data.
 
-This enforces memory-intensive arrays to be of the same data type."""
+This enforces memory-intensive arrays to be of the same data type and avoids
+implicit type casting."""
+_np_float = np.float32
+"The default float type for numpy scalars."
 _is_dbg = False
 "The global flag for debug output"
-_mc_conversion_factor = np.float32(
+_mc_conversion_factor = _np_float(
     2.0 * constants.value('elementary charge') /
     constants.value('atomic mass constant') * 1.0e-12)
 "The internal constant conversion factor for the mass spectrum."
@@ -116,36 +182,17 @@ _mc_conversion_factor = np.float32(
 #
 ################################################################################
 def enable_debug(is_dbg):
+    """Enable or disable debug output.
+
+    Parameters
+    ----------
+    is_dbg : bool
+        Whether to enable or disable debug output.
+    """
+    #
+    #
     global _is_dbg
     _is_dbg = is_dbg
-#
-#
-#
-#
-def get_mass_spectrum(data, spec_par, **kwargs):
-    # get optional keyword arguments
-    hist_par = kwargs.get('hist', {})
-    #
-    # get histogram parameters
-    data_range = hist_par.get('range', None)
-    width      = hist_par.get('width', _default_bin_width)
-    #
-    #
-    # calculate mass-to-charge ratio
-    mc_ratio = _get_mass_to_charge_ratio(data, spec_par)
-    #
-    # set default histogram range if nothing provided
-    if data_range is None:
-        data_range = (np.floor(mc_ratio.min()), np.ceil(mc_ratio.max()))
-    # set number of histogram bins
-    bins = int((data_range[1] - data_range[0]) / width)
-    #
-    # calculate histogram and bin centers
-    hist, bin_edges = np.histogram(mc_ratio, bins = bins, range = data_range)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    #
-    # return histogram, bin centers, and mass-to-charge ratios
-    return hist, bin_centers, mc_ratio
 #
 #
 #
@@ -290,6 +337,67 @@ def get_flight_correction(data, spec_par, **kwargs):
     print("Hit position correction took {0:.3f} seconds.".
           format(timer() - start))
     return coeffs.astype(_dtype), (x, y, z), events, wireframe
+#
+#
+#
+#
+def get_mass_spectrum(data, spec_par, **kwargs):
+    """Get mass spectrum.
+
+    Calculate the mass-to-charge spectrum of the input *data* using the
+    ``numpy.histogram()`` function.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+
+    Keyword Arguments
+    -----------------
+    hist : dict
+        The (optional) histogram parameters used to create the mass-to-charge
+        histogram, as described in
+        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+
+    Returns
+    -------
+    hist : ndarray, shape (m,)
+        The *m* histogram counts.
+    bin_centers : ndarray, shape (m,)
+        The *m* bin centers of the histogram.
+    mc_ratio: ndarray, shape (n,)
+        The *n* mass-to-charge ratios for each event.
+    """
+    #
+    #
+    # get optional keyword arguments
+    hist_par = kwargs.get('hist', {})
+    #
+    # get histogram parameters
+    data_range = hist_par.get('range', None)
+    width      = hist_par.get('width', _default_bin_width)
+    #
+    #
+    # calculate mass-to-charge ratio
+    mc_ratio = _get_mass_to_charge_ratio(data, spec_par)
+    #
+    # set default histogram range if nothing provided
+    if data_range is None:
+        data_range = (np.floor(mc_ratio.min()), np.ceil(mc_ratio.max()))
+    # set number of histogram bins
+    bins = int((data_range[1] - data_range[0]) / width)
+    #
+    # calculate histogram and bin centers
+    hist, bin_edges = np.histogram(mc_ratio, bins = bins, range = data_range)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    #
+    # return histogram, bin centers, and mass-to-charge ratios
+    return hist, bin_centers, mc_ratio
 #
 #
 #
