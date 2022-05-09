@@ -770,7 +770,8 @@ def write_xml(file, data, spec_par, steps):
            str(np.vstack(list(map(np.ravel, (X, Y)))).T))
     #
     # set detector position correction points
-    det_corr = polyval2d(X, Y, spec_par[2][1]).flatten()
+    det_corr = (polyval2d(X, Y, spec_par[2][1]) /
+                (1.0 + 1.0 / spec_par[1]**2 * (X**2 + Y**2))).flatten()
     _debug("Detector correction values are:\n" + str(det_corr))
     #
     #
@@ -778,12 +779,24 @@ def write_xml(file, data, spec_par, steps):
     #
     # create xml document root
     root = ET.Element("TAP-Parameters")
-    root.insert(0, ET.Comment(
-        " Automatically created by the massspec module from the APyT package "
-        "({0:s}). ".format(str(datetime.now()))))
-    root.insert(1, ET.Comment(
-        " Information available at: "
-        "https://apyt.mp.imw.uni-stuttgart.de/apyt.massspec.html "))
+    #
+    #
+    # set version information
+    file_info = ET.SubElement(root, "file-info")
+    ET.SubElement(file_info, "item", {
+        "description": "version"}
+    ).text = "1.0"
+    ET.SubElement(file_info, "item", {
+        "description": "author"}
+    ).text = "Automatically created by the massspec module from the APyT " \
+             "package"
+    ET.SubElement(file_info, "item", {
+        "description": "date"}
+    ).text = str(datetime.now())
+    ET.SubElement(file_info, "item", {
+        "description": "info"}
+    ).text = "Information available at: " \
+             "https://apyt.mp.imw.uni-stuttgart.de/apyt.massspec.html"
     #
     #
     # create flight length and time offset elements
