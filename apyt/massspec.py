@@ -739,10 +739,8 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     #
-    # set minimum and maximum voltage
-    U_min = data[:, 0].min()
-    if U_min <= 0.0:
-        U_min = 1.0
+    # set (positive) minimum and maximum voltage
+    U_min = max(data[:, 0].min(), 1.0)
     U_max = data[:, 0].max()
     #
     # set voltage grid points
@@ -751,6 +749,16 @@ def write_xml(file, data, spec_par, steps):
     #
     # set voltage correction points
     U_corr = 1.0 + 1.0 / U * polyval(U, spec_par[2][0])
+    #
+    #
+    # filter incompatible values (external tools may fail on negative numbers
+    # without prior checks)
+    U_min  = U[(U_corr > 0.0)][0]
+    U_max  = U[(U_corr > 0.0)][-1]
+    U_corr = U_corr[(U_corr > 0.0)]
+    if len(U_corr) != steps[0]:
+        warnings.warn("Number of voltage correction points has been reduced to "
+                      "{0:d} due to compatibility reasons.".format(len(U_corr)))
     _debug("Voltage correction values are:\n" + str(U_corr))
     #
     #
@@ -812,10 +820,10 @@ def write_xml(file, data, spec_par, steps):
     #
     # create voltage correction element
     ET.SubElement(root, "voltage-correction", {
-        "delta": "{0:.6f}".format((U_max - U_min) / (steps[0] - 1)),
+        "delta": "{0:.6f}".format((U_max - U_min) / (len(U_corr) - 1)),
         "max":   "{0:.6f}".format(U_max),
         "min":   "{0:.6f}".format(U_min),
-        "size":  "{0:d}".format(steps[0])}
+        "size":  "{0:d}".format(len(U_corr))}
     ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
     #
     #
