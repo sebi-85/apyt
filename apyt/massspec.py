@@ -191,7 +191,7 @@ _np_float = np.float32
 _is_dbg = False
 """The global flag for debug output.
 
-The flag can be set through the :meth:`enable_debug` function."""
+This flag can be set through the :meth:`enable_debug` function."""
 _mc_conversion_factor = _np_float(
     2.0 * constants.value('elementary charge') /
     constants.value('atomic mass constant') * 1.0e-12)
@@ -222,15 +222,15 @@ def enable_debug(is_dbg):
 #
 #
 def get_flight_correction(data, spec_par, **kwargs):
-    """Obtain coefficients for hit position correction.
+    """Obtain coefficients for flight length correction.
 
-    In order to perform the hit position correction, the detector is first
+    In order to perform the flight length correction, the detector is first
     divided into a regular grid and for each of the corresponding detector
     segments, the position of the maximum peak is determined. By definition, the
     peak position in the very center of the detector is used as the peak target
     position for all detector segments. A 2d polynomial will then be used to map
     all determined peak positions to the peak target position, resulting in the
-    hit position correction.
+    flight length correction.
 
     Parameters
     ----------
@@ -295,7 +295,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     #
     start = timer()
-    print("Performing hit position correction...")
+    print("Performing flight length correction...")
     #
     # get optional keyword arguments
     deg      = kwargs.get('deg', 2)
@@ -384,7 +384,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     #
     # fit correction function to peak positions (with fixed absolute offset)
-    _debug("Correcting hit position using polynomial of degree {0:d}.".
+    _debug("Correcting flight length using polynomial of degree {0:d}.".
            format(deg))
     peak_target = polyval2d(0.0, 0.0, _polyfit2d(
         x, y, z, deg, weights = events))
@@ -674,7 +674,7 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     """Automatically optimize correction coefficients.
 
     This function can be used to fine-tune the coefficients used for the voltage
-    and hit position correction, respectively. The coefficients are varied
+    and flight length correction, respectively. The coefficients are varied
     systematically (using the Nelder--Mead algorithm for the |scipy_minimize|
     function from the *scipy.optimize* module) so that the width of the
     maximum peak in the spectrum reaches maximum possible sharpness.
@@ -690,7 +690,7 @@ def optimize_correction(data, spec_par, mode, **kwargs):
         :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
     mode : str
         The string indicating which coefficients shall be optimized. Must be
-        either ``voltage`` or ``hit``.
+        either ``voltage`` or ``flight``.
 
     Keyword Arguments
     -----------------
@@ -723,8 +723,8 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     #
     if mode == 'voltage':
         return _optimize_voltage_correction(data, spec_par, hist_par)
-    elif mode == 'hit':
-        return _optimize_hit_correction(data, spec_par, hist_par)
+    elif mode == 'flight':
+        return _optimize_flight_correction(data, spec_par, hist_par)
     else:
         raise Exception("Unrecognized mode for minimization ({0:s}).".
                         format(mode))
@@ -737,8 +737,8 @@ def write_xml(file, data, spec_par, steps):
 
     This function generates an XML parameter file containing all relevant data
     to obtain a high-quality mass spectrum without further adjustments. This
-    file can then be used for subsequent processing (e.g. reconstruction of ATP
-    data).
+    file can then be used with external tools for subsequent processing (e.g.
+    reconstruction of ATP data).
 
     Parameters
     ----------
@@ -753,7 +753,7 @@ def write_xml(file, data, spec_par, steps):
         :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
     steps : tuple
         The number of (equidistant) steps used to construct the grid of support
-        points for the voltage and hit position correction.
+        points for the voltage and flight length correction.
     """
     #
     #
@@ -1101,10 +1101,10 @@ def _get_mass_to_charge_ratio(data, spec_par):
     mc_ratio = __get_mass_to_charge_ratio(data, U, t_0, L_0)
     #
     #
-    # apply hit position correction if provided
+    # apply flight length correction if provided
     if hit_coeffs is not None:
         if hit_coeffs.dtype is not np.dtype(_dtype):
-            raise TypeError("Wrong type for hit position coefficients "
+            raise TypeError("Wrong type for flight length coefficients "
                             "({0:s}). Must be '{1:s}'.".format(
                                 str(hit_coeffs.dtype),
                                 str(np.dtype(_dtype))))
@@ -1138,8 +1138,8 @@ def _mem():
 #
 #
 #
-def _optimize_hit_correction(data, spec_par, hist_par):
-    """Optimize coefficients for hit position correction.
+def _optimize_flight_correction(data, spec_par, hist_par):
+    """Optimize coefficients for flight length correction.
 
     Parameters
     ----------
@@ -1158,13 +1158,13 @@ def _optimize_hit_correction(data, spec_par, hist_par):
     Returns
     -------
     coeffs : ndarray, shape of input array
-        The optimized coefficients for the hit position correction (of type
+        The optimized coefficients for the flight length correction (of type
         *float32*).
     """
     #
     #
     start = timer()
-    print("Optimizing hit position correction...")
+    print("Optimizing flight length correction...")
     #
     #
     # get initial peak position and width
@@ -1178,16 +1178,16 @@ def _optimize_hit_correction(data, spec_par, hist_par):
     hit_coeffs     = _poly2d_coeff_mat_to_vec(spec_par[2][1])
     #
     #
-    # optimize hit position correction
+    # optimize flight length correction
     minimization_result = minimize(
         _peak_width_minimizer, hit_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs, hit_coeffs[0]), hist_par, 'hit'),
+                (voltage_coeffs, hit_coeffs[0]), hist_par, 'flight'),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
     #
-    # re-assemble coefficients for hit position correction
+    # re-assemble coefficients for flight length correction
     hit_coeffs = np.append(hit_coeffs[0], minimization_result.x.astype(_dtype))
     hit_coeffs = _poly2d_coeff_vec_to_mat(hit_coeffs)
     #
@@ -1198,12 +1198,12 @@ def _optimize_hit_correction(data, spec_par, hist_par):
         hist_par)
     _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
            format(peak_pos_final, peak_width_final))
-    _debug("Optimized coefficients for hit position correction are {0:s}.".
+    _debug("Optimized coefficients for flight length correction are {0:s}.".
            format(str(hit_coeffs)))
     #
     #
-    # return optimized coefficients for hit position correction
-    print("Optimization of hit position correction took {0:.3f} seconds.".
+    # return optimized coefficients for flight length correction
+    print("Optimization of flight length correction took {0:.3f} seconds.".
           format(timer() - start))
     print("Final peak width is {0:.3f} amu/u (initial: {1:.3f} amu/e).".
           format(peak_width_final, peak_width_init))
@@ -1353,7 +1353,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     L_0 : float32
         The (nominal) distance between tip and detector.
     coeffs_stripped : tuple
-        The voltage and hit position correction coefficients in stripped form,
+        The voltage and flight length correction coefficients in stripped form,
         i.e. excluding the coefficients already given in *x*.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
@@ -1361,7 +1361,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
         :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
     mode : str
         The string indicating which coefficients shall be optimized. Must be
-        either ``voltage`` or ``hit``.
+        either ``voltage`` or ``flight``.
     dict_args : dict
         The optional dictionary arguments passed to this minimizer function,
         consisting of the peak target position (``'peak_target'``).
@@ -1383,7 +1383,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     # re-assemble complete set of coefficients for correction functions
     if mode == 'voltage':
         coeffs = (np.append(coeffs_stripped[0], x), coeffs_stripped[1])
-    elif mode == 'hit':
+    elif mode == 'flight':
         # coefficients are passed in vector form, but we need matrix
         # representation
         coeffs = (coeffs_stripped[0],
@@ -1414,8 +1414,9 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
 def _poly2d_coeff_mat_to_vec(M):
     """Convert 2d coefficient matrix to sparse vector representation.
 
-    Note that the 2d coefficient matrix contains zeros in the lower right corner
-    by definition.
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    are used, i.e. the 2d coefficient matrix contains zeros in the lower right
+    corner.
 
     Parameters
     ----------
@@ -1424,7 +1425,7 @@ def _poly2d_coeff_mat_to_vec(M):
 
     Returns
     -------
-    v : ndarray, shape (n(n + 1) / 2,)
+    v : ndarray, shape (n * (n + 1) / 2,)
         The sparse vector representation of the 2d coefficient matrix.
     """
     #
@@ -1447,12 +1448,13 @@ def _poly2d_coeff_mat_to_vec(M):
 def _poly2d_coeff_vec_to_mat(v):
     """Convert sparse vector representation to 2d coefficient matrix.
 
-    Note that the 2d coefficient matrix contains zeros in the lower right corner
-    by definition.
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    are used, i.e. the returned 2d coefficient matrix will contain zeros in the
+    lower right corner.
 
     Parameters
     ----------
-    v : ndarray, shape (n(n + 1) / 2,)
+    v : ndarray, shape (n * (n + 1) / 2,)
         The sparse vector representation of the 2d coefficient matrix.
 
     Returns
@@ -1480,9 +1482,9 @@ def _poly2d_coeff_vec_to_mat(v):
 def _polyfit2d(x, y, f, deg, **kwargs):
     """Custom 2d fitting routine to allow for optional weights.
 
-    Note that only terms :math:`x^i y^j` with :math:`i + i \leq d` are used,
-    i.e. the returned 2d coefficient matrix will contain zeros in the lower
-    right corner.
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    are used, i.e. the returned 2d coefficient matrix will contain zeros in the
+    lower right corner.
 
     Parameters
     ----------
