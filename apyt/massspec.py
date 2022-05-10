@@ -2,9 +2,11 @@
 The APyT mass spectrum module
 =============================
 
-This module enables the automatic evaluation of mass spectra from raw
-measurement data including optimization routines to obtain peaks with maximum
-possible sharpness.
+This module enables the automatic evaluation of high-quality mass spectra from
+raw measurement data including optimization routines to obtain peaks with
+maximum possible sharpness. An XML parameter file containing all relevant
+information can be written to the working directory which can then be used for
+subsequent processing (e.g. reconstruction of ATP data) with external tools.
 
 
 Howto
@@ -35,7 +37,7 @@ The spectrum of the mass-to-charge ratio is calculated according to
 
 .. math::
     \\frac m q = \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
-                       {(L_0^2 + x^2 + y^2)} \psi(x, y),
+                       {L_0^2 + x^2 + y^2 + \psi(x, y)},
 
 where :math:`\\varphi(U)` is accounting for the correction of the measured
 voltage, :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal)
@@ -45,7 +47,7 @@ hit position :math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific
 machine parameters. :math:`\\varphi(U)` and :math:`\psi(x, y)` are given by 1d
 and 2d polynomials with coefficients as described in |polyval| and |polyval2d|
 from the *numpy* module, respectively. The spectrum parameters are expected to
-be a tuple with *(t_0, L_0, (voltage_coeffs, hit_coeffs))*, where the
+be a tuple with *(t_0, L_0, (voltage_coeffs, flight_coeffs))*, where the
 coefficients are expected to be an *ndarray*. If ``None`` is provided for the
 coefficients, no respective correction will be applied. Note that all values
 must be of type *float32*.
@@ -63,6 +65,29 @@ function:
   parameter). Defaults to 0.05 amu/e.
 
 
+XML parameter file format
+-------------------------
+The generated XML parameter file contains all relevant information necessary to
+reconstruct the high-quality mass spectrum with external tools. However, for
+historic reasons, the correction functions :math:`\\varphi` and :math:`\psi` are
+used to construct an evenly spaced grid with support points for the voltage (1d)
+and flight length correction (2d), which shall then be applied by external tools
+using interpolation (legacy mode). The correction functions in this mode are
+supposed to be multiplicative factors of the form
+
+.. math::
+    \\frac m q = \\frac{2 U (t - t_0)^2} {L_0^2}
+                  \\hat\\varphi(U) \\hat\psi(x, y),
+
+where :math:`\\hat\\varphi(U)` and :math:`\\hat\psi(x, y)` are obtained from the
+corrections functions :math:`\\varphi(U)` and :math:`\psi(x, y)`, respectively.
+
+For higher precision and without the need of interpolation, the coefficients of
+the correction functions :math:`\\varphi` and :math:`\psi` are also written
+directly to the XML parameter file which can then be used by external tools to
+apply a continuous correction (default mode; recommended).
+
+
 List of methods
 ---------------
 
@@ -72,7 +97,8 @@ from raw measurement data.
 The following methods are provided:
 
 * :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`get_hit_correction`: Obtain coefficients for hit position correction.
+* :meth:`get_flight_correction`: Obtain coefficients for flight length
+  correction.
 * :meth:`get_mass_spectrum`: Calculate mass spectrum.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
@@ -106,7 +132,7 @@ The following methods are provided:
 __version__ = '0.1.0'
 __all__ = [
     'enable_debug',
-    'get_hit_correction',
+    'get_flight_correction',
     'get_mass_spectrum',
     'get_voltage_correction',
     'optimize_correction',
@@ -195,7 +221,7 @@ def enable_debug(is_dbg):
 #
 #
 #
-def get_hit_correction(data, spec_par, **kwargs):
+def get_flight_correction(data, spec_par, **kwargs):
     """Obtain coefficients for hit position correction.
 
     In order to perform the hit position correction, the detector is first
