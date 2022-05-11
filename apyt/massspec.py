@@ -799,10 +799,14 @@ def write_xml(file, data, spec_par, steps):
     """
     #
     #
+    # unpack parameters for better readability
+    t_0, L_0, (voltage_coeffs, flight_coeffs) = spec_par
+    #
+    #
     # check for valid parameters
-    if spec_par[1] <= 0.0:
+    if L_0 <= 0.0:
         raise Exception("Flight length must be positive.")
-    if spec_par[2][0] is None or spec_par[2][1] is None:
+    if voltage_coeffs is None or flight_coeffs is None:
         raise Exception("Correction coefficients have not been set.")
     if steps[0] < 0 or steps[1] < 0:
         raise Exception("Number of grid points must not be negative.")
@@ -820,7 +824,7 @@ def write_xml(file, data, spec_par, steps):
     _debug("Voltage grid points are:\n" + str(U))
     #
     # set voltage correction points
-    U_corr = 1.0 + 1.0 / U * polyval(U, spec_par[2][0])
+    U_corr = 1.0 + 1.0 / U * polyval(U, voltage_coeffs)
     #
     #
     # filter incompatible values (external tools may fail on negative numbers
@@ -857,8 +861,8 @@ def write_xml(file, data, spec_par, steps):
            str(np.vstack(list(map(np.ravel, (X, Y)))).T))
     #
     # set flight length correction points
-    flight_corr = (polyval2d(X, Y, spec_par[2][1]) /
-                (1.0 + 1.0 / spec_par[1]**2 * (X**2 + Y**2))).flatten()
+    flight_corr = (polyval2d(X, Y, flight_coeffs) /
+                  (1.0 + 1.0 / L_0**2 * (X**2 + Y**2))).flatten()
     _debug("Flight length correction values are:\n" + str(flight_corr))
     #
     #
@@ -886,11 +890,11 @@ def write_xml(file, data, spec_par, steps):
     ET.SubElement(root, "item", {
         "description": "Flightlength",
         "unit": "mm"}
-    ).text = "{0:.3f}".format(spec_par[1])
+    ).text = "{0:.3f}".format(L_0)
     ET.SubElement(root, "item", {
         "description": "Time-of-flight offset",
         "unit": "ns"}
-    ).text = "{0:.3f}".format(spec_par[0])
+    ).text = "{0:.3f}".format(t_0)
     #
     #
     # create voltage correction element
@@ -918,22 +922,22 @@ def write_xml(file, data, spec_par, steps):
     # create voltage correction coefficients element
     ET.SubElement(root, "voltage-coeffs", {
         "arg-unit": "V",
-        "degree": "{0:d}".format(len(spec_par[2][0]) - 1),
+        "degree": "{0:d}".format(len(voltage_coeffs) - 1),
         "dimension": "1",
         "type": "numpy.polynomial.polynomial.polyval",
         "val-unit": "V"}
-    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s), spec_par[2][0]))
+    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s), voltage_coeffs))
     #
     #
     # create flight length correction coefficients element
     ET.SubElement(root, "flight-coeffs", {
         "arg-unit": "mm",
-        "degree": "{0:d}".format(spec_par[2][1].shape[0] - 1),
+        "degree": "{0:d}".format(flight_coeffs.shape[0] - 1),
         "dimension": "2",
         "type": "numpy.polynomial.polynomial.polyval2d",
         "val-unit": "1"}
     ).text = ','.join(map(lambda s: "{0:+.6e}".format(s),
-                                    spec_par[2][1].flatten()))
+                                    flight_coeffs.flatten()))
     #
     #
     #
