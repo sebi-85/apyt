@@ -946,7 +946,6 @@ def write_xml(file, data, spec_par, steps):
     tree = ET.ElementTree(root)
     #
     #
-    #
     # indentation for ElementTree requires Python 3.9 or higher; use minidom
     # for pretty indentation
     xmlstr = minidom.parseString(ET.tostring(root)). \
