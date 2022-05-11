@@ -303,17 +303,21 @@ def get_flight_correction(data, spec_par, **kwargs):
     deg = kwargs.get('deg', 2)
     if deg < 0:
         warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
+        deg = 2
     hist_par = kwargs.get('hist', {})
     size = kwargs.get('size', 0.3)
     if size < 0.0:
         warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+        size = 0.3
     steps = kwargs.get('steps', 15)
     if steps <= 0:
         warn.warnings("Steps must be positive. Resetting to \"15\".")
+        steps = 15
     thres = kwargs.get('thres', 0.9)
     if thres < 0.0 or thres > 1.0:
         warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
                       "to \"0.9\".")
+        thres = 0.9
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -492,10 +496,12 @@ def get_mass_spectrum(data, spec_par, **kwargs):
         warnings.warn("Invalid data range detected (({0:.3f}, {1:.3}) amu/e). "
                       "Resetting to \"None\".".
                       format(data_range[0], data_range[1]))
+        data_range = None
     width = hist_par.get('width', _default_bin_width)
     if width <= 0.0:
         warnings.warn("Histogram bin width must be positive. Resetting to "
                      "{0:.3f} amu/e.".format(_default_bin_width))
+        width = _default_bin_width
     #
     #
     # calculate mass-to-charge ratio
@@ -589,17 +595,21 @@ def get_voltage_correction(data, spec_par, **kwargs):
     deg = kwargs.get('deg', 2)
     if deg < 0:
         warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
+        deg = 2
     hist_par = kwargs.get('hist', {})
     size = kwargs.get('size', 0.3)
     if size < 0.0:
         warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+        size = 0.3
     steps = kwargs.get('steps', 20)
     if steps <= 0:
         warn.warnings("Steps must be positive. Resetting to \"20\".")
+        steps = 20
     thres = kwargs.get('thres', 0.9)
     if thres < 0.0 or thres > 1.0:
         warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
                       "to \"0.9\".")
+        thres = 0.9
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -737,6 +747,11 @@ def optimize_correction(data, spec_par, mode, **kwargs):
         <a href="https://docs.scipy.org/doc/scipy/reference/generated/
         scipy.optimize.minimize.html" target="_blank">minimize()</a>
     """
+    #
+    #
+    # check for valid correction coefficients
+    if spec_par[2][0] is None or spec_par[2][1] is None:
+        raise Exception("Correction coefficients have not been set.")
     #
     #
     # get optional keyword arguments
@@ -1079,6 +1094,11 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     #
     # get range from histogram parameter dictionary
     data_range = hist_par.get('range', None)
+    if data_range is not None and data_range[0] >= data_range[1]:
+        warnings.warn("Invalid data range detected (({0:.3f}, {1:.3}) amu/e). "
+                      "Resetting to \"None\".".
+                      format(data_range[0], data_range[1]))
+        data_range = None
     #
     #
     # calculate histogram and mass-to-charge ratio
@@ -1129,7 +1149,7 @@ def _get_mass_to_charge_ratio(data, spec_par):
     #
     #
     # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, hit_coeffs) = spec_par
+    t_0, L_0, (voltage_coeffs, flight_coeffs) = spec_par
     #
     #
     # check for correct input data type
@@ -1159,13 +1179,13 @@ def _get_mass_to_charge_ratio(data, spec_par):
     #
     #
     # apply flight length correction if provided
-    if hit_coeffs is not None:
-        if hit_coeffs.dtype is not np.dtype(_dtype):
+    if flight_coeffs is not None:
+        if flight_coeffs.dtype is not np.dtype(_dtype):
             raise TypeError("Wrong type for flight length coefficients "
                             "({0:s}). Must be '{1:s}'.".format(
-                                str(hit_coeffs.dtype),
+                                str(flight_coeffs.dtype),
                                 str(np.dtype(_dtype))))
-        mc_ratio /= polyval2d(data[:, 1], data[:, 2], hit_coeffs)
+        mc_ratio /= polyval2d(data[:, 1], data[:, 2], flight_coeffs)
     #
     #
     # return (corrected) mass-to-charge ratio
@@ -1232,31 +1252,32 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
-    hit_coeffs     = _poly2d_coeff_mat_to_vec(spec_par[2][1])
+    flight_coeffs  = _poly2d_coeff_mat_to_vec(spec_par[2][1])
     #
     #
     # optimize flight length correction
     minimization_result = minimize(
-        _peak_width_minimizer, hit_coeffs[1:],
+        _peak_width_minimizer, flight_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs, hit_coeffs[0]), hist_par, 'flight'),
+                (voltage_coeffs, flight_coeffs[0]), hist_par, 'flight'),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
     #
     # re-assemble coefficients for flight length correction
-    hit_coeffs = np.append(hit_coeffs[0], minimization_result.x.astype(_dtype))
-    hit_coeffs = _poly2d_coeff_vec_to_mat(hit_coeffs)
+    flight_coeffs = np.append(flight_coeffs[0],
+                              minimization_result.x.astype(_dtype))
+    flight_coeffs = _poly2d_coeff_vec_to_mat(flight_coeffs)
     #
     #
     # get peak position and width for optimized coefficients
     peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, hit_coeffs)),
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
         hist_par)
     _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
            format(peak_pos_final, peak_width_final))
     _debug("Optimized coefficients for flight length correction are {0:s}.".
-           format(str(hit_coeffs)))
+           format(str(flight_coeffs)))
     #
     #
     # return optimized coefficients for flight length correction
@@ -1264,7 +1285,7 @@ def _optimize_flight_correction(data, spec_par, hist_par):
           format(timer() - start))
     print("Final peak width is {0:.3f} amu/u (initial: {1:.3f} amu/e).".
           format(peak_width_final, peak_width_init))
-    return hit_coeffs.astype(_dtype)
+    return flight_coeffs.astype(_dtype)
 #
 #
 #
@@ -1306,14 +1327,14 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     # parse coefficients
     voltage_coeffs = spec_par[2][0]
-    hit_coeffs     = spec_par[2][1]
+    flight_coeffs  = spec_par[2][1]
     #
     #
     # optimize voltage correction
     minimization_result = minimize(
         _peak_width_minimizer, voltage_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs[0], hit_coeffs), hist_par, 'voltage',
+                (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage',
                 {'peak_target': peak_pos_init}),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
@@ -1326,7 +1347,7 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     # get peak position and width for optimized coefficients
     peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, hit_coeffs)),
+        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
         hist_par)
     #
     #
@@ -1380,6 +1401,14 @@ def _peak_width(data, spec_par, hist_par):
     """
     #
     #
+    # check for valid histogram bin width
+    width = hist_par.get('width', _default_bin_width)
+    if width <= 0.0:
+        warnings.warn("Histogram bin width must be positive. Resetting to "
+                     "{0:.3f} amu/e.".format(_default_bin_width))
+        width = _default_bin_width
+    #
+    #
     # calculate histogram and bin centers
     hist, bin_centers, _ = get_mass_spectrum(data, spec_par, hist = hist_par)
     #
@@ -1388,7 +1417,7 @@ def _peak_width(data, spec_par, hist_par):
     width_half = peak_widths(hist, peaks, rel_height = 0.5)[0][0]
     #
     # return peak positions and widths
-    return bin_centers[peaks[0]], width_half * hist_par['width']
+    return bin_centers[peaks[0]], width_half * width
 #
 #
 #
