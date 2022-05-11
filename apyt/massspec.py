@@ -823,18 +823,14 @@ def write_xml(file, data, spec_par, steps):
     #
     # set version information
     file_info = ET.SubElement(root, "file-info")
-    ET.SubElement(file_info, "item", {
-        "description": "version"}
+    ET.SubElement(file_info, "version"
     ).text = "1.0"
-    ET.SubElement(file_info, "item", {
-        "description": "author"}
+    ET.SubElement(file_info, "author",
     ).text = "Automatically created by the massspec module from the APyT " \
              "package"
-    ET.SubElement(file_info, "item", {
-        "description": "date"}
+    ET.SubElement(file_info, "date",
     ).text = str(datetime.now())
-    ET.SubElement(file_info, "item", {
-        "description": "info"}
+    ET.SubElement(file_info, "info",
     ).text = "Information available at: " \
              "https://apyt.mp.imw.uni-stuttgart.de/apyt.massspec.html"
     #
@@ -868,6 +864,27 @@ def write_xml(file, data, spec_par, steps):
         "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
         "width-size":   "{0:d}".format(steps[1])}
     ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
+    #
+    #
+    # create voltage correction coefficients element
+    ET.SubElement(root, "voltage-coeffs", {
+        "arg-unit": "V",
+        "degree": "{0:d}".format(len(spec_par[2][0]) - 1),
+        "dimension": "1",
+        "type": "numpy.polynomial.polynomial.polyval",
+        "val-unit": "V"}
+    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s), spec_par[2][0]))
+    #
+    #
+    # create flight length correction coefficients element
+    ET.SubElement(root, "flight-coeffs", {
+        "arg-unit": "mm",
+        "degree": "{0:d}".format(spec_par[2][1].shape[0] - 1),
+        "dimension": "2",
+        "type": "numpy.polynomial.polynomial.polyval2d",
+        "val-unit": "1"}
+    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s),
+                                    spec_par[2][1].flatten()))
     #
     #
     #
