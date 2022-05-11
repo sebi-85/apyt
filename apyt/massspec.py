@@ -777,11 +777,15 @@ def write_xml(file, data, spec_par, steps):
     U_corr = 1.0 + 1.0 / U * polyval(U, spec_par[2][0])
     #
     #
+    # find index of *last* negative value
+    last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
+    #
     # filter incompatible values (external tools may fail on negative numbers
     # without prior checks)
-    U_min  = U[(U_corr > 0.0)][0]
-    U_max  = U[(U_corr > 0.0)][-1]
-    U_corr = U_corr[(U_corr > 0.0)]
+    U_corr = U_corr[last_negative + 1:]
+    U      = U[last_negative + 1:]
+    U_min  = U[0]
+    U_max  = U[-1]
     if len(U_corr) != steps[0]:
         warnings.warn("Number of voltage correction points has been reduced to "
                       "{0:d} due to compatibility reasons.".format(len(U_corr)))
