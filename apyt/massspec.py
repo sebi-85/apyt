@@ -37,20 +37,22 @@ The spectrum of the mass-to-charge ratio is calculated according to
 
 .. math::
     \\frac m q = \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
-                       {L_0^2 + x^2 + y^2 + \psi(x, y)},
+                       {(L_0^2 + x^2 + y^2) \psi(x, y)},
 
-where :math:`\\varphi(U)` is accounting for the correction of the measured
-voltage, :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal)
-distance between tip and detector, and :math:`\psi(x, y)` accounts for the
-deviation of the actual flight length from Pythagoras, depending on the detector
-hit position :math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific
-machine parameters. :math:`\\varphi(U)` and :math:`\psi(x, y)` are given by 1d
-and 2d polynomials with coefficients as described in |polyval| and |polyval2d|
-from the *numpy* module, respectively. The spectrum parameters are expected to
-be a tuple with *(t_0, L_0, (voltage_coeffs, flight_coeffs))*, where the
-coefficients are expected to be an *ndarray*. If ``None`` is provided for the
-coefficients, no respective correction will be applied. Note that all values
-must be of type *float32*.
+where :math:`\\varphi(U)` accounts for the correction of the measured voltage,
+:math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal) distance
+between tip and detector, and :math:`\psi(x, y)` accounts for the deviation of
+the actual flight length from Pythagoras, depending on the detector hit position
+:math:`(x, y)`. (Note that the correction in the center of the detector is zero
+by definition, i.e. :math:`\psi(0, 0) \\equiv 1`.) Both :math:`t_0` and
+:math:`L_0` are specific machine parameters. :math:`\\varphi(U)` and
+:math:`\psi(x, y)` are given by 1d and 2d polynomials with coefficients as
+described in |polyval| and |polyval2d| from the *numpy* module, respectively.
+The spectrum parameters are expected to be a tuple with
+*(t_0, L_0, (voltage_coeffs, flight_coeffs))*, where the coefficients are
+expected to be an *ndarray*. If ``None`` is provided for the coefficients, no
+respective correction will be applied. Note that all values must be of type
+*float32*.
 
 
 Histogram parameters
@@ -389,7 +391,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     peak_target = polyval2d(0.0, 0.0, _polyfit2d(
         x, y, z, deg, weights = events))
     _debug("Peak target position is {0:.2f} amu/e.".format(peak_target))
-    coeffs = _polyfit2d(x, y, peak_target / z, deg,
+    coeffs = _polyfit2d(x, y, z / peak_target, deg,
                         weights = events, offset = 1.0)
     _debug("Polynomial coefficients are: {0:s}.".format(str(coeffs)))
     #
@@ -400,7 +402,7 @@ def get_flight_correction(data, spec_par, **kwargs):
                    "# x (mm)\t  y (mm)\t  events\trel_size\tm/q (amu/e)\t" \
                    "m/q (amu/e) (corr.)".format(len(z))
         for elem in list(zip(x, y, events, events / len(data) * 100, z,
-                             z * polyval2d(x, y, coeffs))):
+                             z / polyval2d(x, y, coeffs))):
             peak_str += "\n{0:+8.3f}\t{1:+8.3f}\t{2:8d}\t{3:7.1f}%\t" \
                         "{4:.3f}\t\t{5:.3f}". \
                         format(elem[0], elem[1], elem[2], elem[3], elem[4],
@@ -410,7 +412,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     # set standard deviation before and after correction
     std_init = np.std(z)
-    std = np.std(z * polyval2d(x, y, coeffs))
+    std = np.std(z / polyval2d(x, y, coeffs))
     _debug("Standard deviation of initial peak positions:   {0:.3f} amu/e.".
            format(std_init))
     _debug("Standard deviation of corrected peak positions: {0:.3f} amu/e.".
@@ -427,7 +429,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     # construct wireframe data obtained from fit function
     X = np.meshgrid(np.linspace(x_min + 0.5 * Δx, x_max - 0.5 * Δx, steps),
                     np.linspace(y_min + 0.5 * Δy, y_max - 0.5 * Δy, steps))
-    wireframe = (*X, peak_target / polyval2d(*X, coeffs))
+    wireframe = (*X, peak_target * polyval2d(*X, coeffs))
     #
     #
     # return coefficients for correction function
@@ -1112,7 +1114,7 @@ def _get_mass_to_charge_ratio(data, spec_par):
                             "({0:s}). Must be '{1:s}'.".format(
                                 str(hit_coeffs.dtype),
                                 str(np.dtype(_dtype))))
-        mc_ratio *= polyval2d(data[:, 1], data[:, 2], hit_coeffs)
+        mc_ratio /= polyval2d(data[:, 1], data[:, 2], hit_coeffs)
     #
     #
     # return (corrected) mass-to-charge ratio
