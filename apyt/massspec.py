@@ -780,17 +780,19 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     # find index of *last* negative value
-    last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
-    #
-    # filter incompatible values (external tools may fail on negative numbers
-    # without prior checks)
-    U_corr = U_corr[last_negative + 1:]
-    U      = U[last_negative + 1:]
-    U_min  = U[0]
-    U_max  = U[-1]
-    if len(U_corr) != steps[0]:
-        warnings.warn("Number of voltage correction points has been reduced to "
-                      "{0:d} due to compatibility reasons.".format(len(U_corr)))
+    if len(U_corr) > 0:
+        last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
+        #
+        # filter incompatible values (external tools may fail on negative numbers
+        # without prior checks)
+        U_corr = U_corr[last_negative + 1:]
+        U      = U[last_negative + 1:]
+        U_min  = U[0]
+        U_max  = U[-1]
+        if len(U_corr) != steps[0]:
+            warnings.warn("Number of voltage correction points has been "
+                          "reduced to {0:d} due to compatibility reasons.".
+                          format(len(U_corr)))
     _debug("Voltage correction values are:\n" + str(U_corr))
     #
     #
@@ -847,23 +849,25 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     # create voltage correction element
-    ET.SubElement(root, "voltage-correction", {
-        "delta": "{0:.6f}".format((U_max - U_min) / (len(U_corr) - 1)),
-        "max":   "{0:.6f}".format(U_max),
-        "min":   "{0:.6f}".format(U_min),
-        "size":  "{0:d}".format(len(U_corr))}
-    ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
+    if len(U_corr) > 0:
+        ET.SubElement(root, "voltage-correction", {
+            "delta": "{0:.6f}".format((U_max - U_min) / (len(U_corr) - 1)),
+            "max":   "{0:.6f}".format(U_max),
+            "min":   "{0:.6f}".format(U_min),
+            "size":  "{0:d}".format(len(U_corr))}
+        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
     #
     #
     # create detector correction element
-    ET.SubElement(root, "flightlength-correction", {
-        "height":       "{0:.6f}".format(diameter),
-        "height-delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
-        "height-size":  "{0:d}".format(steps[1]),
-        "width":        "{0:.6f}".format(diameter),
-        "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
-        "width-size":   "{0:d}".format(steps[1])}
-    ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
+    if len(det_corr) > 0:
+        ET.SubElement(root, "flightlength-correction", {
+            "height":       "{0:.6f}".format(diameter),
+            "height-delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
+            "height-size":  "{0:d}".format(steps[1]),
+            "width":        "{0:.6f}".format(diameter),
+            "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
+            "width-size":   "{0:d}".format(steps[1])}
+        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
     #
     #
     # create voltage correction coefficients element
