@@ -300,11 +300,20 @@ def get_flight_correction(data, spec_par, **kwargs):
     print("Performing flight length correction...")
     #
     # get optional keyword arguments
-    deg      = kwargs.get('deg', 2)
+    deg = kwargs.get('deg', 2)
+    if deg < 0:
+        warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
     hist_par = kwargs.get('hist', {})
-    size     = kwargs.get('size', 0.3)
-    steps    = kwargs.get('steps', 15)
-    thres    = kwargs.get('thres', 0.9)
+    size = kwargs.get('size', 0.3)
+    if size < 0.0:
+        warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+    steps = kwargs.get('steps', 15)
+    if steps <= 0:
+        warn.warnings("Steps must be positive. Resetting to \"15\".")
+    thres = kwargs.get('thres', 0.9)
+    if thres < 0.0 or thres > 1.0:
+        warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
+                      "to \"0.9\".")
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -380,8 +389,8 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     # check for sufficient peaks
     if len(z) < (deg + 1) * (deg + 2) // 2:
-        raise Exception("Insufficient number of peaks ({0:d}) detected for hit "
-                        "position correction (must be at least {1:d}).".
+        raise Exception("Insufficient number of peaks ({0:d}) detected for "
+                        "flight length correction (must be at least {1:d}).".
                         format(len(z), (deg + 1) * (deg + 2) // 2))
     #
     #
@@ -433,7 +442,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     #
     # return coefficients for correction function
-    print("Hit position correction took {0:.3f} seconds.".
+    print("Flight length correction took {0:.3f} seconds.".
           format(timer() - start))
     return coeffs.astype(_dtype), (x, y, z), events, wireframe
 #
@@ -479,7 +488,14 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     #
     # get histogram parameters
     data_range = hist_par.get('range', None)
-    width      = hist_par.get('width', _default_bin_width)
+    if data_range is not None and data_range[0] >= data_range[1]:
+        warnings.warn("Invalid data range detected (({0:.3f}, {1:.3}) amu/e). "
+                      "Resetting to \"None\".".
+                      format(data_range[0], data_range[1]))
+    width = hist_par.get('width', _default_bin_width)
+    if width <= 0.0:
+        warnings.warn("Histogram bin width must be positive. Resetting to "
+                     "{0:.3f} amu/e.".format(_default_bin_width))
     #
     #
     # calculate mass-to-charge ratio
@@ -570,11 +586,20 @@ def get_voltage_correction(data, spec_par, **kwargs):
     print("Performing voltage correction...")
     #
     # get optional keyword arguments
-    deg      = kwargs.get('deg', 2)
+    deg = kwargs.get('deg', 2)
+    if deg < 0:
+        warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
     hist_par = kwargs.get('hist', {})
-    size     = kwargs.get('size', 0.3)
-    steps    = kwargs.get('steps', 20)
-    thres    = kwargs.get('thres', 0.9)
+    size = kwargs.get('size', 0.3)
+    if size < 0.0:
+        warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+    steps = kwargs.get('steps', 20)
+    if steps <= 0:
+        warn.warnings("Steps must be positive. Resetting to \"20\".")
+    thres = kwargs.get('thres', 0.9)
+    if thres < 0.0 or thres > 1.0:
+        warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
+                      "to \"0.9\".")
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -759,9 +784,13 @@ def write_xml(file, data, spec_par, steps):
     """
     #
     #
-    # check for valid correction coefficients
+    # check for valid parameters
+    if spec_par[1] <= 0.0:
+        raise Exception("Flight length must be positive.")
     if spec_par[2][0] is None or spec_par[2][1] is None:
         raise Exception("Correction coefficients have not been set.")
+    if steps[0] < 0 or steps[1] < 0:
+        raise Exception("Number of grid points must not be negative.")
     print("Writing parameter file \"{0:s}\".".format(file))
     #
     #
@@ -779,19 +808,20 @@ def write_xml(file, data, spec_par, steps):
     U_corr = 1.0 + 1.0 / U * polyval(U, spec_par[2][0])
     #
     #
-    # find index of *last* negative value
+    # filter incompatible values (external tools may fail on negative numbers
+    # without prior checks)
     if len(U_corr) > 0:
+        # find index of *last* negative value
         last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
         #
-        # filter incompatible values (external tools may fail on negative numbers
-        # without prior checks)
         U_corr = U_corr[last_negative + 1:]
         U      = U[last_negative + 1:]
         U_min  = U[0]
         U_max  = U[-1]
         if len(U_corr) != steps[0]:
             warnings.warn("Number of voltage correction points has been "
-                          "reduced to {0:d} due to compatibility reasons.".
+                          "reduced to {0:d} due to compatibility reasons "
+                          "(negative values encountered).".
                           format(len(U_corr)))
     _debug("Voltage correction values are:\n" + str(U_corr))
     #
@@ -804,17 +834,17 @@ def write_xml(file, data, spec_par, steps):
         abs(data[:, 2].min()), abs(data[:, 2].max()))
     _debug("Detector diameter is {0:.3f} mm.".format(diameter))
     #
-    # create meshgrid for evaluation of detector correction points
+    # create meshgrid for evaluation of flight length correction points
     X, Y = np.meshgrid(
         np.linspace(-diameter / 2, diameter / 2, steps[1]),
         np.linspace(-diameter / 2, diameter / 2, steps[1]))
     _debug("Detector grid points are:\n" +
            str(np.vstack(list(map(np.ravel, (X, Y)))).T))
     #
-    # set detector position correction points
-    det_corr = (polyval2d(X, Y, spec_par[2][1]) /
+    # set flight length correction points
+    flight_corr = (polyval2d(X, Y, spec_par[2][1]) /
                 (1.0 + 1.0 / spec_par[1]**2 * (X**2 + Y**2))).flatten()
-    _debug("Detector correction values are:\n" + str(det_corr))
+    _debug("Flight length correction values are:\n" + str(flight_corr))
     #
     #
     #
@@ -858,8 +888,8 @@ def write_xml(file, data, spec_par, steps):
         ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
     #
     #
-    # create detector correction element
-    if len(det_corr) > 0:
+    # create flight length correction element
+    if len(flight_corr) > 0:
         ET.SubElement(root, "flightlength-correction", {
             "height":       "{0:.6f}".format(diameter),
             "height-delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
@@ -867,7 +897,7 @@ def write_xml(file, data, spec_par, steps):
             "width":        "{0:.6f}".format(diameter),
             "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
             "width-size":   "{0:d}".format(steps[1])}
-        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), det_corr))
+        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), flight_corr))
     #
     #
     # create voltage correction coefficients element
