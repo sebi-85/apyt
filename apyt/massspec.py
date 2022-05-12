@@ -1322,6 +1322,14 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     print("Optimizing voltage correction...")
     #
     #
+    # fine correction of the voltage coefficients may lead to a drastic drift of
+    # the spectrum in rare cases due to numerical instabilities, so we unset the
+    # histogram range here and default to the intrinsic data range so that all
+    # peaks can still be detected in the spectrum
+    if 'range' in hist_par:
+        hist_par['range'] = None
+    #
+    #
     # get initial peak position and width
     peak_pos_init, peak_width_init = _peak_width(data, spec_par, hist_par)
     _debug("Initial peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
