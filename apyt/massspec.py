@@ -829,7 +829,7 @@ def write_xml(file, data, spec_par, steps):
     #
     # filter incompatible values (external tools may fail on negative numbers
     # without prior checks)
-    if len(U_corr) > 0:
+    if len(U_corr) > 0 and U_corr.min() <= 0.0:
         # find index of *last* negative value
         last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
         #
