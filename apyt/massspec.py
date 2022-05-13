@@ -856,7 +856,8 @@ def write_xml(file, data, spec_par, steps):
     # create meshgrid for evaluation of flight length correction points
     X, Y = np.meshgrid(
         np.linspace(-diameter / 2, diameter / 2, steps[1]),
-        np.linspace(-diameter / 2, diameter / 2, steps[1]))
+        np.linspace(-diameter / 2, diameter / 2, steps[1]),
+        indexing = 'ij')
     _debug("Detector grid points are:\n" +
            str(np.vstack(list(map(np.ravel, (X, Y)))).T))
     #
