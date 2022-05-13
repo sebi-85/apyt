@@ -71,18 +71,43 @@ XML parameter file format
 -------------------------
 The generated XML parameter file contains all relevant information necessary to
 reconstruct the high-quality mass spectrum with external tools. However, for
-historic reasons, the correction functions :math:`\\varphi` and :math:`\psi` are
-used to construct an evenly spaced grid with support points for the voltage (1d)
-and flight length correction (2d), which shall then be applied by external tools
-using interpolation (legacy mode). The correction functions in this mode are
-supposed to be multiplicative factors of the form
+historic reasons, the (internal) correction functions :math:`\\varphi` and
+:math:`\psi` are used to construct an evenly spaced grid with support points for
+the voltage (1d) and flight length correction (2d), which shall then be applied
+by external tools using interpolation (legacy mode). The correction functions in
+this mode are supposed to be multiplicative factors of the form
 
 .. math::
     \\frac m q = \\frac{2 U (t - t_0)^2} {L_0^2}
                   \\hat\\varphi(U) \\hat\psi(x, y),
 
 where :math:`\\hat\\varphi(U)` and :math:`\\hat\psi(x, y)` are obtained from the
-corrections functions :math:`\\varphi(U)` and :math:`\psi(x, y)`, respectively.
+(internal) correction functions :math:`\\varphi(U)` and :math:`\psi(x, y)`,
+respectively. The :math:`n` voltage grid points are written as a comma-separated
+list with
+
+.. math::
+    \\hat\\varphi(U_\\textnormal{min}), \
+    \\hat\\varphi(U_\\textnormal{min} + \Delta U), \\ldots, \
+    \\hat\\varphi(U_\\textnormal{min} + (n - 1)\Delta U) = \
+    \\hat\\varphi(U_\\textnormal{max}).
+
+Similarly, the :math:`m_x \\times m_y` flight length correction points are
+written as a comma-separated list according to
+
+.. math::
+    &\\hat\psi(x_\\textnormal{min}, y_\\textnormal{min}), \\ldots, \
+    \\hat\psi(x_\\textnormal{min}, y_\\textnormal{max}), \\\\
+    \\hookrightarrow\\quad & \
+    \\hat\psi(x_\\textnormal{min} + \Delta x, y_\\textnormal{min}), \\ldots, \
+    \\hat\psi(x_\\textnormal{min} + \Delta x, y_\\textnormal{max})), \\\\
+    \\hookrightarrow\\quad &\\ldots, \\\\
+    \\hookrightarrow\\quad &
+    \\hat\psi(x_\\textnormal{max}, y_\\textnormal{min}), \\ldots, \
+    \\hat\psi(x_\\textnormal{max}, y_\\textnormal{max}).
+
+Further details can be obtained by inspecting a self-explanatory XML parameter
+file.
 
 For higher precision and without the need of interpolation, the coefficients of
 the correction functions :math:`\\varphi` and :math:`\psi` are also written
