@@ -861,8 +861,11 @@ def write_xml(file, data, spec_par, steps):
            str(np.vstack(list(map(np.ravel, (X, Y)))).T))
     #
     # set flight length correction points
-    flight_corr = (polyval2d(X, Y, flight_coeffs) /
-                  (1.0 + 1.0 / L_0**2 * (X**2 + Y**2))).flatten()
+    flight_corr = 1.0 / (
+        (1.0 + (X**2 + Y**2) / L_0**2) * polyval2d(X, Y, flight_coeffs)
+    )
+    # flatten flight length correction points
+    flight_corr = flight_corr.flatten()
     _debug("Flight length correction values are:\n" + str(flight_corr))
     #
     #
