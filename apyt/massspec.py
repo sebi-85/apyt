@@ -129,6 +129,7 @@ The following methods are provided:
 * :meth:`get_mass_spectrum`: Calculate mass spectrum.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
+* :meth:`peak_align`: Automatically align peak positions.
 * :meth:`write_xml`: Write XML file for subsequent usage.
 
 
@@ -163,6 +164,7 @@ __all__ = [
     'get_mass_spectrum',
     'get_voltage_correction',
     'optimize_correction',
+    'peak_align',
     'write_xml'
 ]
 #
@@ -185,7 +187,7 @@ from os import getpid
 from psutil import Process
 from resource import getrusage, RUSAGE_SELF
 from scipy import constants
-from scipy.optimize import minimize
+from scipy.optimize import fsolve, minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
@@ -795,6 +797,87 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     else:
         raise Exception("Unrecognized mode for minimization ({0:s}).".
                         format(mode))
+#
+#
+#
+#
+def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
+    """Automatically align peak positions.
+
+    After the coefficients for the voltage and flight length have been
+    determined in order to obtain sharp peaks, the mass spectrum still needs to
+    be aligned properly. In principle, there are two parameters to be
+    determined: The scaling factor :math:`\\alpha` of the voltage-to-flight
+    length ratio and the time offset :math:`t_0` (see
+    :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`).
+    These parameters can be obtained by solving
+
+    .. math::
+        \\frac m q = \\alpha \\left(\\frac m q\\right)^0 \
+                     \\left(1 - \\frac{t_0}{L_0} \
+                                \\sqrt{\\frac{2 U_\\textnormal{fix}} \
+                                             {\\left(\\frac m q\\right)^0} \
+                                }\\right)^2
+
+    for two known peaks, where :math:`\\left(\\frac m q\\right)^0` and
+    :math:`\\frac m q` are the initial and peak target position, respectively,
+    and :math:`U_\\textnormal{fix}` is the voltage fix point at which no voltage
+    correction is applied by definition.
+
+    Parameters
+    ----------
+    peaks_init : ndarray, shape (2,)
+        The two initial peak positions (amu/e) **before** alignment.
+    peaks_final : ndarray, shape (2,)
+        The two final peak target positions (amu/e) **after** alignment.
+    voltage_coeffs : ndarray, shape(n,)
+        The voltage correction coefficients, as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    L_0 : _np_float
+        The nominal flight length.
+    U_guess : float, optional
+        The initial guess for the voltage fix point (i.e. the voltage at which
+        no correction is applied by definition). Defaults to 10 kV.
+
+    Returns
+    -------
+    params : ndarray, shape (2,)
+        The coefficients :math:`(t_0, \\alpha)` for the peak alignment.
+    """
+    #
+    #
+    # local helper function to be solved with optimize.fsolve()
+    def _peak_align(x, peak_init, peak_final):
+        return x[0] * peak_init * \
+               (1.0 - x[1] * np.sqrt(2.0 * U_fix / peak_init) / \
+                      L_0 * 1e-6)**2 - \
+               peak_final
+    #
+    #
+    # convert peak positions from amu/e to corresponding SI units
+    _debug("Selected peaks (amu/e) for automatic adjustment:"
+           "\n{0:.2f} --> {1:.2f}\n{2:.2f} --> {3:.2f}".
+           format(peaks_init[0], peaks_final[0], peaks_init[1], peaks_final[1]))
+    mc_ratio_unit = constants.value('atomic mass constant') / \
+                    constants.value('elementary charge')
+    peaks_init  *= mc_ratio_unit
+    peaks_final *= mc_ratio_unit
+    #
+    #
+    # get voltage fix point (i.e. voltage at which no correction is applied)
+    U_fix = fsolve(lambda U: polyval(U, voltage_coeffs), [U_guess])[0]
+    _debug("Voltage fix point is {0:.3f} kV.".format(U_fix * 1e-3))
+    #
+    #
+    # return parameters for peak alignment
+    params = fsolve(
+        lambda x: [
+            _peak_align(x, peaks_init[0], peaks_final[0]),
+            _peak_align(x, peaks_init[1], peaks_final[1])
+        ], [1.0, 1.0])
+    _debug("Automatically determined parameters for peak adjustment:\n"
+           "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
+    return params
 #
 #
 #
