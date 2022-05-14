@@ -840,13 +840,13 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
     These parameters can be obtained by solving
 
     .. math::
-        \\frac m q = \\alpha \\left(\\frac m q\\right)^0 \
+        \\frac m q = \\alpha \\left(\\frac m q\\right)_0 \
                      \\left(1 - \\frac{t_0}{L_0} \
                                 \\sqrt{\\frac{2 U_\\textnormal{fix}} \
-                                             {\\left(\\frac m q\\right)^0} \
+                                             {\\left(\\frac m q\\right)_0} \
                                 }\\right)^2
 
-    for two known peaks, where :math:`\\left(\\frac m q\\right)^0` and
+    for two known peaks, where :math:`\\left(\\frac m q\\right)_0` and
     :math:`\\frac m q` are the initial and peak target position, respectively,
     and :math:`U_\\textnormal{fix}` is the voltage fix point at which no voltage
     correction is applied by definition.
@@ -935,7 +935,7 @@ def write_xml(file, data, spec_par, steps):
     #
     #
     # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, flight_coeffs) = spec_par
+    t_0, L_0, (voltage_coeffs, flight_coeffs), alpha = spec_par
     #
     #
     # check for valid parameters
@@ -1159,8 +1159,8 @@ def __filter_range(data, col, min, max):
 #
 #
 #
-@numba.njit('f4[:](f4[:, :], f4[:], f4, f4)', parallel = True)
-def __get_mass_to_charge_ratio(data, U, t_0, L_0):
+@numba.njit('f4[:](f4[:, :], f4[:], f4, f4, f4)', parallel = True)
+def __get_mass_to_charge_ratio(data, U, t_0, L_0, alpha):
     """Calculate mass-to-charge ratio for every event.
 
     Parameters
@@ -1182,8 +1182,9 @@ def __get_mass_to_charge_ratio(data, U, t_0, L_0):
     """
     #
     #
+    alpha *= _mc_conversion_factor
     return U * (data[:, 3] - t_0)**2 / \
-           (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * _mc_conversion_factor
+           (L_0**2 + data[:, 1]**2 + data[:, 2]**2) * alpha
 #
 #
 #
@@ -1291,7 +1292,7 @@ def _get_mass_to_charge_ratio(data, spec_par):
     #
     #
     # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, flight_coeffs) = spec_par
+    t_0, L_0, (voltage_coeffs, flight_coeffs), alpha = spec_par
     #
     #
     # check for correct input data type
@@ -1317,7 +1318,7 @@ def _get_mass_to_charge_ratio(data, spec_par):
     #
     #
     # calculate mass-to-charge ratio
-    mc_ratio = __get_mass_to_charge_ratio(data, U, t_0, L_0)
+    mc_ratio = __get_mass_to_charge_ratio(data, U, t_0, L_0, alpha)
     #
     #
     # apply flight length correction if provided
@@ -1401,7 +1402,8 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     minimization_result = minimize(
         _peak_width_minimizer, flight_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs, flight_coeffs[0]), hist_par, 'flight'),
+                (voltage_coeffs, flight_coeffs[0]), spec_par[3], hist_par,
+                'flight'),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
@@ -1413,9 +1415,9 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     #
     # get peak position and width for optimized coefficients
-    peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
-        hist_par)
+    peak_pos_final, peak_width_final = _peak_width(data,
+        (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs),
+         spec_par[3]), hist_par)
     _debug("Final peak position is at {0:.3f} amu/e (width {1:.3f} amu/e).".
            format(peak_pos_final, peak_width_final))
     _debug("Optimized coefficients for flight length correction are {0:s}.".
@@ -1484,8 +1486,8 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     minimization_result = minimize(
         _peak_width_minimizer, voltage_coeffs[1:],
         args = (data, spec_par[0], spec_par[1],
-                (voltage_coeffs[0], flight_coeffs), hist_par, 'voltage',
-                {'peak_target': peak_pos_init}),
+                (voltage_coeffs[0], flight_coeffs), spec_par[3], hist_par,
+                'voltage', {'peak_target': peak_pos_init}),
         method = 'nelder-mead',
         options = {'fatol': 1e-2, 'disp': _is_dbg, 'maxiter': 100})
     #
@@ -1496,9 +1498,9 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     #
     # get peak position and width for optimized coefficients
-    peak_pos_final, peak_width_final = _peak_width(
-        data, (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs)),
-        hist_par)
+    peak_pos_final, peak_width_final = _peak_width(data,
+        (spec_par[0], spec_par[1], (voltage_coeffs, flight_coeffs),
+         spec_par[3]), hist_par)
     #
     #
     # set correction factor to maintain initial peak position
@@ -1572,8 +1574,8 @@ def _peak_width(data, spec_par, hist_par):
 #
 #
 #
-def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
-                          dict_args = None):
+def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, alpha, hist_par,
+                          mode, dict_args = None):
     """The minimizer function for the calculation of the peak width.
 
     Parameters
@@ -1591,6 +1593,9 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     coeffs_stripped : tuple
         The voltage and flight length correction coefficients in stripped form,
         i.e. excluding the coefficients already given in *x*.
+    alpha : float32
+        The scaling factor of the mass-to-charge spectrum, as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
@@ -1633,7 +1638,8 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, hist_par, mode,
     #
     #
     # get maximum peak and its width
-    peak_pos, peak_width = _peak_width(data, (t_0, L_0, coeffs), hist_par)
+    peak_pos, peak_width = _peak_width(
+        data, (t_0, L_0, coeffs, alpha), hist_par)
     #
     #
     # if target position for peak provided, scale peak widths accordingly
