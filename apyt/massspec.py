@@ -36,20 +36,47 @@ Physical spectrum parameters
 The spectrum of the mass-to-charge ratio is calculated according to
 
 .. math::
-    \\frac m q = \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
-                       {(L_0^2 + x^2 + y^2) \psi(x, y)},
+    \\frac m q = \\alpha \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
+                               {(L_0^2 + x^2 + y^2) \psi(x, y)},
 
 where :math:`\\varphi(U)` accounts for the correction of the measured voltage,
 :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal) distance
 between tip and detector, and :math:`\psi(x, y)` accounts for the deviation of
 the actual flight length from Pythagoras, depending on the detector hit position
-:math:`(x, y)`. (Note that the correction in the center of the detector is zero
-by definition, i.e. :math:`\psi(0, 0) \\equiv 1`.) Both :math:`t_0` and
-:math:`L_0` are specific machine parameters. :math:`\\varphi(U)` and
-:math:`\psi(x, y)` are given by 1d and 2d polynomials with coefficients as
-described in |polyval| and |polyval2d| from the *numpy* module, respectively.
-The spectrum parameters are expected to be a tuple with
-*(t_0, L_0, (voltage_coeffs, flight_coeffs))*, where the coefficients are
+:math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific machine
+parameters.
+
+Note that the correction in the center of the detector is zero by definition,
+i.e. :math:`\psi(0, 0) \\equiv 1`. Also, by definition, the fix point of the
+voltage correction, :math:`U_\\textnormal{fix}`, i.e. the voltage at which no
+correction is applied (:math:`\\varphi(U_\\textnormal{fix}) = 0`), is determined
+as demonstrated in the following figure:
+
+.. figure:: img/massspec_voltage_correction.png
+    :align: center
+    :alt: Voltage correction
+    :width: 500
+
+    Exemplary voltage correction.
+
+First, the peak position in the mass-to-charge spectrum is obtained for all
+voltage subranges (data points). The weighted average (with respect to the
+number of events) of all voltage subranges is then set to be the peak target
+position for the voltage correction (black line). The intersection eventually
+determines the fix point of the voltage correction
+(:math:`U_\\textnormal{fix} \\approx 12\,\\textnormal{kV}` in the figure).
+
+Since the actual values for the voltage correction and flight length :math:`L_0`
+cannot be determined unambiguously, but are rather prescribed by the procedure,
+the ratio of the voltage and flight length is still subjected to a constant
+scaling factor :math:`\\alpha`, which is a free parameter along with :math:`t_0`
+for the final adjustment of the peak positions in the mass spectrum (cf.
+:meth:`peak_align`).
+
+:math:`\\varphi(U)` and :math:`\psi(x, y)` are given by 1d and 2d polynomials
+with coefficients as described in |polyval| and |polyval2d| from the *numpy*
+module, respectively. The spectrum parameters are expected to be a tuple with
+*(t_0, L_0, (voltage_coeffs, flight_coeffs), alpha)*, where the coefficients are
 expected to be an *ndarray*. If ``None`` is provided for the coefficients, no
 respective correction will be applied. Note that all values must be of type
 *float32*.
