@@ -882,9 +882,9 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
     #
     #
     # convert peak positions from amu/e to corresponding SI units
-    _debug("Selected peaks (amu/e) for automatic adjustment:"
-           "\n{0:.2f} --> {1:.2f}\n{2:.2f} --> {3:.2f}".
-           format(peaks_init[0], peaks_final[0], peaks_init[1], peaks_final[1]))
+    print("Selected peaks (amu/e) for automatic adjustment:"
+          "\n{0:.2f} --> {1:.2f}\n{2:.2f} --> {3:.2f}".
+          format(peaks_init[0], peaks_final[0], peaks_init[1], peaks_final[1]))
     mc_ratio_unit = constants.value('atomic mass constant') / \
                     constants.value('elementary charge')
     peaks_init  *= mc_ratio_unit
@@ -902,8 +902,8 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
             _peak_align(x, peaks_init[0], peaks_final[0]),
             _peak_align(x, peaks_init[1], peaks_final[1])
         ], [1.0, 1.0])
-    _debug("Automatically determined parameters for peak adjustment:\n"
-           "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
+    print("Automatically determined parameters for peak adjustment:\n"
+          "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
     return params
 #
 #
