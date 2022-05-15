@@ -119,6 +119,9 @@ list with
     \\hat\\varphi(U_\\textnormal{min} + (n - 1)\Delta U) = \
     \\hat\\varphi(U_\\textnormal{max}).
 
+The constant spectrum scaling parameter :math:`\\alpha` is incorporated into the
+voltage correction factor :math:`\\hat\\varphi(U)` by definition.
+
 Similarly, the :math:`m_x \\times m_y` flight length correction points are
 written as a comma-separated list according to
 
@@ -959,7 +962,7 @@ def write_xml(file, data, spec_par, steps):
     _debug("Voltage grid points are:\n" + str(U))
     #
     # set voltage correction points
-    U_corr = 1.0 + 1.0 / U * polyval(U, voltage_coeffs)
+    U_corr = (1.0 + 1.0 / U * polyval(U, voltage_coeffs)) * alpha
     #
     #
     # filter incompatible values (external tools may fail on negative numbers
@@ -1033,7 +1036,14 @@ def write_xml(file, data, spec_par, steps):
     ET.SubElement(root, "item", {
         "description": "Time-of-flight offset",
         "unit": "ns"}
-    ).text = "{0:.3f}".format(t_0)
+    ).text = "{0:.6f}".format(t_0)
+    #
+    #
+    # create constant spectrum scaling factor element
+    ET.SubElement(root, "item", {
+        "description": "alpha",
+        "unit": "1"}
+    ).text = "{0:.6f}".format(alpha)
     #
     #
     # create voltage correction element
