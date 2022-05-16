@@ -831,7 +831,8 @@ def optimize_correction(data, spec_par, mode, **kwargs):
 #
 #
 #
-def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
+def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
+               U_guess = 10e3):
     """Automatically align peak positions.
 
     After the coefficients for the voltage and flight length have been
@@ -865,6 +866,11 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
         :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
     L_0 : _np_float
         The nominal flight length.
+    alpha : _np_float
+        The current constant spectrum scaling factor, as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        Required for iterative calls of this function if the current value is
+        not equal to unity.
     U_guess : float, optional
         The initial guess for the voltage fix point (i.e. the voltage at which
         no correction is applied by definition). Defaults to 10 kV.
@@ -879,7 +885,7 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, U_guess = 10e3):
     # local helper function to be solved with optimize.fsolve()
     def _peak_align(x, peak_init, peak_final):
         return x[0] * peak_init * \
-               (1.0 - x[1] * np.sqrt(2.0 * U_fix / peak_init) / \
+               (1.0 - x[1] * np.sqrt(2.0 * alpha * U_fix / peak_init) / \
                       L_0 * 1e-6)**2 - \
                peak_final
     #
