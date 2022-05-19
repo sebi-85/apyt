@@ -1045,13 +1045,6 @@ def write_xml(file, data, spec_par, steps):
     ).text = "{0:.6f}".format(t_0)
     #
     #
-    # create constant spectrum scaling factor element
-    ET.SubElement(root, "item", {
-        "description": "alpha",
-        "unit": "1"}
-    ).text = "{0:.6f}".format(alpha)
-    #
-    #
     # create voltage correction element
     if len(U_corr) > 0:
         ET.SubElement(root, "voltage-correction", {
@@ -1093,6 +1086,13 @@ def write_xml(file, data, spec_par, steps):
         "val-unit": "1"}
     ).text = ','.join(map(lambda s: "{0:+.6e}".format(s),
                                     flight_coeffs.flatten()))
+    #
+    #
+    # create constant spectrum scaling factor element
+    ET.SubElement(root, "alpha", {
+        "type": "scalar",
+        "val-unit": "1"}
+    ).text = "{0:.6f}".format(alpha)
     #
     #
     #
