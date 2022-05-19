@@ -918,7 +918,7 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
 #
 #
 #
-def write_xml(file, data, spec_par, steps):
+def write_xml(file, data, spec_par, steps, pulse_coupling, detector_voltage):
     """Write XML file for subsequent usage.
 
     This function generates an XML parameter file containing all relevant data
@@ -940,6 +940,10 @@ def write_xml(file, data, spec_par, steps):
     steps : tuple
         The number of (equidistant) steps used to construct the grid of support
         points for the voltage and flight length correction.
+    pulse_coupling : _np_float
+        The pulse coupling factor.
+    detector_voltage : _np_float
+        The detector voltage.
     """
     #
     #
@@ -1043,6 +1047,17 @@ def write_xml(file, data, spec_par, steps):
         "description": "Time-of-flight offset",
         "unit": "ns"}
     ).text = "{0:.6f}".format(t_0)
+    #
+    #
+    # create pulse coupling and detector voltage elements
+    ET.SubElement(root, "item", {
+        "description": "Pulse coupling",
+        "unit": "1"}
+    ).text = "{0:.3f}".format(pulse_coupling)
+    ET.SubElement(root, "item", {
+        "description": "Detector voltage",
+        "unit": "V"}
+    ).text = "{0:.3f}".format(detector_voltage)
     #
     #
     # create voltage correction element
