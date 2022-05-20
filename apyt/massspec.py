@@ -613,6 +613,8 @@ def get_voltage_correction(data, spec_par, **kwargs):
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
         :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+    r_max : _np_float
+        The optional radial range for filtering.
     size : float
         The minimum required size to take a certain voltage range into account
         for correction. The size is given relative to the number of events which
