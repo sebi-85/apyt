@@ -94,6 +94,39 @@ function:
   parameter). Defaults to 0.05 amu/e.
 
 
+Automatic peak alignment
+------------------------
+
+After the coefficients for the voltage and flight length correction have been
+determined in order to obtain sharp peaks, the mass spectrum still needs to be
+aligned properly. In principle, there are two parameters to be determined: The
+scaling factor :math:`\\alpha` of the voltage-to-flight length ratio and the
+time offset :math:`t_0` (see
+:ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`). These
+parameters can be obtained automatically by selecting two peak indices from the
+peak list and their corresponding known target positions, as illustrated in the
+following figure:
+
+.. figure:: img/massspec_peak_align_init.png
+    :align: center
+    :alt: Peak alignment
+    :width: 500
+
+    Peak selection for automatic alignment.
+
+The optimized values for :math:`\\alpha` and :math:`t_0` will be determined and
+updated accordingly. Usually, a change in the time-of-flight offset requires
+another correction cycle, after which the final spectrum with well-aligned peaks
+is obtained:
+
+.. figure:: img/massspec_peak_align_final.png
+    :align: center
+    :alt: Peak alignment
+    :width: 500
+
+    Final spectrum after automatic alignment.
+
+
 XML parameter file format
 -------------------------
 The generated XML parameter file contains all relevant information necessary to
@@ -854,9 +887,9 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
                U_guess = 10e3):
     """Automatically align peak positions.
 
-    After the coefficients for the voltage and flight length have been
-    determined in order to obtain sharp peaks, the mass spectrum still needs to
-    be aligned properly. In principle, there are two parameters to be
+    After the coefficients for the voltage and flight correction length have
+    been determined in order to obtain sharp peaks, the mass spectrum still
+    needs to be aligned properly. In principle, there are two parameters to be
     determined: The scaling factor :math:`\\alpha` of the voltage-to-flight
     length ratio and the time offset :math:`t_0` (see
     :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`).
