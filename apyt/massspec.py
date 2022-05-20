@@ -835,6 +835,11 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     #
     #
     if mode == 'voltage':
+        if len(spec_par[2][0]) == 1:
+            warnings.warn("Cannot perform voltage correction for constant "
+                          "polynomial function of degree 0 due to insufficient "
+                          "degrees of freedom. Skipping...")
+            return spec_par[2][0]
         return _optimize_voltage_correction(data, spec_par, hist_par)
     elif mode == 'flight':
         return _optimize_flight_correction(data, spec_par, hist_par)
