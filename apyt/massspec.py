@@ -654,6 +654,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
         warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
         deg = 2
     hist_par = kwargs.get('hist', {})
+    r_max = kwargs.get('r_max', -1.0)
     size = kwargs.get('size', 0.3)
     if size < 0.0:
         warn.warnings("Size must not be negative. Resetting to \"0.3\".")
@@ -667,6 +668,11 @@ def get_voltage_correction(data, spec_par, **kwargs):
         warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
                       "to \"0.9\".")
         thres = 0.9
+    #
+    #
+    # filter radial detector range if requested
+    if r_max > 0.0:
+        data = __filter_radial_range(data, _np_float(r_max * r_max))
     #
     #
     # limit data to certain mass-to-charge ratio range
@@ -1158,6 +1164,30 @@ def __filter_mass_to_charge_range(data, mc_ratio, min, max):
     #
     #
     return data[(min <= mc_ratio) & (mc_ratio <= max)]
+#
+#
+#
+#
+@numba.njit('f4[:, :](f4[:, :], f4)', parallel = True)
+def __filter_radial_range(data, r_sqr):
+    """Filter data for specific radial detector range.
+
+    Parameters
+    ----------
+    data : ndarray, shape (n, 4)
+        The *n* measured events, as described in
+        :ref:`event data<apyt.massspec:Event data>`.
+    r_sqr : _np_float
+        The squared maximum radius used for filtering.
+
+    Returns
+    -------
+    data_f : ndarray, shape (m, 4)
+        The filtered data.
+    """
+    #
+    #
+    return data[(data[:, 1]**2 + data[:, 2]**2 <= r_sqr)]
 #
 #
 #
