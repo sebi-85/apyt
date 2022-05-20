@@ -434,11 +434,14 @@ def get_flight_correction(data, spec_par, **kwargs):
                 # another, so we will always pick the first one later)
                 peaks, _ = find_peaks(hist, height = thres * hist.max())
                 #
-                # check for valid peaks (should not fail!)
+                # check for valid peaks (might fail if we only capture the flank
+                # of the highest peak, i.e. peak maximum is slightly out of
+                # range; simply issue a warning and ignore this segment)
                 if len(peaks) == 0:
-                    raise Exception("No peaks detected for xy-range "
-                                    "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
-                                    format(x_low, x_high, y_low, y_high))
+                    warnings.warn("No peaks detected for xy-range "
+                                  "({0:.1f}, {1:.1f}), ({2:.1f}, {3:.1f})!".
+                                  format(x_low, x_high, y_low, y_high))
+                    continue
                 #
                 #
                 # append fit data
@@ -714,10 +717,13 @@ def get_voltage_correction(data, spec_par, **kwargs):
             # another, so we will always pick the first one later)
             peaks, _ = find_peaks(hist, height = thres * hist.max())
             #
-            # check for valid peaks (should not fail!)
+            # check for valid peaks (might fail if we only capture the flank of
+            # the highest peak, i.e. peak maximum is slightly out of range;
+            # simply issue a warning and ignore this segment)
             if len(peaks) == 0:
-                raise Exception("No peaks detected for voltage range "
-                                "({0:.1f}, {1:.1f})!".format(U_low, U_high))
+                warnings.warn("No peaks detected for voltage range "
+                              "({0:.1f}, {1:.1f})!".format(U_low, U_high))
+                continue
             #
             #
             # append fit data
