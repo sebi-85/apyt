@@ -217,6 +217,10 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     data = np.loadtxt(tapsim_file, skiprows = 46, usecols = (0, 1, 7, 8))
     #
     #
+    # filter entries with nan values for detector position
+    data = data[~(np.isnan(data[:, 2]) | np.isnan(data[:, 3]))]
+    #
+    #
     # initialize empty array for mapped atomic ids
     id = np.full(len(data), -1, dtype = int)
     #
