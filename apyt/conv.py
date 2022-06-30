@@ -76,6 +76,7 @@ __all__ = [
 #
 # import modules
 import numpy as np
+import warnings
 #
 # import some special functions
 from datetime import datetime
@@ -218,7 +219,11 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     #
     #
     # filter entries with nan values for detector position
+    length_init = len(data)
     data = data[~(np.isnan(data[:, 2]) | np.isnan(data[:, 3]))]
+    if length_init != len(data):
+        warnings.warn("{0:d} events with invalid detector positions (nan) have "
+                      "been removed.".format(length_init - len(data)))
     #
     #
     # initialize empty array for mapped atomic ids
