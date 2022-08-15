@@ -117,6 +117,11 @@ def calc_stats(data, **kwargs):
          The method to use to determine the bin width for the histogram. This
          argument will be passed through to the ``numpy.histogram()`` method.
          Default: ``None``, which evaluates to a bin width of ``1.0``.
+    correlation : int
+         The correlation factor of the samples. If the samples are correlated,
+         the statistical error estimates will be underestimated, but can be
+         corrected with this option. Default: ``1``, i.e. all samples are
+         uncorrelated.
 
     Returns
     -------
@@ -160,22 +165,40 @@ def calc_stats(data, **kwargs):
     counts_norm = counts / (num * (bin_edges[1:] - bin_edges[:-1]))
     #
     #
-    # calculate moments
-    mu       = sum(counts *  bin_centers)          / num
-    var      = sum(counts * (bin_centers - mu)**2) / num
-    moment_4 = sum(counts * (bin_centers - mu)**4) / num
+    # calculate central moments
+    mu   = sum(counts *  bin_centers)          / num
+    mu_2 = sum(counts * (bin_centers - mu)**2) / num
+    mu_4 = sum(counts * (bin_centers - mu)**4) / num
     #
     #
-    # calculate statistical errors
-    delta_mu    = np.sqrt(var / num)
-    delta_var   = 2.0 / np.sqrt(num) * np.sqrt(moment_4);
-    delta_var_r = 1.0 / (mu * np.sqrt(num)) * \
-                  np.sqrt(4.0 * moment_4 + var**3 / mu**2)
+    # set number of independent samples (may be lower than actual sample size
+    # due to user-defined correlation);
+    # using int type may result in integer overflow below; convert to float64
+    n = np.float64(num / kwargs.get('correlation', 1))
+    #
+    #
+    # calculate central moment estimates (correction does not matter for
+    # sufficiently large n)
+    # https://mathworld.wolfram.com/h-Statistic.html
+    h_2 = n * mu_2 / (n - 1)
+    h_4 = (3 * (3 - 2 * n) * n**2 * mu_2**2 + \
+           n**2 * (n**2 - 2 * n + 3) * mu_4) / \
+          ((n - 3) * (n - 2) * (n - 1) * n)
+    #
+    # calculate estimate of relative variance
+    h_2_r = h_2 / mu
+    #
+    #
+    # calculate statistical errors; use fabs to catch floating point errors
+    # https://stats.stackexchange.com/a/157305
+    Δmu    = np.sqrt(h_2 / n)
+    Δh_2   = np.sqrt(np.fabs((h_4 - (n - 3) / (n - 1) * h_2**2) / n))
+    Δh_2_r = np.sqrt(Δh_2**2 + h_2_r**2 * Δmu**2) / mu
     #
     #
     # return histogram data and statistics
     return (counts, bin_edges, bin_centers, counts_norm), \
-           (mu, delta_mu, var, delta_var, var / mu, delta_var_r)
+           (mu, Δmu, h_2, Δh_2, h_2_r, Δh_2_r)
 #
 #
 #
