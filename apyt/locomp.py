@@ -593,7 +593,7 @@ def _query(tree, query_points, query, types):
     if query['type'] == 'neighbor':
         # query neighbors
         dists, indices = tree.query(
-            query_points, k = query['param'], n_jobs = -1)
+            query_points, k = query['param'], workers = -1)
         #
         #
         # distances are sorted, so maximum distance is last entry;
@@ -604,7 +604,7 @@ def _query(tree, query_points, query, types):
     elif query['type'] == 'volume':
         # query neighbors
         indices = tree.query_ball_point(
-            query_points, query['param'], n_jobs = -1, return_sorted = False)
+            query_points, query['param'], workers = -1, return_sorted = False)
     #
     #
     #
