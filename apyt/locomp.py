@@ -45,6 +45,7 @@ The following methods are provided:
 * :meth:`check_periodic_box`: Check periodic boundary conditions.
 * :meth:`emulate_efficiency`: Emulate detector efficiency for simulated data.
 * :meth:`get_composition`: Get local compositions for query points.
+* :meth:`get_margin_filter`: Automatically filter margin region.
 * :meth:`get_query_points`: Get query points for neighbor search.
 
 
@@ -68,6 +69,7 @@ __all__ = [
     'check_periodic_box',
     'emulate_efficiency',
     'get_composition',
+    'get_margin_filter',
     'get_query_points'
 ]
 #
@@ -370,6 +372,61 @@ def get_composition(data, query_points, query, **kwargs):
     elif query['type'] == 'volume':
         return _query_volume(tree, query_points, query, types,
                              verbose = verbose)
+#
+#
+#
+#
+def get_margin_filter(query_points, r, box_l, box_u, threshold = 1.1):
+    """Automatically filter margin region.
+
+    Query points close to the surface in the margin region should not be
+    included in the evaluation since the nearest neighbors will typically not be
+    confined in a spherical volume, but rather in a truncated sphere. Only if
+    the distance of the query point to the surface is sufficiently large, the
+    maximum nearest neighbor distance becomes equal to the sphere radius. The
+    critical condition is reached if the distance of the query point is
+    identical to the maximum nearest neighbor distance. By default, an
+    additional buffer of 10% is included, which can be controlled by the
+    optional ``threshold`` argument.
+
+    Parameters
+    ----------
+    query_points : ndarray, shape (n, 3)
+        The *n* three-dimensional query points.
+    r : ndarray, shape (n,)
+        The *n* sphere radii (maximum nearest neighbor distances).
+    box_l : ndarray, shape (3,)
+        The lower box boundary.
+    box_u : ndarray, shape (3,)
+        The upper box boundary.
+    threshold : float
+        The optional threshold used for filtering. Defaults to 1.1.
+
+    Returns
+    -------
+    mask : ndarray, shape (n,)
+        The bolean mask indicating which query points do **not**
+        belong to the margin region.
+    """
+    #
+    #
+    # calculate distance of each query point to surface (first distance to
+    # surface in each dimension, then minimum of all dimensions)
+    print("Calculating filter mask for query points in margin region ...")
+    d = np.amin(np.minimum(query_points - box_l, box_u - query_points),
+                axis = 1)
+    #
+    #
+    # create filter mask (only use query points where distance of 'sphere'
+    # center from surface is greater than 'sphere' radius including additional
+    # threshold)
+    mask = (d >= threshold * r)
+    print("Margin region contains {0:d} query points."
+          .format(np.count_nonzero(~mask)))
+    #
+    #
+    # return filter mask
+    return mask
 #
 #
 #
