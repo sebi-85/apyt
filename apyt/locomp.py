@@ -405,7 +405,7 @@ def get_margin_filter(query_points, r, box_l, box_u, threshold = 1.1):
     Returns
     -------
     mask : ndarray, shape (n,)
-        The bolean mask indicating which query points do **not**
+        The boolean mask indicating which query points do **not**
         belong to the margin region.
     """
     #
