@@ -256,7 +256,7 @@ def check_periodic_box(comment):
 #
 #
 #
-def emulate_efficiency(data, seed = None):
+def emulate_efficiency(data, p, seed = None):
     """Emulate detector efficiency for simulated data.
 
     For data prior to evaporation and reconstruction, the limited detector
@@ -268,6 +268,8 @@ def emulate_efficiency(data, seed = None):
     ----------
     data : ndarray, shape (n, 4)
         The *n* types and three-dimensional coordinates of the atoms.
+    p : float
+        The detector efficiency to emulate.
     seed : int, optional
         The optional seed to initialize the random number generator. Defaults to
         ``None``.
