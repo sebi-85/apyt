@@ -442,7 +442,10 @@ def get_query_points(coords, **kwargs):
     artifacts. With the ``distance`` keyword argument, a minimum separation
     between the query points is ensured, which is achieved by the construction
     of a regular three-dimensional grid. For periodic boxes, the box dimensions
-    should be passed using the ``box`` keyword argument.
+    should be passed using the ``box`` keyword argument. By default, internal
+    consistency checks for appropriate use of the ``margin`` keyword argument
+    are performed, but these checks can be disabled with the
+    ``no_margin_checks`` keyword argument.
 
     Parameters
     ----------
@@ -457,6 +460,8 @@ def get_query_points(coords, **kwargs):
         The (minimum) separation between the query points.
     margin : float
         The width of the margin region to exclude for the query points.
+    no_margin_checks : bool
+        Whether to disable internal margin checks.
 
     Returns
     -------
@@ -466,20 +471,20 @@ def get_query_points(coords, **kwargs):
     #
     #
     # get optional keyword arguments
-    distance    = kwargs.get('distance', None)
-    is_periodic = (kwargs.get('box', None) is not None)
-    margin      = kwargs.get('margin', None)
+    distance         = kwargs.get('distance', None)
+    is_periodic      = (kwargs.get('box', None) is not None)
+    margin           = kwargs.get('margin', None)
+    no_margin_checks = kwargs.get('no_margin_checks', False)
     #
     #
     # do some error checking for non-reasonable combination of options
-    if is_periodic and margin is not None:
-        print('ERROR: You cannot use the "--margin" option with periodic '
-              'boundary conditions.', file = stderr)
-        exit(1)
-    if is_periodic == False and margin is None:
-        print('ERROR: You must use the "--margin" option to exclude surface '
-              'artifacts. (See "--help" for details.)', file = stderr)
-        exit(1)
+    if no_margin_checks == False:
+        if is_periodic == True and margin is not None:
+            raise Exception("You cannot use the \"--margin\" option with "
+                            "periodic boundary conditions.")
+        if is_periodic == False and margin is None:
+            raise Exception("You must use the \"--margin\" option to exclude "
+                            "surface artifacts. (See \"--help\" for details.)")
     #
     #
     #
@@ -494,9 +499,8 @@ def get_query_points(coords, **kwargs):
     # construct 3d grid if requested
     if distance is not None:
         if distance <= 0.0:
-            print('ERROR: Distance ({0:.3f}) must be positive.'
-                  .format(distance), file = stderr)
-            exit(1)
+            raise Exception("Distance ({0:.3f}) must be positive.".
+                            format(distance))
         #
         #
         # get minimum and maximum positions for each direction
@@ -514,9 +518,7 @@ def get_query_points(coords, **kwargs):
             # number of grid points
             n_grid = int((max_pos[i] - min_pos[i]) / distance) + 1
             if n_grid <= 1:
-                print('ERROR: Cannot construct grid. Separation too big?',
-                      file = stderr)
-                exit(1)
+                raise Exception("Cannot construct grid. Separation too big?")
             #
             # separation between grid points
             delta = (max_pos[i] - min_pos[i]) / (n_grid - 1)
