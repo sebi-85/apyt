@@ -368,9 +368,9 @@ def get_composition(data, query_points, query, **kwargs):
     #
     # call respective wrapper for neighbor search
     if query['type'] == 'neighbor':
-        return _query_nearest(tree, query_points, query, types, kwargs)
+        return _query_nearest(tree, query_points, query, types, **kwargs)
     elif query['type'] == 'volume':
-        return _query_volume(tree, query_points, query, types, kwargs)
+        return _query_volume(tree, query_points, query, types, **kwargs)
 #
 #
 #
@@ -784,7 +784,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
             #
             # get partial results
             dists_partial, compositions_partial = _query(
-                tree, query_points_partial, query, types, kwargs)
+                tree, query_points_partial, query, types, **kwargs)
             #
             # append partial results
             dists        = np.append(dists,        dists_partial)
@@ -798,7 +798,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
         # search all neighbors at once
         if verbose == True:
             print('Searching neighbors and evaluating compositions ...')
-        return _query(tree, query_points, query, types, kwargs)
+        return _query(tree, query_points, query, types, **kwargs)
 #
 #
 #
@@ -890,7 +890,7 @@ def _query_volume(tree, query_points, query, types, **kwargs):
             #
             # get partial results
             neighbors_partial, compositions_partial = _query(
-                tree, query_points_partial, query, types, kwargs)
+                tree, query_points_partial, query, types, **kwargs)
             #
             # append partial results
             neighbors    = np.append(neighbors, neighbors_partial)
@@ -904,4 +904,4 @@ def _query_volume(tree, query_points, query, types, **kwargs):
         # search all neighbors at once
         if verbose == True:
             print('Searching neighbors and evaluating compositions ...')
-        return _query(tree, query_points, query, types, kwargs)
+        return _query(tree, query_points, query, types, **kwargs)
