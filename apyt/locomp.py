@@ -322,6 +322,9 @@ def get_composition(data, query_points, query, **kwargs):
         The periodic box dimensions (if present).
     verbose : bool
         Whether to be verbose. Default: ``False``.
+    workers : int
+        The optional number of worker threads to use. If not provided, all
+        system cores will be used.
 
     Returns
     -------
@@ -344,16 +347,12 @@ def get_composition(data, query_points, query, **kwargs):
     """
     #
     #
-    # set verbosity
-    verbose = kwargs.get('verbose', False)
-    #
-    #
     # set atomic types
     types = data[:, 0].astype(int)
     #
     #
     # build tree
-    if verbose == True:
+    if kwargs.get('verbose', False) == True:
         print('Building tree ...')
     tree = cKDTree(data[:, 1:4], boxsize = kwargs.get('box', None))
     #
@@ -369,11 +368,9 @@ def get_composition(data, query_points, query, **kwargs):
     #
     # call respective wrapper for neighbor search
     if query['type'] == 'neighbor':
-        return _query_nearest(tree, query_points, query, types,
-                              verbose = verbose)
+        return _query_nearest(tree, query_points, query, types, kwargs)
     elif query['type'] == 'volume':
-        return _query_volume(tree, query_points, query, types,
-                             verbose = verbose)
+        return _query_volume(tree, query_points, query, types, kwargs)
 #
 #
 #
@@ -609,7 +606,7 @@ def _get_composition(indices, types):
 #
 #
 #
-def _query(tree, query_points, query, types):
+def _query(tree, query_points, query, types, **kwargs):
     """Query neighbors.
 
     Depending on the value of ``type`` in the **query** dictionary argument,
@@ -627,6 +624,12 @@ def _query(tree, query_points, query, types):
         of neighbors or neighbor search cutoff).
     types : ndarray, shape(n,)
         The *n* atomic types.
+
+    Keyword Arguments
+    -----------------
+    workers : int
+        The number of worker threads to use. Defaults to ``-1``, i.e. use all
+        system cores.
 
     Returns
     -------
@@ -654,7 +657,8 @@ def _query(tree, query_points, query, types):
     if query['type'] == 'neighbor':
         # query neighbors
         dists, indices = tree.query(
-            query_points, k = query['param'], workers = -1)
+            query_points, k = query['param'],
+            workers = kwargs.get('workers', -1))
         #
         #
         # distances are sorted, so maximum distance is last entry;
@@ -665,7 +669,8 @@ def _query(tree, query_points, query, types):
     elif query['type'] == 'volume':
         # query neighbors
         indices = tree.query_ball_point(
-            query_points, query['param'], workers = -1, return_sorted = False)
+            query_points, query['param'], workers = kwargs.get('workers', -1)),
+            return_sorted = False)
     #
     #
     #
@@ -728,6 +733,8 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
     -----------------
     verbose : bool
         Whether to be verbose. Default: ``False``.
+    workers : int
+        The optional number of worker threads to use.
 
     Returns
     -------
@@ -777,7 +784,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
             #
             # get partial results
             dists_partial, compositions_partial = _query(
-                tree, query_points_partial, query, types)
+                tree, query_points_partial, query, types, kwargs)
             #
             # append partial results
             dists        = np.append(dists,        dists_partial)
@@ -791,7 +798,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
         # search all neighbors at once
         if verbose == True:
             print('Searching neighbors and evaluating compositions ...')
-        return _query(tree, query_points, query, types)
+        return _query(tree, query_points, query, types, kwargs)
 #
 #
 #
@@ -821,6 +828,8 @@ def _query_volume(tree, query_points, query, types, **kwargs):
     -----------------
     verbose : bool
         Whether to be verbose. Default: ``False``.
+    workers : int
+        The number of worker threads to use.
 
     Returns
     -------
@@ -881,7 +890,7 @@ def _query_volume(tree, query_points, query, types, **kwargs):
             #
             # get partial results
             neighbors_partial, compositions_partial = _query(
-                tree, query_points_partial, query, types)
+                tree, query_points_partial, query, types, kwargs)
             #
             # append partial results
             neighbors    = np.append(neighbors, neighbors_partial)
@@ -895,4 +904,4 @@ def _query_volume(tree, query_points, query, types, **kwargs):
         # search all neighbors at once
         if verbose == True:
             print('Searching neighbors and evaluating compositions ...')
-        return _query(tree, query_points, query, types)
+        return _query(tree, query_points, query, types, kwargs)
