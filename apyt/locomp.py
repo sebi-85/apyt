@@ -664,8 +664,11 @@ def _query(tree, query_points, query, types, **kwargs):
         # distances are sorted, so maximum distance is last entry;
         # create copy of maximum distances to allow freeing of full distance
         # array
-        r_sphere = np.copy(dists[:, -1])
-        dists    = None
+        if query['param'] == 1:
+            r_sphere = np.copy(dists)
+        else:
+            r_sphere = np.copy(dists[:, -1])
+        dists = None
     elif query['type'] == 'volume':
         # query neighbors
         indices = tree.query_ball_point(
