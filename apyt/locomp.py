@@ -320,6 +320,9 @@ def get_composition(data, query_points, query, **kwargs):
     -----------------
     box : ndarray, shape (3,) or None
         The periodic box dimensions (if present).
+    memory : float
+        The maximum amount of memory (GB) to use. If not provided, an internally
+        specified fraction of the total system memory will be used at maximum.
     verbose : bool
         Whether to be verbose. Default: ``False``.
     workers : int
@@ -718,7 +721,7 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
     Before the neighbor search is performed, this method estimates the amount of
     memory needed for the search. If insufficient free memory is available, the
     neighbor search is split into smaller chunks so that approximately only half
-    of the currently available memory is used.
+    of the currently available memory is used (if not specified otherwise).
 
     Parameters
     ----------
@@ -736,6 +739,8 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
     -----------------
     verbose : bool
         Whether to be verbose. Default: ``False``.
+    memory : float
+        The optional maximum amount of memory (GB) to use.
     workers : int
         The optional number of worker threads to use.
 
@@ -755,19 +760,29 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
     # estimated memory in GB (factor two accounts for indices and distances)
     mem_estimated = len(query_points) * query['param'] * 2 * 8 * 1e-9
     #
-    # get available memory
-    mem_available = virtual_memory().available * 1e-9
+    # get internal memory limit
+    mem_limit = _mem_threshold * virtual_memory().available * 1e-9
+    #
+    #
+    # check allowed memory
+    mem_req = mem_limit if   kwargs.get('memory') is None \
+                        else kwargs.get('memory')
+    if mem_req > mem_limit:
+        print('WARNING: Requested amount of memory ({0:.1f} GB) exceeds '
+              'internal limit ({1:.1f} GB). Using internal limit.'.
+              format(mem_req, mem_limit))
+        mem_req = mem_limit
     #
     #
     # test for sufficient available memory
-    if mem_estimated > _mem_threshold * mem_available:
+    if mem_estimated > mem_req:
         if verbose == True:
-            print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
-                  'available memory ({2:.2f} GB).'.format(
-                      mem_estimated, int(_mem_threshold * 100), mem_available))
+            print('NOTE: Estimated memory usage ({0:.1f} GB) exceeds '
+                  'requested/available memory ({1:.1f} GB).'.format(
+                      mem_estimated, mem_req))
         #
         # set number of chunks
-        chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
+        chunks = int(np.ceil(mem_estimated / mem_req))
         if verbose == True:
             print('      Splitting problem into {0:d} chunks. (This may cause '
                   'overhead.)'.format(chunks))
@@ -831,6 +846,8 @@ def _query_volume(tree, query_points, query, types, **kwargs):
     -----------------
     verbose : bool
         Whether to be verbose. Default: ``False``.
+    memory : float
+        The optional maximum amount of memory (GB) to use.
     workers : int
         The number of worker threads to use.
 
@@ -860,20 +877,29 @@ def _query_volume(tree, query_points, query, types, **kwargs):
     samples = None
     #
     #
-    # get available memory
-    mem_available = virtual_memory().available * 1e-9
+    # get internal memory limit
+    mem_limit = _mem_threshold * virtual_memory().available * 1e-9
+    #
+    #
+    # check allowed memory
+    mem_req = mem_limit if   kwargs.get('memory') is None \
+                        else kwargs.get('memory')
+    if mem_req > mem_limit:
+        print('WARNING: Requested amount of memory ({0:.1f} GB) exceeds '
+              'internal limit ({1:.1f} GB). Using internal limit.'.
+              format(mem_req, mem_limit))
+        mem_req = mem_limit
     #
     #
     # test for sufficient available memory
-    if mem_estimated > _mem_threshold * mem_available:
+    if mem_estimated > mem_req:
         if verbose == True:
-            print('NOTE: Estimated memory usage ({0:.2f} GB) exceeds {1:d}% of '
-                  'available memory ({2:.2f} GB).'
-                  .format(mem_estimated, int(_mem_threshold * 100),
-                          mem_available))
+            print('NOTE: Estimated memory usage ({0:.1f} GB) exceeds '
+                  'requested/available memory ({1:.1f} GB).'.format(
+                      mem_estimated, mem_req))
         #
         # set number of chunks
-        chunks = int(np.ceil(mem_estimated / (_mem_threshold * mem_available)))
+        chunks = int(np.ceil(mem_estimated / mem_req))
         if verbose == True:
             print('      Splitting problem into {0:d} chunks. (This may cause '
                   'overhead.)'.format(chunks))
