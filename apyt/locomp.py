@@ -322,7 +322,8 @@ def get_composition(data, query_points, query, **kwargs):
         The periodic box dimensions (if present).
     memory : float
         The maximum amount of memory (GB) to use. If not provided, an internally
-        specified fraction of the total system memory will be used at maximum.
+        specified fraction of the available system memory will be used at
+        maximum.
     verbose : bool
         Whether to be verbose. Default: ``False``.
     workers : int
@@ -720,8 +721,10 @@ def _query_nearest(tree, query_points, query, types, **kwargs):
 
     Before the neighbor search is performed, this method estimates the amount of
     memory needed for the search. If insufficient free memory is available, the
-    neighbor search is split into smaller chunks so that approximately only half
-    of the currently available memory is used (if not specified otherwise).
+    neighbor search is split into smaller chunks so that approximately an
+    internally specified fraction of the currently available memory is used at
+    maximum (if not a lower amount is specified otherwise with the ``memory``
+    keyword argument).
 
     Parameters
     ----------
