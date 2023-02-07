@@ -45,6 +45,8 @@ The following methods are provided:
 * :meth:`check_periodic_box`: Check periodic boundary conditions.
 * :meth:`emulate_efficiency`: Emulate detector efficiency for simulated data.
 * :meth:`get_composition`: Get local compositions for query points.
+* :meth:`get_extended_cell_geometry`: Get simulation cell geometry in \
+                                      *extended xyz* format.
 * :meth:`get_margin_filter`: Automatically filter margin region.
 * :meth:`get_query_points`: Get query points for neighbor search.
 
@@ -69,6 +71,7 @@ __all__ = [
     'check_periodic_box',
     'emulate_efficiency',
     'get_composition',
+    'get_extended_cell_geometry',
     'get_margin_filter',
     'get_query_points'
 ]
@@ -79,6 +82,7 @@ __all__ = [
 # import modules
 import multiprocessing
 import numpy as np
+import warnings
 #
 # import some special functions
 from functools import partial
@@ -375,6 +379,57 @@ def get_composition(data, query_points, query, **kwargs):
         return _query_nearest(tree, query_points, query, types, **kwargs)
     elif query['type'] == 'volume':
         return _query_volume(tree, query_points, query, types, **kwargs)
+#
+#
+#
+#
+def get_extended_cell_geometry(comment):
+    """Get simulation cell geometry in *extended xyz* format.
+
+    This method checks an OVITO comment line in standard *xyz* format for the
+    simulation cell geometry and, if present, returns the cell geometry in
+    *extended xyz* format.
+
+    Parameters
+    ----------
+    comment : str
+        A valid OVITO comment line from a file in *xyz* format.
+
+    Returns
+    -------
+    cell : str
+        The simulation cell geometry in *extended xyz* format (empty if no cell
+        geometry found).
+    """
+    #
+    #
+    # split comment line into single tokens
+    comment = comment.split()
+    #
+    #
+    # get cell vectors
+    cell = ""
+    for i in range(1, 4):
+        try:
+            index = comment.index('cell_vec{0:d}'.format(i)) + 1
+            cell += " ".join(comment[index:index + 3]) + " "
+        except:
+            warnings.warn("Could not find 'cell_vec{0:d}' in comment line. "
+                          "Skipping …".format(i))
+            return ""
+    cell = "Lattice=\"" + cell[:-1] + "\" "
+    #
+    # get cell origin
+    try:
+        index = comment.index('cell_orig') + 1
+        cell += "Origin=\"" + " ".join(comment[index:index + 3]) + "\" "
+    except:
+        warnings.warn("Could not find 'cell_orig' in comment line. "
+                      "Skipping …" )
+    #
+    #
+    # return cell geometry
+    return cell
 #
 #
 #
