@@ -580,6 +580,10 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     """
     #
     #
+    start = timer()
+    _debug("Calculating mass spectrum for {0:.1f} M events...".
+           format(len(data) / 1e6))
+    #
     # get optional keyword arguments
     hist_par = kwargs.get('hist', {})
     #
@@ -611,6 +615,8 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     #
     # return histogram, bin centers, and mass-to-charge ratios
+    _debug("Calculation of mass spectrum took {0:.3f} seconds.".
+           format(timer() - start))
     return hist, bin_centers, mc_ratio
 #
 #
