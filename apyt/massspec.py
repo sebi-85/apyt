@@ -1287,6 +1287,9 @@ def __get_mass_to_charge_ratio(data, U, t_0, L_0, alpha):
         The time-of-flight offset.
     L_0 : float32
         The (nominal) distance between tip and detector.
+    alpha : float32
+        The scaling factor of the mass-to-charge spectrum, as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
 
     Returns
     -------
