@@ -705,6 +705,27 @@ def _get_molecular_isotope_list(molecule):
 #
 #
 #
+def _get_nonzero_isotopes(element):
+    """
+    Return list of isotopes with non-zero abundances.
+    """
+    #
+    #
+    # loop through isotopes with non-zero abundances
+    isotope_list = []
+    abundances   = []
+    for isotope in element.isotopes:
+        if element[isotope].abundance > 0.0:
+            isotope_list.append(isotope)
+            abundances.append(element[isotope].abundance)
+    #
+    #
+    # return list of isotopes and their abundances
+    return isotope_list, np.asarray(abundances)
+#
+#
+#
+#
 def _isotope_spectrum(x, params, isotope):
     """
     Get spectrum for specified isotope.
