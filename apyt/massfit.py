@@ -113,6 +113,7 @@ from histogram data.
 The following methods are provided:
 
 * :meth:`counts`: Get counts for all elements.
+* :meth:`enable_debug`: Enable or disable debug output.
 * :meth:`fit`: Fit mass spectrum.
 * :meth:`isotope_list`: Get list of all isotopes for specified elements and
   charge states.
@@ -163,6 +164,10 @@ from scipy.special import erf
 # private module-level variables
 #
 ################################################################################
+_is_dbg = False
+"""The global flag for debug output.
+
+This flag can be set through the :meth:`enable_debug` function."""
 #
 #
 #
@@ -295,6 +300,22 @@ def counts(isotope_list, params, data_range, bin_width,
     #
     # return element counts, total counts, and background counts
     return count_list, total_counts, background
+#
+#
+#
+#
+def enable_debug(is_dbg):
+    """Enable or disable debug output.
+
+    Parameters
+    ----------
+    is_dbg : bool
+        Whether to enable or disable debug output.
+    """
+    #
+    #
+    global _is_dbg
+    _is_dbg = is_dbg
 #
 #
 #
