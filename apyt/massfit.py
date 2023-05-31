@@ -137,6 +137,7 @@ The following methods are provided:
 __version__ = '0.1.0'
 __all__ = [
     'counts',
+    'enable_debug',
     'fit',
     'isotope_list',
     'spectrum'
