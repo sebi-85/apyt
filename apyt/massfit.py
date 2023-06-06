@@ -156,6 +156,7 @@ import warnings
 # import some special functions/modules
 from scipy.signal import find_peaks, peak_widths
 from scipy.special import erf
+from scipy.stats import multinomial
 #
 #
 #
@@ -165,6 +166,8 @@ from scipy.special import erf
 # private module-level variables
 #
 ################################################################################
+_abundance_thres = 1e-9
+"The abundance threshold for discarding isotopes."
 _is_dbg = False
 """The global flag for debug output.
 
@@ -431,7 +434,7 @@ def isotope_list(element_dict, verbose = False):
             # loop through isotopes
             for isotope in isotopes:
                 # skip invalid isotope
-                if isotope.abundance <= 0.0:
+                if isotope.abundance <= _abundance_thres * 100:
                     continue
                 #
                 #
@@ -441,7 +444,7 @@ def isotope_list(element_dict, verbose = False):
                 elif isotope.__str__() == 'T':
                     mass_charge_ratio = 3.0 / q
                 else:
-                    mass_charge_ratio = int(isotope.__str__().split('-')[0]) / q
+                    mass_charge_ratio = isotope.isotope / q
                 #
                 # append isotope dictionary to isotope list
                 isotope_dict = {
@@ -646,51 +649,110 @@ def _get_molecular_isotope_list(molecule):
     """
     #
     #
-    print("Determining isotopes for molecule \"{0:s}\"…".format(molecule))
+    print("Determining isotope combinations for molecule \"{0:s}\"…".
+          format(molecule))
     #
     #
     # get molecular constituents and their isotopes
     atomic_number = 0
-    isotope_list = []
-    element_list = []
+    mass_number_list = []
     for element, element_count in periodictable.formula(molecule).atoms.items():
         # cumulate (artificial) atomic number
         atomic_number += element_count * element.number
         #
-        # cumulate individual atoms
-        element_list.append(list(itertools.repeat(element, element_count)))
         #
-        # cumulate isotope number lists (consider only isotopes with finite
-        # abundance)
-        isotope_list.append(
-            list(itertools.repeat(
-                [isotope for isotope in element.isotopes
-                 if element[isotope].abundance > 0.0],
-                element_count)
-            )
+        # get list of isotopes with non-zero abundance for current element
+        isotope_list, abundances = _get_nonzero_isotopes(element)
+        #
+        #
+        # calculate all possible isotope combinations (Cartesian product) (from
+        # zero to element_count for each individual isotope which may form the
+        # molecule for the current element); each element of the resulting list
+        # is an n-tuple, where n corresponds to the number of (non-zero)
+        # isotopes and the elements of the tuple denote the counts of the
+        # respective isotopes; note that by definition, not all isotope
+        # combinations in the Cartesian product add up to element_count
+        isotope_combinations = itertools.product(
+            range(element_count + 1), repeat = len(isotope_list)
         )
+        # only use isotope combinations where all counts add up to total element
+        # count
+        isotope_combinations = \
+            [ic for ic in isotope_combinations if sum(ic) == element_count]
+        #
+        #
+        # calculate probabilities and mass number for all valid isotope
+        # combinations
+        mass_number_list_element = []
+        for ic in isotope_combinations:
+            # calculate probability for current isotope combination according to
+            # multinomial distribution and store together with mass number as
+            # tuple
+            mass_number_list_element.append((
+                np.sum(np.asarray(isotope_list) * np.asarray(ic)), # mass number
+                multinomial.pmf(ic, element_count, p = abundances / 100)
+            ))
+        # sum total probability
+        p_tot = sum([mn[1] for mn in mass_number_list_element])
+        #
+        #
+        # print debug output if requested
+        if _is_dbg == True:
+            print("\nIsotope combinations for {0:s} ({1:d} atom(s) in "
+                  "molecule):".format(element.name, element_count))
+            for isotope in isotope_list:
+                print("#{0:s}\t".format(element[isotope].__repr__()), end = '')
+            print("mass number\tprobability\n" +
+                  "--------" * len(isotope_list) +
+                  "---------------------------")
+            #
+            for ic in zip(isotope_combinations, mass_number_list_element):
+                # skip combinations with negligible contribution
+                if ic[1][1] < _abundance_thres:
+                    continue
+                #
+                print(("{:d}\t" * len(isotope_list)).format(*ic[0]), end = '')
+                print("{0:d}\t\t{1:.9f}".format(*ic[1]))
+            print("========" * len(isotope_list) +
+                  "===========================")
+            print("\t" * len(isotope_list) + "\ttotal\t{0:.9f}".format(p_tot))
+        #
+        #
+        # test whether all valid isotope combinations add up to 100%
+        if abs(p_tot - 1.0) > np.finfo(np.float32).eps:
+            raise Exception("Total probability ({0:.6f}) for \"{1:s}\" differs "
+                            "from unity.".format(p_tot, element.name))
+        #
+        #
+        # append mass number list for current element to overall mass number
+        # list
+        mass_number_list.append(mass_number_list_element)
     #
-    # flatten lists
-    element_list = list(itertools.chain(*element_list))
-    isotope_list = list(itertools.chain(*isotope_list))
+    #
+    # loop through all element combinations and calculate combined probability
+    # for molecule
+    mass_number_list_molecule = []
+    for mn_tuple in itertools.product(*mass_number_list):
+        mass_number_list_molecule.append((
+            # sum of elemental mass numbers
+            np.sum( [mn[0] for mn in mn_tuple]),
+            # product of elemental probabilities
+            np.prod([mn[1] for mn in mn_tuple])
+        ))
+    #
     #
     # create new Element object
     artificial_element = periodictable.core.Element(
         molecule, molecule, atomic_number, None, periodictable
     )
+    if _is_dbg == True: print("")
     print("Artifical atomic number for \"{0:s}\" is {1:d}.".
           format(artificial_element.name, artificial_element.number))
     #
     #
-    # calculate all possible isotope combinations (Cartesian product); each
-    # element of the resulting list is an n-tuple, where n corresponds to the
-    # total atom count of the molecule
-    isotope_product = list(itertools.product(*isotope_list))
-    #
-    #
     # add all possible isotopes to the artificial element
-    for isotope_tuple in isotope_product:
-        artificial_element.add_isotope(sum(isotope_tuple))
+    for mn in mass_number_list_molecule:
+        artificial_element.add_isotope(mn[0])
     #
     #
     # initialize all abundances to zero
@@ -698,23 +760,32 @@ def _get_molecular_isotope_list(molecule):
         isotope._abundance = 0.0
     #
     #
-    # set abundance for every molecular isotope
-    for isotope_tuple in isotope_product:
-        # loop through constituting elements
-        abundance = 1.0
-        for i in range(len(isotope_tuple)):
-            abundance *= element_list[i][isotope_tuple[i]].abundance / 100
-        #
-        # cumulate abundance for current tuple (multiple tuples may correspond
-        # to the same isotope number)
-        artificial_element[sum(isotope_tuple)]._abundance += abundance * 100
+    # cumulate abundance for every molecular isotope from mass number list
+    # (multiple mass numbers may correspond to the same isotope number)
+    for mn in mass_number_list_molecule:
+        artificial_element[mn[0]]._abundance += mn[1] * 100
     #
     #
-    # test whether all isotopes add up to 100%
+    # sum total abundance
     total_abundance = 0.0
     for isotope in artificial_element:
         total_abundance += isotope.abundance
-    if abs(total_abundance - 100) > np.finfo(np.float32).eps:
+    #
+    #
+    # print debug output if requested
+    if _is_dbg == True:
+        print("\nIsotope combinations for molecule \"{0:s}\":".format(molecule))
+        print("mass number\tprobability\n---------------------------")
+        for isotope in artificial_element:
+            if isotope.abundance > _abundance_thres:
+                print("{0:d}\t\t{1:.9f}".
+                      format(isotope.isotope, isotope.abundance / 100))
+        print("===========================\n\ttotal\t{0:.9f}\n".
+              format(total_abundance / 100))
+    #
+    #
+    # test whether all isotopes add up to 100%
+    if abs(total_abundance - 100.0) > np.finfo(np.float32).eps:
         raise Exception("Total abundance ({0:.6f}) for molecule \"{1:s}\" "
                         "differs from unity.".
                         format(total_abundance / 100, molecule))
