@@ -830,7 +830,7 @@ def _get_molecular_isotope_list(molecule):
         print("\nIsotope combinations for molecule \"{0:s}\":".format(molecule))
         print("mass number\tprobability\n---------------------------")
         for isotope in artificial_element:
-            if isotope.abundance > _abundance_thres:
+            if isotope.abundance >= _abundance_thres * 100:
                 print("{0:d}\t\t{1:.9f}".
                       format(isotope.isotope, isotope.abundance / 100))
         print("===========================\n\ttotal\t{0:.9f}\n".
