@@ -326,12 +326,32 @@ def counts(isotope_list, params, data_range, bin_width,
     if verbose == True:
         print("Total number of counts (without background) is {0:.0f}:".
               format(total_counts))
+        print("Number of background counts is {0:.0f} ({1:.1f}%).\n".format(
+              background, background / (total_counts + background) * 100))
         print("element\tcharge\t   count\tfraction")
+        print("--------" * 4 + "--------")
         for count in count_list:
             print("{0:s}\t{1:d}\t{2:8.0f}\t{3:.4f}".
                   format(*count.values()))
-        print("Number of background counts is {0:.0f}.".format(background))
-        print("")
+        #
+        #
+        # combine counts for different charge states for individual elements
+        print("\nelement\t   count\tfraction")
+        print("--------" * 3 + "--------")
+        element_count = 0
+        element       = count_list[0]['element']
+        for count in count_list:
+            if count['element'] == element:
+                element_count += count['count']
+            else:
+                # print previous element and reset
+                print("{0:s}\t{1:8.0f}\t{2:.4f}".format(
+                      element, element_count, element_count / total_counts))
+                element_count = count['count']
+                element       = count['element']
+        # print last element
+        print("{0:s}\t{1:8.0f}\t{2:.4f}\n".
+              format(element, element_count, element_count / total_counts))
     #
     #
     # return element counts, total counts, and background counts
@@ -495,6 +515,7 @@ def isotope_list(element_dict, verbose = False):
     if verbose == True:
         print("Total number of isotopes is {0:d}:".format(len(isotope_list)))
         print('\t'.join(isotope_list[0].keys()))
+        print("--------" * 7 + "------")
         for isotope in isotope_list:
             print("{0:s}\t{1:d}\t{2:.2f}\t\t\t{3:.6f}\t{4!r}".
                   format(*isotope.values()))
