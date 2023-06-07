@@ -178,6 +178,38 @@ This flag can be set through the :meth:`enable_debug` function."""
 #
 ################################################################################
 #
+# module-level initialization
+#
+################################################################################
+def _add_element(name, symbol, number, table, isotopes):
+    """
+    Add new element to periodic table.
+    """
+    #
+    #
+    # create new element
+    element = table.core.Element(name, symbol, number, None, table)
+    #
+    # add isotopes to element
+    for isotope in isotopes:
+        element.add_isotope(isotope[0])
+        element[isotope[0]]._abundance = isotope[1]
+    #
+    #
+    # add new element to table (append 'X' to indicate custom element)
+    table.elements._element["{0:d}X".format(number)] = element
+    setattr(table,          symbol, element)
+    setattr(table.elements, symbol, element)
+#
+#
+# add gallium used by FIB (only one isotope!)
+_add_element("gallium (FIB)", "Ga_FIB", 31, periodictable, [(69, 100.0)])
+#
+#
+#
+#
+################################################################################
+#
 # public functions
 #
 ################################################################################
