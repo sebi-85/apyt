@@ -213,8 +213,8 @@ _add_element("gallium (FIB)", "Ga_FIB", 31, periodictable, [(69, 100.0)])
 # public functions
 #
 ################################################################################
-def counts(isotope_list, params, data_range, bin_width,
-                   verbose = False):
+def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
+           verbose = False):
     """
     Get counts for all elements.
 
@@ -239,6 +239,9 @@ def counts(isotope_list, params, data_range, bin_width,
 
     Keyword Arguments
     -----------------
+    ignore_list : list of str
+        The list of elements/molecules to ignore when calculating compositions.
+        Defaults to empty list.
     verbose : bool
         Whether to print the content of all element count dictionaries. Defaults
         to ``False``.
@@ -333,10 +336,12 @@ def counts(isotope_list, params, data_range, bin_width,
         for count in count_list:
             print("{0:s}\t{1:d}\t{2:8.0f}\t{3:.4f}".
                   format(*count.values()))
+        print("========" * 4 + "========")
+        print("\ttotal\t{0:8.0f}\n".format(total_counts))
         #
         #
         # combine counts for different charge states for individual elements
-        print("\nelement\t   count\tfraction")
+        print("element\t   count\tfraction")
         print("--------" * 3 + "--------")
         element_count = 0
         element       = count_list[0]['element']
@@ -350,8 +355,56 @@ def counts(isotope_list, params, data_range, bin_width,
                 element_count = count['count']
                 element       = count['element']
         # print last element
-        print("{0:s}\t{1:8.0f}\t{2:.4f}\n".
+        print("{0:s}\t{1:8.0f}\t{2:.4f}".
               format(element, element_count, element_count / total_counts))
+        print("========" * 3 + "========")
+        print("total\t{0:8.0f}\n".format(total_counts))
+        #
+        #
+        # break down molecules into individual elements
+        count_dict = {}
+        is_molecule = False
+        for count in count_list:
+            # check whether element is in ignore list
+            if count['element'] in ignore_list:
+                if _is_dbg:
+                    print("Ignoring element \"{0:s}\".".
+                          format(count['element']))
+                continue
+            #
+            #
+            # get molecule items
+            molecule_items = \
+                periodictable.formula(count['element']).atoms.items()
+            #
+            # check whether multiple elements present
+            if len(molecule_items) > 1:
+                is_molecule = True
+            #
+            # loop through elements in molecule
+            for element, element_count in molecule_items:
+                # check whether multiple atoms are present for individual
+                # element
+                if element_count > 1:
+                    is_molecule = True
+                #
+                # create new dictionary key-value pair if element not found,
+                # increment otherwise
+                if element.symbol not in count_dict:
+                    count_dict[element.symbol]  = element_count * count['count']
+                else:
+                    count_dict[element.symbol] += element_count * count['count']
+        #
+        # only print if molecule found or ignore list active
+        if is_molecule == True or len(ignore_list) > 0:
+            print("element\t   count\tfraction")
+            print("--------" * 3 + "--------")
+            for element, element_count in count_dict.items():
+                print("{0:s}\t{1:8.0f}\t{2:.4f}".
+                      format(element, element_count,
+                             element_count / sum(count_dict.values())))
+            print("========" * 3 + "========")
+            print("total\t{0:8.0f}\n".format(sum(count_dict.values())))
     #
     #
     # return element counts, total counts, and background counts
