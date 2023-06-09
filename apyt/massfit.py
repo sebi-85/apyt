@@ -686,7 +686,7 @@ def _estimate_fit_parameters(data, isotope_list):
     # add decay constant parameters
     params.add('τ1', value =       τ, min = 0.0)
     params.add('τ2', value = 0.1 * τ, min = 0.0)
-    params.add('φ',  value = 0.5)
+    params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
     #
     #
     # estimate baseline
