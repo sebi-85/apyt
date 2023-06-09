@@ -611,7 +611,8 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     bins = int((data_range[1] - data_range[0]) / width)
     #
     # calculate histogram and bin centers
-    hist, bin_edges = np.histogram(mc_ratio, bins = bins, range = data_range)
+    hist, bin_edges = np.histogram(mc_ratio, bins = bins,
+        range = (data_range[0] - width / 2, data_range[1] + width / 2))
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     #
     # return histogram, bin centers, and mass-to-charge ratios
