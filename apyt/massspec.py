@@ -607,8 +607,8 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     # set default histogram range if nothing provided
     if data_range is None:
         data_range = (np.floor(mc_ratio.min()), np.ceil(mc_ratio.max()))
-    # set number of histogram bins
-    bins = int((data_range[1] - data_range[0]) / width)
+    # set number of histogram bins (add one to account for extended range below)
+    bins = int((data_range[1] - data_range[0]) / width) + 1
     #
     # calculate histogram and bin centers
     hist, bin_edges = np.histogram(mc_ratio, bins = bins,
