@@ -14,7 +14,7 @@ Package modules
 
    The APyT file format conversion module (apyt.conv)<apyt.conv>
    The APyT local composition module (apyt.locomp)<apyt.locomp>
-   The APyT mass spectrum fitting module (apyt.massspec)<apyt.massfit>
+   The APyT mass spectrum fitting module (apyt.masssfit)<apyt.massfit>
    The APyT mass spectrum module (apyt.massspec)<apyt.massspec>
    The APyT SDM module (apyt.sdm)<apyt.sdm>
 
