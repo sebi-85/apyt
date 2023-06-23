@@ -193,7 +193,7 @@ The following methods are provided:
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`peak_align`: Automatically align peak positions.
-* :meth:`update_sql_record`: Update SQL record in global database."
+* :meth:`update_sql_record`: Update SQL record in global database.
 * :meth:`write_xml`: Write XML file for subsequent usage.
 
 
@@ -229,6 +229,7 @@ __all__ = [
     'get_voltage_correction',
     'optimize_correction',
     'peak_align',
+    'update_sql_record',
     'write_xml'
 ]
 #
