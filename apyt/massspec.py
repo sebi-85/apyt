@@ -193,6 +193,7 @@ The following methods are provided:
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`peak_align`: Automatically align peak positions.
+* :meth:`update_sql_record`: Update SQL record in global database."
 * :meth:`write_xml`: Write XML file for subsequent usage.
 
 
@@ -238,15 +239,18 @@ __all__ = [
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
+import requests
+import tkinter as tk
 import warnings
 import xml.etree.ElementTree as ET
 #
 # import some special functions/modules
 from datetime import datetime
+from html2text import HTML2Text
 from inspect import getframeinfo, stack
 from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
                                         polyvander2d
-from os import getpid
+from os import getlogin, getpid
 from psutil import Process
 from resource import getrusage, RUSAGE_SELF
 from scipy import constants
@@ -254,6 +258,9 @@ from scipy.optimize import fsolve, minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
+from tkinter import messagebox, ttk
+from ttkthemes import ThemedTk
+from urllib.parse import quote
 from xml.dom import minidom
 #
 #
@@ -387,7 +394,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     #
     #
     start = timer()
-    print("Performing flight length correction...")
+    print("Performing flight length correction…")
     #
     # get optional keyword arguments
     deg = kwargs.get('deg', 2)
@@ -581,7 +588,7 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     #
     #
     start = timer()
-    _debug("Calculating mass spectrum for {0:.1f} M events...".
+    _debug("Calculating mass spectrum for {0:.1f} M events…".
            format(len(data) / 1e6))
     #
     # get optional keyword arguments
@@ -691,7 +698,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     #
     #
     start = timer()
-    print("Performing voltage correction...")
+    print("Performing voltage correction…")
     #
     # get optional keyword arguments
     deg = kwargs.get('deg', 2)
@@ -878,7 +885,7 @@ def optimize_correction(data, spec_par, mode, **kwargs):
         if len(spec_par[2][0]) == 1:
             warnings.warn("Cannot perform voltage correction for constant "
                           "polynomial function of degree 0 due to insufficient "
-                          "degrees of freedom. Skipping...")
+                          "degrees of freedom. Skipping…")
             return spec_par[2][0]
         return _optimize_voltage_correction(data, spec_par, hist_par)
     elif mode == 'flight':
@@ -973,6 +980,135 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
     print("Automatically determined parameters for peak adjustment:\n"
           "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
     return params
+#
+#
+#
+#
+def update_sql_record(id, spec_par):
+    """Update SQL record in global database.
+
+    This function uploads all relevant data to obtain a high-quality mass
+    spectrum without further adjustments to a global SQL database. This
+    information can then be used with external tools for subsequent processing
+    (e.g. reconstruction of ATP data).
+
+    Parameters
+    ----------
+    id : int
+        The record ID in the global SQL database.
+    spec_par : tuple
+        The physical parameters used to calculate the mass-to-charge spectrum,
+        as described in
+        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+    """
+    #
+    #
+    # unpack parameters for better readability
+    t_0, _, (voltage_coeffs, flight_coeffs), alpha = spec_par
+    #
+    #
+    # create root window
+    root = ThemedTk(theme = 'breeze')
+    root.withdraw()
+    #
+    #
+    # only upload data if requested
+    action = messagebox.askyesno(
+        "SQL upload",
+        "Do you want to upload your spectrum parameters to the SQL database?"
+    )
+    if not action == True:
+        root.destroy()
+        return
+    #
+    #
+    # construct JSON string for upload
+    json = "'{{\"alpha\": {0:.6f}, " \
+           "\"t_0\": {1:.6f}, " \
+           "\"voltage-coeffs\": {2:s}, " \
+           "\"flight-coeffs\": {3:s}}}'". \
+           format(
+               alpha, t_0,
+               np.array2string(
+                   voltage_coeffs, separator = ', ',
+                   formatter = {'float_kind': lambda x: "%.6e" % x}),
+               # remove linebreaks in 2d array
+               np.array2string(
+                   flight_coeffs, separator = ', ',
+                   formatter = {'float_kind': lambda x: "%.6e" % x}).
+               replace('\n', '')
+    )
+    #
+    #
+    # create sign in frame
+    pad = 10
+    login = ttk.Frame(root)
+    login.pack(padx = pad, pady = pad, fill = 'x', expand = True)
+    user, password = tk.StringVar(login, getlogin()), tk.StringVar(login)
+    #
+    ttk.Label(login, text = "Please provide your login credentials."). \
+        pack(anchor = 'w', pady = (0, pad))
+    #
+    ttk.Label(login, text = "User name:").pack(fill = 'x', expand = True)
+    ttk.Entry(login, textvariable = user). \
+        pack(fill = 'x', expand = True, pady = (0, pad))
+    #
+    ttk.Label(login, text = "Password:").pack(fill = 'x', expand = True)
+    password_entry = ttk.Entry(login, textvariable = password, show = "*")
+    password_entry.pack(fill = 'x', expand = True,  pady = (0, pad))
+    password_entry.focus()
+    #
+    # login button
+    ttk.Button(login, text = "Login", command = root.quit). \
+        pack(fill = 'x', expand = True)
+    #
+    #
+    # set root window properties
+    root.resizable(False, False)
+    root.title("Login")
+    root.bind('<Return>', lambda x: root.quit())
+    root.protocol('WM_DELETE_WINDOW', lambda: None)
+    root.eval('tk::PlaceWindow . center')
+    #
+    #
+    # use infinite loop to allow multiple user upload attempts
+    print("Uploading spectrum parameters to SQL database… ", end = "")
+    while True:
+        # get authorization credentials
+        password.set("")
+        root.deiconify()
+        root.mainloop()
+        root.withdraw()
+        #
+        # update database record
+        r = requests.get(
+            "https://" +
+            quote(user.get()) + ":" + quote(password.get()) + "@" +
+            "apt-upload.mp.imw.uni-stuttgart.de/update.php?"
+            "id=" + id + "&" +
+            "key=spectrum_params" + "&" +
+            "value=" + quote(json)
+        )
+        #
+        # check for error and ask for retry on failure
+        response = r.content.decode('utf-8')
+        if response != "OK":
+            action = messagebox.askyesno(
+                "Upload failed",
+                "The following error occurred:\n\n" +
+                HTML2Text().handle(response) +
+                "Do you want to retry?"
+            )
+            if action == False:
+                print("\033[91mFAILED!\033[0m")
+                break
+        else:
+            print("\033[92mSUCCESS!\033[0m")
+            break
+    #
+    #
+    # destroy root window
+    root.destroy()
 #
 #
 #
@@ -1368,7 +1504,7 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     #
     # if no range provided, use fixed width of 20 around maximum peak
     if data_range is None:
-        _debug("Auto-detecting range...")
+        _debug("Auto-detecting range…")
         peaks, _ = find_peaks(hist, distance = np.iinfo(np.int32).max)
         _debug("Maximum peak is at {0:.1f} amu/e.".
                format(bin_centers[peaks[0]]))
@@ -1501,7 +1637,7 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     #
     #
     start = timer()
-    print("Optimizing flight length correction...")
+    print("Optimizing flight length correction…")
     #
     #
     # get initial peak position and width
@@ -1577,7 +1713,7 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     #
     #
     start = timer()
-    print("Optimizing voltage correction...")
+    print("Optimizing voltage correction…")
     #
     #
     # fine correction of the voltage coefficients may lead to a drastic drift of
