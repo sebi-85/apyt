@@ -255,7 +255,6 @@ from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
                                         polyvander2d
 from os import getlogin, getpid
 from psutil import Process
-from resource import getrusage, RUSAGE_SELF
 from scipy import constants
 from scipy.optimize import fsolve, minimize
 from scipy.signal import find_peaks, peak_widths
@@ -1623,6 +1622,12 @@ def _get_mass_to_charge_ratio(data, spec_par):
 def _mem():
     "Print current and peak memory usage to *stderr*."
     #
+    #
+    # resource module may not be available on all platforms
+    try:
+        from resource import getrusage, RUSAGE_SELF
+    except:
+        return
     #
     # set debug message
     msg = "Current memory usage is {0:.1f} MB (peak {1:.1f} MB).".format(
