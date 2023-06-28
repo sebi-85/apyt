@@ -190,6 +190,7 @@ The following methods are provided:
 * :meth:`get_flight_correction`: Obtain coefficients for flight length
   correction.
 * :meth:`get_mass_spectrum`: Calculate mass spectrum.
+* :meth:`get_login_credentials`: Get login credentials.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`peak_align`: Automatically align peak positions.
@@ -225,6 +226,7 @@ __version__ = '0.1.0'
 __all__ = [
     'enable_debug',
     'get_flight_correction',
+    'get_login_credentials',
     'get_mass_spectrum',
     'get_voltage_correction',
     'optimize_correction',
@@ -550,6 +552,67 @@ def get_flight_correction(data, spec_par, **kwargs):
     print("Flight length correction took {0:.3f} seconds.".
           format(timer() - start))
     return coeffs.astype(_dtype), (x, y, z), events, wireframe
+#
+#
+#
+#
+def get_login_credentials():
+    """Get login credentials.
+
+    This function creates a simple login form to get username/password
+    credentials.
+
+    Returns
+    -------
+    auth : tuple of str
+        The tuple containing the username and password.
+    """
+    #
+    #
+    # create root window
+    root = ThemedTk(theme = 'breeze')
+    root.withdraw()
+    #
+    #
+    # create sign-in frame
+    pad = 10
+    login = ttk.Frame(root)
+    login.pack(padx = pad, pady = pad, fill = 'x', expand = True)
+    user, password = tk.StringVar(login, getlogin()), tk.StringVar(login)
+    #
+    ttk.Label(login, text = "Please provide your login credentials."). \
+        pack(anchor = 'w', pady = (0, pad))
+    #
+    ttk.Label(login, text = "User name:").pack(fill = 'x', expand = True)
+    ttk.Entry(login, textvariable = user). \
+        pack(fill = 'x', expand = True, pady = (0, pad))
+    #
+    ttk.Label(login, text = "Password:").pack(fill = 'x', expand = True)
+    password_entry = ttk.Entry(login, textvariable = password, show = "*")
+    password_entry.pack(fill = 'x', expand = True,  pady = (0, pad))
+    password_entry.focus()
+    #
+    # login button
+    ttk.Button(login, text = "Login", command = root.quit). \
+        pack(fill = 'x', expand = True)
+    #
+    #
+    # set root window properties
+    root.resizable(False, False)
+    root.title("Login")
+    root.bind('<Return>', lambda x: root.quit())
+    root.protocol('WM_DELETE_WINDOW', lambda: None)
+    root.eval('tk::PlaceWindow . center')
+    #
+    #
+    # get authorization credentials
+    root.deiconify()
+    root.mainloop()
+    auth = (user.get(), password.get())
+    root.destroy()
+    #
+    #
+    return auth
 #
 #
 #
@@ -1008,7 +1071,7 @@ def update_sql_record(id, spec_par):
     t_0, _, (voltage_coeffs, flight_coeffs), alpha = spec_par
     #
     #
-    # create root window
+    # create dummy root window to load custom Tk theme
     root = ThemedTk(theme = 'breeze')
     root.withdraw()
     #
@@ -1041,58 +1104,20 @@ def update_sql_record(id, spec_par):
     )
     #
     #
-    # create sign in frame
-    pad = 10
-    login = ttk.Frame(root)
-    login.pack(padx = pad, pady = pad, fill = 'x', expand = True)
-    user, password = tk.StringVar(login, getlogin()), tk.StringVar(login)
-    #
-    ttk.Label(login, text = "Please provide your login credentials."). \
-        pack(anchor = 'w', pady = (0, pad))
-    #
-    ttk.Label(login, text = "User name:").pack(fill = 'x', expand = True)
-    ttk.Entry(login, textvariable = user). \
-        pack(fill = 'x', expand = True, pady = (0, pad))
-    #
-    ttk.Label(login, text = "Password:").pack(fill = 'x', expand = True)
-    password_entry = ttk.Entry(login, textvariable = password, show = "*")
-    password_entry.pack(fill = 'x', expand = True,  pady = (0, pad))
-    password_entry.focus()
-    #
-    # login button
-    ttk.Button(login, text = "Login", command = root.quit). \
-        pack(fill = 'x', expand = True)
-    #
-    #
-    # set root window properties
-    root.resizable(False, False)
-    root.title("Login")
-    root.bind('<Return>', lambda x: root.quit())
-    root.protocol('WM_DELETE_WINDOW', lambda: None)
-    root.eval('tk::PlaceWindow . center')
-    #
-    #
     # use infinite loop to allow multiple user upload attempts
     print("Uploading spectrum parameters to SQL database… ", end = "")
     while True:
-        # get authorization credentials
-        password.set("")
-        root.deiconify()
-        root.mainloop()
-        root.withdraw()
-        #
         # update database record
         r = requests.get(
-            "https://" +
-            quote(user.get()) + ":" + quote(password.get()) + "@" +
-            "apt-upload.mp.imw.uni-stuttgart.de/update.php?"
+            "https://apt-upload.mp.imw.uni-stuttgart.de/update.php?"
             "id=" + id + "&" +
             "key=spectrum_params" + "&" +
-            "value=" + quote(json)
+            "value=" + quote(json),
+            auth = get_login_credentials()
         )
         #
         # check for error and ask for retry on failure
-        response = r.content.decode('utf-8')
+        response = r.text
         if response != "OK":
             action = messagebox.askyesno(
                 "Upload failed",
