@@ -1067,7 +1067,7 @@ def update_sql_record(id, spec_par):
     #
     #
     # unpack parameters for better readability
-    t_0, _, (voltage_coeffs, flight_coeffs), alpha = spec_par
+    t_0, L_0, (voltage_coeffs, flight_coeffs), alpha = spec_par
     #
     #
     # create dummy root window to load custom Tk theme
@@ -1087,11 +1087,12 @@ def update_sql_record(id, spec_par):
     #
     # construct JSON string for upload
     json = "'{{\"alpha\": {0:.6f}, " \
-           "\"t_0\": {1:.6f}, " \
-           "\"voltage-coeffs\": {2:s}, " \
-           "\"flight-coeffs\": {3:s}}}'". \
+           "\"L_0\": {1:.3f}, " \
+           "\"t_0\": {2:.6f}, " \
+           "\"voltage-coeffs\": {3:s}, " \
+           "\"flight-coeffs\": {4:s}}}'". \
            format(
-               alpha, t_0,
+               alpha, L_0, t_0,
                np.array2string(
                    voltage_coeffs, separator = ', ',
                    formatter = {'float_kind': lambda x: "%.6e" % x}),
