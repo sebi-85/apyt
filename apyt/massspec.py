@@ -190,11 +190,9 @@ The following methods are provided:
 * :meth:`get_flight_correction`: Obtain coefficients for flight length
   correction.
 * :meth:`get_mass_spectrum`: Calculate mass spectrum.
-* :meth:`get_login_credentials`: Get login credentials.
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`peak_align`: Automatically align peak positions.
-* :meth:`update_sql_record`: Update SQL record in global database.
 * :meth:`write_xml`: Write XML file for subsequent usage.
 
 
@@ -226,12 +224,10 @@ __version__ = '0.1.0'
 __all__ = [
     'enable_debug',
     'get_flight_correction',
-    'get_login_credentials',
     'get_mass_spectrum',
     'get_voltage_correction',
     'optimize_correction',
     'peak_align',
-    'update_sql_record',
     'write_xml'
 ]
 #
@@ -242,27 +238,21 @@ __all__ = [
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
-import requests
-import tkinter as tk
 import warnings
 import xml.etree.ElementTree as ET
 #
 # import some special functions/modules
 from datetime import datetime
-from html2text import HTML2Text
 from inspect import getframeinfo, stack
 from numpy.polynomial.polynomial import polyfit, polyval, polyval2d, \
                                         polyvander2d
-from os import getlogin, getpid
+from os import getpid
 from psutil import Process
 from scipy import constants
 from scipy.optimize import fsolve, minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
-from tkinter import messagebox, ttk
-from ttkthemes import ThemedTk
-from urllib.parse import quote
 from xml.dom import minidom
 #
 #
@@ -551,67 +541,6 @@ def get_flight_correction(data, spec_par, **kwargs):
     print("Flight length correction took {0:.3f} seconds.".
           format(timer() - start))
     return coeffs.astype(_dtype), (x, y, z), events, wireframe
-#
-#
-#
-#
-def get_login_credentials():
-    """Get login credentials.
-
-    This function creates a simple login form to get username/password
-    credentials.
-
-    Returns
-    -------
-    auth : tuple of str
-        The tuple containing the username and password.
-    """
-    #
-    #
-    # create root window
-    root = ThemedTk(theme = 'breeze')
-    root.withdraw()
-    #
-    #
-    # create sign-in frame
-    pad = 10
-    login = ttk.Frame(root)
-    login.pack(padx = pad, pady = pad, fill = 'x', expand = True)
-    user, password = tk.StringVar(login, getlogin()), tk.StringVar(login)
-    #
-    ttk.Label(login, text = "Please provide your login credentials."). \
-        pack(anchor = 'w', pady = (0, pad))
-    #
-    ttk.Label(login, text = "User name:").pack(fill = 'x', expand = True)
-    ttk.Entry(login, textvariable = user). \
-        pack(fill = 'x', expand = True, pady = (0, pad))
-    #
-    ttk.Label(login, text = "Password:").pack(fill = 'x', expand = True)
-    password_entry = ttk.Entry(login, textvariable = password, show = "*")
-    password_entry.pack(fill = 'x', expand = True,  pady = (0, pad))
-    password_entry.focus()
-    #
-    # login button
-    ttk.Button(login, text = "Login", command = root.quit). \
-        pack(fill = 'x', expand = True)
-    #
-    #
-    # set root window properties
-    root.resizable(False, False)
-    root.title("Login")
-    root.bind('<Return>', lambda x: root.quit())
-    root.protocol('WM_DELETE_WINDOW', lambda: None)
-    root.eval('tk::PlaceWindow . center')
-    #
-    #
-    # get authorization credentials
-    root.deiconify()
-    root.mainloop()
-    auth = (user.get(), password.get())
-    root.destroy()
-    #
-    #
-    return auth
 #
 #
 #
@@ -1043,98 +972,6 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
     print("Automatically determined parameters for peak adjustment:\n"
           "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
     return params
-#
-#
-#
-#
-def update_sql_record(id, spec_par):
-    """Update SQL record in global database.
-
-    This function uploads all relevant data to obtain a high-quality mass
-    spectrum without further adjustments to a global SQL database. This
-    information can then be used with external tools for subsequent processing
-    (e.g. reconstruction of ATP data).
-
-    Parameters
-    ----------
-    id : int
-        The record ID in the global SQL database.
-    spec_par : tuple
-        The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
-    """
-    #
-    #
-    # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, flight_coeffs), alpha = spec_par
-    #
-    #
-    # create dummy root window to load custom Tk theme
-    root = ThemedTk(theme = 'breeze')
-    root.withdraw()
-    #
-    #
-    # only upload data if requested
-    action = messagebox.askyesno(
-        "SQL upload",
-        "Do you want to upload your spectrum parameters to the SQL database?"
-    )
-    if not action == True:
-        root.destroy()
-        return
-    #
-    #
-    # construct JSON string for upload
-    json = "'{{\"alpha\": {0:.6f}, " \
-           "\"L_0\": {1:.3f}, " \
-           "\"t_0\": {2:.6f}, " \
-           "\"voltage-coeffs\": {3:s}, " \
-           "\"flight-coeffs\": {4:s}}}'". \
-           format(
-               alpha, L_0, t_0,
-               np.array2string(
-                   voltage_coeffs, separator = ', ',
-                   formatter = {'float_kind': lambda x: "%.6e" % x}),
-               # remove linebreaks in 2d array
-               np.array2string(
-                   flight_coeffs, separator = ', ',
-                   formatter = {'float_kind': lambda x: "%.6e" % x}).
-               replace('\n', '')
-    )
-    #
-    #
-    # use infinite loop to allow multiple user upload attempts
-    print("Uploading spectrum parameters to SQL database… ", end = "")
-    while True:
-        # update database record
-        r = requests.get(
-            "https://apt-upload.mp.imw.uni-stuttgart.de/update.php?"
-            "id=" + id + "&" +
-            "key=spectrum_params" + "&" +
-            "value=" + quote(json),
-            auth = get_login_credentials()
-        )
-        #
-        # check for error and ask for retry on failure
-        response = r.text
-        if response != "OK":
-            action = messagebox.askyesno(
-                "Upload failed",
-                "The following error occurred:\n\n" +
-                HTML2Text().handle(response) +
-                "Do you want to retry?"
-            )
-            if action == False:
-                print("\033[91mFAILED!\033[0m")
-                break
-        else:
-            print("\033[92mSUCCESS!\033[0m")
-            break
-    #
-    #
-    # destroy root window
-    root.destroy()
 #
 #
 #
