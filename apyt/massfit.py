@@ -80,16 +80,16 @@ The element dictionary consists of key--value pairs, where each key represents
 one element (may also be a molecule) and the value is a tuple containing the
 occurring charge states of the respective element.
 
-Isotope dictionary
-^^^^^^^^^^^^^^^^^^
+Peak dictionary
+^^^^^^^^^^^^^^^
 
-The isotope dictionary consists of the following keys:
+The peak dictionary consists of the following keys:
 
-* ``element``: The element name (may also be a molecule).
-* ``charge``: The charge state.
-* ``mass_charge_ratio``: The mass-to-charge ratio for this isotope.
+* ``element``: The associated element name (may also be a molecule).
+* ``charge``: The associated charge state.
+* ``mass_charge_ratio``: The mass-to-charge ratio for this peak.
 * ``abundance``: The isotope abundance (as a decimal fraction).
-* ``is_max``: Whether this isotope has maximum abundance for the respective
+* ``is_max``: Whether this peak has maximum abundance for the associated
   element.
 
 Element count dictionary
@@ -115,7 +115,7 @@ The following methods are provided:
 * :meth:`counts`: Get counts for all elements.
 * :meth:`enable_debug`: Enable or disable debug output.
 * :meth:`fit`: Fit mass spectrum.
-* :meth:`isotope_list`: Get list of all isotopes for specified elements and
+* :meth:`peaks_list`: Get list of all peaks for specified elements and
   charge states.
 * :meth:`spectrum`: Calculate spectrum for specified list of elements.
 
@@ -139,7 +139,7 @@ __all__ = [
     'counts',
     'enable_debug',
     'fit',
-    'isotope_list',
+    'peaks_list',
     'spectrum'
 ]
 #
@@ -215,20 +215,20 @@ _add_element("gallium (FIB)", "Gafib", 31, periodictable, [(69, 100.0)],
 # public functions
 #
 ################################################################################
-def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
+def counts(peaks_list, params, data_range, bin_width, ignore_list = [],
            verbose = False):
     """
     Get counts for all elements.
 
-    This functions loops trough all isotopes in *isotope_list* with the
-    ``is_max`` key set to ``True`` and returns the counts for each element and
-    charge state combination.
+    This functions loops trough all peaks in *peaks_list* with the ``is_max``
+    key set to ``True`` and returns the counts for each element and charge state
+    combination.
 
     Parameters
     ----------
-    isotope_list : list of dicts
-        The list of all occurring isotopes in the mass spectrum, as described in
-        :ref:`isotope dictionary<apyt.massfit:Isotope dictionary>`.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
@@ -250,7 +250,7 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
 
     Returns
     -------
-    count_list : list of dicts
+    counts_list : list of dicts
         The list of all element count dictionaries, as described in
         :ref:`element count dictionary<apyt.massfit:Element count dictionary>`.
     total_counts : int
@@ -290,16 +290,16 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
     w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
     #
     #
-    # loop through all isotopes
-    count_list = []
+    # loop through all peaks
+    counts_list = []
     total_counts = 0.0
-    for isotope in isotope_list:
-        # calculate element count only from isotope with maximum abundance
-        if isotope['is_max'] == False:
+    for peak in peaks_list:
+        # calculate element count only from peak with maximum abundance
+        if peak['is_max'] == False:
             continue
         #
-        # get intensity parameter for current isotope
-        I = params[_get_intensity_name(isotope)]
+        # get intensity parameter for current peak
+        I = params[_get_intensity_name(peak)]
         #
         # calculate count
         count = I / bin_width * (
@@ -311,15 +311,15 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
         total_counts += count
         #
         # append count dictionary to count list
-        count_list.append({
-            'element':  isotope['element'],
-            'charge':   isotope['charge'],
+        counts_list.append({
+            'element':  peak['element'],
+            'charge':   peak['charge'],
             'count':    count,
             'fraction': 0.0
             })
     #
     # add fractions
-    for count in count_list:
+    for count in counts_list:
         count['fraction'] = count['count'] / total_counts
     #
     #
@@ -335,7 +335,7 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
               background, background / (total_counts + background) * 100))
         print("element\tcharge\t   count\tfraction")
         print("--------" * 4 + "--------")
-        for count in count_list:
+        for count in counts_list:
             print("{0:s}\t{1:d}\t{2:8.0f}\t{3:.4f}".
                   format(*count.values()))
         print("========" * 4 + "========")
@@ -346,8 +346,8 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
         print("element\t   count\tfraction")
         print("--------" * 3 + "--------")
         element_count = 0
-        element       = count_list[0]['element']
-        for count in count_list:
+        element       = counts_list[0]['element']
+        for count in counts_list:
             if count['element'] == element:
                 element_count += count['count']
             else:
@@ -366,7 +366,7 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
         # break down molecules into individual elements
         count_dict = {}
         is_molecule = False
-        for count in count_list:
+        for count in counts_list:
             # check whether element is in ignore list
             if count['element'] in ignore_list:
                 if _is_dbg:
@@ -410,7 +410,7 @@ def counts(isotope_list, params, data_range, bin_width, ignore_list = [],
     #
     #
     # return element counts, total counts, and background counts
-    return count_list, total_counts, background
+    return counts_list, total_counts, background
 #
 #
 #
@@ -431,21 +431,21 @@ def enable_debug(is_dbg):
 #
 #
 #
-def fit(spectrum, isotope_list, verbose = False):
+def fit(spectrum, peaks_list, verbose = False):
     """
     Fit mass spectrum.
 
     This function internally uses the |lmfit| module to fit the complete mass
-    spectrum, where the peak positions are provided by the *isotope_list*
+    spectrum, where the peak positions are provided by the *peaks_list*
     argument.
 
     Parameters
     ----------
     spectrum : ndarray, shape (n, 2)
         The mass spectrum histogram data.
-    isotope_list : list of dicts
-        The list of all occurring isotopes in the mass spectrum, as described in
-        :ref:`isotope dictionary<apyt.massfit:Isotope dictionary>`.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
 
     Keyword Arguments
     -----------------
@@ -465,18 +465,18 @@ def fit(spectrum, isotope_list, verbose = False):
     model = lmfit.Model(_model_spectrum)
     #
     # estimate fit parameters
-    parameters = _estimate_fit_parameters(spectrum, isotope_list)
+    parameters = _estimate_fit_parameters(spectrum, peaks_list)
     #
     #
     # perform fit and print results
     with warnings.catch_warnings():
         warnings.filterwarnings(
             'ignore',
-            message = "The keyword argument isotope_list does not match any " +
+            message = "The keyword argument peaks_list does not match any " +
             "arguments of the model function. It will be ignored.",
             category = UserWarning)
         result = model.fit(spectrum[:, 1], parameters, x = spectrum[:, 0],
-                           isotope_list = isotope_list)
+                           peaks_list = peaks_list)
     if verbose == True:
         print(result.fit_report(show_correl = False))
         print("")
@@ -488,9 +488,9 @@ def fit(spectrum, isotope_list, verbose = False):
 #
 #
 #
-def isotope_list(element_dict, verbose = False):
+def peaks_list(element_dict, verbose = False):
     """
-    Get list of all isotopes for specified elements and charge states.
+    Get list of all peaks for specified elements and charge states.
 
     Parameters
     ----------
@@ -501,19 +501,19 @@ def isotope_list(element_dict, verbose = False):
     Keyword Arguments
     -----------------
     verbose : bool
-        Whether to print the content of all determined isotope dictionaries.
+        Whether to print the content of all determined peak dictionaries.
         Defaults to ``False``.
 
     Returns
     -------
-    isotope_list : list of dicts
-        The list of all occurring isotopes in the mass spectrum, as described in
-        :ref:`isotope dictionary<apyt.massfit:Isotope dictionary>`.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
     """
     #
     #
     # loop through elements
-    isotope_list = []
+    peaks_dict = {}
     for element, charge_states in element_dict.items():
         # check whether charge states contains only one element
         if type(charge_states) is not tuple:
@@ -523,12 +523,13 @@ def isotope_list(element_dict, verbose = False):
         # check for possible molecule
         counts = list(periodictable.formula(element).atoms.values())
         if len(counts) > 1 or max(counts) > 1:
-            isotopes = _get_molecular_isotope_list(element)
+            isotopes = _get_molecular_isotopes_list(element)
         else:
             isotopes = periodictable.elements.symbol(element)
         #
         #
         # loop through charge states
+        peaks_dict[element] = {}
         for q in tuple(charge_states):
             # get isotope with maximum abundance
             abundance_max = 0.0
@@ -539,6 +540,7 @@ def isotope_list(element_dict, verbose = False):
             #
             #
             # loop through isotopes
+            peaks_dict[element][str(q)] = []
             for isotope in isotopes:
                 # skip invalid isotope
                 if isotope.abundance <= _abundance_thres * 100:
@@ -553,8 +555,8 @@ def isotope_list(element_dict, verbose = False):
                 else:
                     mass_charge_ratio = isotope.isotope / q
                 #
-                # append isotope dictionary to isotope list
-                isotope_dict = {
+                # append peak dictionary to peak list
+                peak_dict = {
                     'element':           element,
                     'charge':            q,
                     'mass_charge_ratio': mass_charge_ratio,
@@ -562,28 +564,37 @@ def isotope_list(element_dict, verbose = False):
                     'is_max':            False
                 }
                 if isotope == isotope_max:
-                    isotope_dict['is_max'] = True
-                isotope_list.append(isotope_dict)
+                    peak_dict['is_max'] = True
+                peaks_dict[element][str(q)].append(peak_dict)
     #
     #
-    # print all isotopes if requested
+    # loop through all elements and charge states and create flat peak list
+    peaks_list = []
+    for element in peaks_dict.values():
+        for charge_states_peaks_list in element.values():
+            peaks_list.extend(charge_states_peaks_list)
+    #
+    #
+    #
+    #
+    # print all peaks if requested
     if verbose == True:
-        print("Total number of isotopes is {0:d}:".format(len(isotope_list)))
-        print('\t'.join(isotope_list[0].keys()))
+        print("Total number of peaks is {0:d}:".format(len(peaks_list)))
+        print('\t'.join(peaks_list[0].keys()))
         print("--------" * 7 + "------")
-        for isotope in isotope_list:
+        for peak in peaks_list:
             print("{0:s}\t{1:d}\t{2:.2f}\t\t\t{3:.6f}\t{4!r}".
-                  format(*isotope.values()))
+                  format(*peak.values()))
         print("")
     #
     #
-    # return isotope list
-    return isotope_list
+    # return peak list and nested peaks dictionary
+    return peaks_list, peaks_dict
 #
 #
 #
 #
-def spectrum(x, params, isotope_list, element_list = None):
+def spectrum(x, params, peaks_list, elements_list = None):
     """
     Calculate spectrum for specified list of elements.
 
@@ -595,16 +606,16 @@ def spectrum(x, params, isotope_list, element_list = None):
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
         the |lmfit| module.
-    isotope_list : list of dicts
-        The list of all occurring isotopes in the mass spectrum, as described in
-        :ref:`isotope dictionary<apyt.massfit:Isotope dictionary>`.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
 
     Keyword Arguments
     -----------------
-    element_list : list of str
+    elements_list : list of str
         The list specifying for which elements the mass spectrum should be
         evaluated. Defaults to ``None``, indicating to use all elements
-        occurring in *isotope_list*. Note that the background is not included.
+        occurring in *peaks_list*. Note that the background is not included.
 
     Returns
     -------
@@ -614,12 +625,12 @@ def spectrum(x, params, isotope_list, element_list = None):
     """
     #
     #
-    # cumulate all isotope contributions for specified elements
+    # cumulate all peak contributions for specified elements
     y = 0.0
-    for isotope in isotope_list:
-        if element_list is None or \
-           _get_intensity_name(isotope).split('_')[1] in element_list:
-            y += _isotope_spectrum(x, params, isotope)
+    for peak in peaks_list:
+        if elements_list is None or \
+           _get_intensity_name(peak).split('_')[1] in elements_list:
+            y += _isotope_spectrum(x, params, peak)
     #
     #
     return y
@@ -664,13 +675,13 @@ def _decay(x):
 #
 #
 #
-def _estimate_fit_parameters(data, isotope_list):
+def _estimate_fit_parameters(data, peaks_list):
     """
     Estimate initial fit parameters.
     """
     #
     #
-    # initialize fit parameter object
+    # initialize fit parameters object
     params = lmfit.Parameters()
     #
     #
@@ -692,7 +703,7 @@ def _estimate_fit_parameters(data, isotope_list):
     #
     #
     # estimate baseline
-    peak, props = find_peaks(
+    _, props = find_peaks(
         data[:, 1],
         distance = np.iinfo(np.int32).max,
         width = np.finfo(np.float32).eps, rel_height = 1.0)
@@ -706,29 +717,29 @@ def _estimate_fit_parameters(data, isotope_list):
     #
     #
     # estimate peak intensities
-    for isotope in isotope_list:
-        # only consider isotope with maximum abundance
-        if isotope['is_max'] == False:
+    for peak in peaks_list:
+        # only consider peak with maximum abundance
+        if peak['is_max'] == False:
             continue
         #
         #
         # select peak region
         data_sel = data[
-            (isotope['mass_charge_ratio'] - 0.25 <= data[:, 0]) &
-            (data[:, 0] <= isotope['mass_charge_ratio'] + 0.25)
+            (peak['mass_charge_ratio'] - 0.25 <= data[:, 0]) &
+            (data[:, 0] <= peak['mass_charge_ratio'] + 0.25)
         ]
         #
         # find (maximum) peak in selected region
-        peak, props = find_peaks(
+        _, props = find_peaks(
             data_sel[:, 1],
             distance = np.iinfo(np.int32).max, height = 0.0)
         #
         #
         # estimate intensity (for entire isotopic peak group at hypothetical
         # position at unity)
-        I = 2.0 * props['peak_heights'][0] / isotope['abundance'] * \
-            isotope['mass_charge_ratio']
-        params.add(_get_intensity_name(isotope), value = I, min = 0.0)
+        I = 2.0 * props['peak_heights'][0] / peak['abundance'] * \
+            peak['mass_charge_ratio']
+        params.add(_get_intensity_name(peak), value = I, min = 0.0)
     #
     #
     #
@@ -740,18 +751,19 @@ def _estimate_fit_parameters(data, isotope_list):
 #
 #
 #
-def _get_intensity_name(isotope):
+def _get_intensity_name(peak):
     """
-    Simple wrapper to obtain peak intensity for specific element
+    Simple wrapper to obtain intensity parameter name for element/charge state
+    associated with specified peak.
     """
     #
     #
-    return "I_{0:s}_{1:d}".format(isotope['element'], isotope['charge'])
+    return "I_{0:s}_{1:d}".format(peak['element'], peak['charge'])
 #
 #
 #
 #
-def _get_molecular_isotope_list(molecule):
+def _get_molecular_isotopes_list(molecule):
     """
     Return (artificial) Element object with all isotopes for specified molecule.
     """
@@ -763,14 +775,14 @@ def _get_molecular_isotope_list(molecule):
     #
     # get molecular constituents and their isotopes
     atomic_number = 0
-    mass_number_list = []
+    mass_numbers_list = []
     for element, element_count in periodictable.formula(molecule).atoms.items():
         # cumulate (artificial) atomic number
         atomic_number += element_count * element.number
         #
         #
         # get list of isotopes with non-zero abundance for current element
-        isotope_list, abundances = _get_nonzero_isotopes(element)
+        isotopes_list, abundances = _get_nonzero_isotopes(element)
         #
         #
         # calculate all possible isotope combinations (Cartesian product) (from
@@ -781,7 +793,7 @@ def _get_molecular_isotope_list(molecule):
         # respective isotopes; note that by definition, not all isotope
         # combinations in the Cartesian product add up to element_count
         isotope_combinations = itertools.product(
-            range(element_count + 1), repeat = len(isotope_list)
+            range(element_count + 1), repeat = len(isotopes_list)
         )
         # only use isotope combinations where all counts add up to total element
         # count
@@ -789,41 +801,41 @@ def _get_molecular_isotope_list(molecule):
             [ic for ic in isotope_combinations if sum(ic) == element_count]
         #
         #
-        # calculate probabilities and mass number for all valid isotope
+        # calculate probabilities and mass numbers for all valid isotope
         # combinations
-        mass_number_list_element = []
+        mass_numbers_list_element = []
         for ic in isotope_combinations:
             # calculate probability for current isotope combination according to
             # multinomial distribution and store together with mass number as
             # tuple
-            mass_number_list_element.append((
-                np.sum(np.asarray(isotope_list) * np.asarray(ic)), # mass number
+            mass_numbers_list_element.append((
+                np.sum(np.asarray(isotopes_list) * np.asarray(ic)), # mass number
                 multinomial.pmf(ic, element_count, p = abundances / 100)
             ))
         # sum total probability
-        p_tot = sum([mn[1] for mn in mass_number_list_element])
+        p_tot = sum([mn[1] for mn in mass_numbers_list_element])
         #
         #
         # print debug output if requested
         if _is_dbg == True:
             print("\nIsotope combinations for {0:s} ({1:d} atom(s) in "
                   "molecule):".format(element.name, element_count))
-            for isotope in isotope_list:
+            for isotope in isotopes_list:
                 print("#{0:s}\t".format(element[isotope].__repr__()), end = '')
             print("mass number\tprobability\n" +
-                  "--------" * len(isotope_list) +
+                  "--------" * len(isotopes_list) +
                   "---------------------------")
             #
-            for ic in zip(isotope_combinations, mass_number_list_element):
+            for ic in zip(isotope_combinations, mass_numbers_list_element):
                 # skip combinations with negligible contribution
                 if ic[1][1] < _abundance_thres:
                     continue
                 #
-                print(("{:d}\t" * len(isotope_list)).format(*ic[0]), end = '')
+                print(("{:d}\t" * len(isotopes_list)).format(*ic[0]), end = '')
                 print("{0:d}\t\t{1:.9f}".format(*ic[1]))
-            print("========" * len(isotope_list) +
+            print("========" * len(isotopes_list) +
                   "===========================")
-            print("\t" * len(isotope_list) + "\ttotal\t{0:.9f}".format(p_tot))
+            print("\t" * len(isotopes_list) + "\ttotal\t{0:.9f}".format(p_tot))
         #
         #
         # test whether all valid isotope combinations add up to 100%
@@ -832,16 +844,16 @@ def _get_molecular_isotope_list(molecule):
                             "from unity.".format(p_tot, element.name))
         #
         #
-        # append mass number list for current element to overall mass number
+        # append mass numbers list for current element to overall mass numbers
         # list
-        mass_number_list.append(mass_number_list_element)
+        mass_numbers_list.append(mass_numbers_list_element)
     #
     #
     # loop through all element combinations and calculate combined probability
     # for molecule
-    mass_number_list_molecule = []
-    for mn_tuple in itertools.product(*mass_number_list):
-        mass_number_list_molecule.append((
+    mass_numbers_list_molecule = []
+    for mn_tuple in itertools.product(*mass_numbers_list):
+        mass_numbers_list_molecule.append((
             # sum of elemental mass numbers
             np.sum( [mn[0] for mn in mn_tuple]),
             # product of elemental probabilities
@@ -859,7 +871,7 @@ def _get_molecular_isotope_list(molecule):
     #
     #
     # add all possible isotopes to the artificial element
-    for mn in mass_number_list_molecule:
+    for mn in mass_numbers_list_molecule:
         artificial_element.add_isotope(mn[0])
     #
     #
@@ -868,9 +880,9 @@ def _get_molecular_isotope_list(molecule):
         isotope._abundance = 0.0
     #
     #
-    # cumulate abundance for every molecular isotope from mass number list
+    # cumulate abundances for every molecular isotope from mass numbers list
     # (multiple mass numbers may correspond to the same isotope number)
-    for mn in mass_number_list_molecule:
+    for mn in mass_numbers_list_molecule:
         artificial_element[mn[0]]._abundance += mn[1] * 100
     #
     #
@@ -913,23 +925,23 @@ def _get_nonzero_isotopes(element):
     #
     #
     # loop through isotopes with non-zero abundances
-    isotope_list = []
+    isotopes_list = []
     abundances   = []
     for isotope in element.isotopes:
         if element[isotope].abundance > 0.0:
-            isotope_list.append(isotope)
+            isotopes_list.append(isotope)
             abundances.append(element[isotope].abundance)
     #
     #
     # return list of isotopes and their abundances
-    return isotope_list, np.asarray(abundances)
+    return isotopes_list, np.asarray(abundances)
 #
 #
 #
 #
-def _isotope_spectrum(x, params, isotope):
+def _isotope_spectrum(x, params, peak):
     """
-    Get spectrum for specified isotope.
+    Get spectrum for isotope associated with specified peak.
     """
     #
     #
@@ -937,8 +949,8 @@ def _isotope_spectrum(x, params, isotope):
     τ1 = params['τ1']
     τ2 = params['τ2']
     φ  = params['φ']
-    I  = params[_get_intensity_name(isotope)]
-    x0 = isotope['mass_charge_ratio']
+    I  = params[_get_intensity_name(peak)]
+    x0 = peak['mass_charge_ratio']
     #
     # activation parameter is fixed through maximum condition at nominal
     # mass-to-charge ratio
@@ -947,7 +959,7 @@ def _isotope_spectrum(x, params, isotope):
     #
     # intensities are calculated for hypothetical peak position at unity to
     # account for the scaling with the mass-to-charge ratio
-    return I / x0 * isotope['abundance'] * _activation((x / x0 - 1.0) / w) * (
+    return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / w) * (
                φ  * _decay((x / x0 - 1.0) / τ1) +
         (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
     )
@@ -955,16 +967,16 @@ def _isotope_spectrum(x, params, isotope):
 #
 #
 #
-def _model_spectrum(x, isotope_list = None, **params):
+def _model_spectrum(x, peaks_list = None, **params):
     """
     Model function to describe complete mass spectrum.
     """
     #
     #
-    # cumulate all isotope contributions
+    # cumulate all peak contributions
     result = 0.0
-    for isotope in isotope_list:
-        result += _isotope_spectrum(x, params, isotope)
+    for peak in peaks_list:
+        result += _isotope_spectrum(x, params, peak)
     #
     #
     # return function value
