@@ -61,10 +61,25 @@ parameters are pre-determined from the natural abundances of the elements,
 reducing the number of independent fitting parameters, effectively resulting in
 only one intensity parameter per isotope peak group.
 
-Also, the peak shape may be more complex so that the tailing decay can only be
-described by a sum of two exponential decay functions, i.e. using two decay
-constants. This approach is used in this module for *all* peaks with identical
-decay constants.
+Also, the peak shape may be more complex so that the tailing decay may only be
+described by e.g. a sum of two exponential decay functions, i.e. using two decay
+constants. The general peak shape function to be used can be passed to several
+methods (cf. :ref:`List of methods<apyt.massfit:List of methods>`) and is
+identified through one of the following strings:
+
+* ``error-expDecay``: Error function activation with exponential decay.
+* ``error-doubleExpDecay``: Error function activation with double exponential
+  decay.
+
+If a new general peak shape function shall be implemented, the following methods
+need to be extended accordingly:
+
+* :meth:`_isotope_spectrum` for the actual analytical implementation (internal
+  use only);
+* :meth:`_estimate_fit_parameters` to estimate the initial fitting parameters
+  (internal use only);
+* :meth:`counts` to get the counts for a specific peak, i.e. the area under the
+  peak.
 
 
 Data type description
@@ -215,8 +230,8 @@ _add_element("gallium (FIB)", "Gafib", 31, periodictable, [(69, 100.0)],
 # public functions
 #
 ################################################################################
-def counts(peaks_list, params, data_range, bin_width, ignore_list = [],
-           verbose = False):
+def counts(peaks_list, function, params, data_range, bin_width,
+           ignore_list = [], verbose = False):
     """
     Get counts for all elements.
 
@@ -229,6 +244,9 @@ def counts(peaks_list, params, data_range, bin_width, ignore_list = [],
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
         :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    function : str
+        The string identifying the general peak shape function, as described in
+        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
@@ -280,14 +298,28 @@ def counts(peaks_list, params, data_range, bin_width, ignore_list = [],
     """
     #
     #
-    # parse parameters
-    τ1 = params['τ1']
-    τ2 = params['τ2']
-    φ  = params['φ']
+    # peak shape: error function activation with exponential decay
+    if function == "error-expDecay":
+        # calculate unified area
+        unified_area = np.exp(1.0 / np.pi) * params['τ']
     #
-    # activation parameter is fixed through maximum condition at nominal
-    # mass-to-charge ratio
-    w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
+    # peak shape: error function activation with double exponential decay
+    elif function == "error-doubleExpDecay":
+        # parse parameters
+        τ1 = params['τ1']
+        τ2 = params['τ2']
+        φ  = params['φ']
+        #
+        # activation parameter is fixed through maximum condition at nominal
+        # mass-to-charge ratio
+        w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
+        #
+        # calculate unified area
+        unified_area =        φ  * np.exp((w / τ1)**2 / np.pi) * τ1 + \
+                       (1.0 - φ) * np.exp((w / τ2)**2 / np.pi) * τ2
+    #
+    else:
+        _raise_unknown_function(function)
     #
     #
     # loop through all peaks
@@ -302,10 +334,7 @@ def counts(peaks_list, params, data_range, bin_width, ignore_list = [],
         I = params[_get_intensity_name(peak)]
         #
         # calculate count
-        count = I / bin_width * (
-                   φ  * np.exp((w / τ1)**2 / np.pi) * τ1 +
-            (1.0 - φ) * np.exp((w / τ2)**2 / np.pi) * τ2
-        )
+        count = I / bin_width * unified_area
         #
         # cumulate total counts
         total_counts += count
@@ -431,7 +460,7 @@ def enable_debug(is_dbg):
 #
 #
 #
-def fit(spectrum, peaks_list, verbose = False):
+def fit(spectrum, peaks_list, function, verbose = False):
     """
     Fit mass spectrum.
 
@@ -446,6 +475,9 @@ def fit(spectrum, peaks_list, verbose = False):
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
         :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    function : str
+        The string identifying the general peak shape function, as described in
+        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
 
     Keyword Arguments
     -----------------
@@ -465,18 +497,19 @@ def fit(spectrum, peaks_list, verbose = False):
     model = lmfit.Model(_model_spectrum)
     #
     # estimate fit parameters
-    parameters = _estimate_fit_parameters(spectrum, peaks_list)
+    parameters = _estimate_fit_parameters(spectrum, peaks_list, function)
     #
     #
     # perform fit and print results
+    print("Fitting mass spectrum using \"{0:s}\"…".format(function))
     with warnings.catch_warnings():
         warnings.filterwarnings(
             'ignore',
-            message = "The keyword argument peaks_list does not match any " +
-            "arguments of the model function. It will be ignored.",
+            message = "The keyword argument (function|peaks_list) does not " +
+            "match any arguments of the model function. It will be ignored.",
             category = UserWarning)
         result = model.fit(spectrum[:, 1], parameters, x = spectrum[:, 0],
-                           peaks_list = peaks_list)
+                           peaks_list = peaks_list, function = function)
     if verbose == True:
         print(result.fit_report(show_correl = False))
         print("")
@@ -594,7 +627,7 @@ def peaks_list(element_dict, verbose = False):
 #
 #
 #
-def spectrum(x, params, peaks_list, elements_list = None):
+def spectrum(x, peaks_list, function, params, elements_list = None):
     """
     Calculate spectrum for specified list of elements.
 
@@ -602,13 +635,16 @@ def spectrum(x, params, peaks_list, elements_list = None):
     ----------
     x : ndarray or scalar
         The position(s) where to evaluate the mass spectrum.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    function : str
+        The string identifying the general peak shape function, as described in
+        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
         the |lmfit| module.
-    peaks_list : list of dicts
-        The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
 
     Keyword Arguments
     -----------------
@@ -630,7 +666,7 @@ def spectrum(x, params, peaks_list, elements_list = None):
     for peak in peaks_list:
         if elements_list is None or \
            _get_intensity_name(peak).split('_')[1] in elements_list:
-            y += _isotope_spectrum(x, params, peak)
+            y += _isotope_spectrum(x, peak, function, params)
     #
     #
     return y
@@ -675,7 +711,7 @@ def _decay(x):
 #
 #
 #
-def _estimate_fit_parameters(data, peaks_list):
+def _estimate_fit_parameters(data, peaks_list, function):
     """
     Estimate initial fit parameters.
     """
@@ -685,21 +721,38 @@ def _estimate_fit_parameters(data, peaks_list):
     params = lmfit.Parameters()
     #
     #
-    # determine maximum peak to estimate decay constant
+    # determine maximum peak to estimate general peak shape parameters
     print("Finding maximum peak to estimate general peak shape parameters…")
     peak, props = find_peaks(
         data[:, 1],
         distance = np.iinfo(np.int32).max,
         width = 0.0, rel_height = 1.0 - 1.0 / np.e)
     peak_pos = data[peak[0], 0]
-    τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
     print("Position of maximum peak is {0:.2f} amu/e.".format(peak_pos))
-    print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
     #
-    # add decay constant parameters
-    params.add('τ1', value =       τ, min = 0.0)
-    params.add('τ2', value = 0.1 * τ, min = 0.0)
-    params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
+    #
+    #
+    #
+    # peak shape: error function activation with exponential decay
+    if function == "error-expDecay":
+        # estimate decay constant
+        τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+        params.add('τ', value = τ, min = 0.0)
+        print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
+    #
+    # peak shape: error function activation with double exponential decay
+    elif function == "error-doubleExpDecay":
+        # estimate decay constant
+        τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+        params.add('τ1', value =       τ, min = 0.0)
+        params.add('τ2', value = 0.1 * τ, min = 0.0)
+        params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
+        print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
+    #
+    else:
+        _raise_unknown_function(function)
+    #
+    #
     #
     #
     # estimate baseline
@@ -939,35 +992,53 @@ def _get_nonzero_isotopes(element):
 #
 #
 #
-def _isotope_spectrum(x, params, peak):
+def _isotope_spectrum(x, peak, function, params):
     """
     Get spectrum for isotope associated with specified peak.
     """
     #
     #
-    # parse parameters
-    τ1 = params['τ1']
-    τ2 = params['τ2']
-    φ  = params['φ']
-    I  = params[_get_intensity_name(peak)]
-    x0 = peak['mass_charge_ratio']
+    # peak shape: error function activation with exponential decay
+    if function == "error-expDecay":
+        # parse parameters
+        τ  = params['τ']
+        I  = params[_get_intensity_name(peak)]
+        x0 = peak['mass_charge_ratio']
+        #
+        #
+        # intensities are calculated for hypothetical peak position at unity to
+        # account for the scaling with the mass-to-charge ratio
+        return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / τ) \
+                                          *      _decay((x / x0 - 1.0) / τ)
     #
-    # activation parameter is fixed through maximum condition at nominal
-    # mass-to-charge ratio
-    w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
+    # peak shape: error function activation with double exponential decay
+    elif function == "error-doubleExpDecay":
+        # parse parameters
+        τ1 = params['τ1']
+        τ2 = params['τ2']
+        φ  = params['φ']
+        I  = params[_get_intensity_name(peak)]
+        x0 = peak['mass_charge_ratio']
+        #
+        # activation parameter is fixed through maximum condition at nominal
+        # mass-to-charge ratio
+        w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
+        #
+        #
+        # intensities are calculated for hypothetical peak position at unity to
+        # account for the scaling with the mass-to-charge ratio
+        return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / w) * (
+                   φ  * _decay((x / x0 - 1.0) / τ1) +
+            (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
+        )
     #
-    #
-    # intensities are calculated for hypothetical peak position at unity to
-    # account for the scaling with the mass-to-charge ratio
-    return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / w) * (
-               φ  * _decay((x / x0 - 1.0) / τ1) +
-        (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
-    )
+    else:
+        _raise_unknown_function(function)
 #
 #
 #
 #
-def _model_spectrum(x, peaks_list = None, **params):
+def _model_spectrum(x, peaks_list = None, function = None, **params):
     """
     Model function to describe complete mass spectrum.
     """
@@ -976,8 +1047,19 @@ def _model_spectrum(x, peaks_list = None, **params):
     # cumulate all peak contributions
     result = 0.0
     for peak in peaks_list:
-        result += _isotope_spectrum(x, params, peak)
+        result += _isotope_spectrum(x, peak, function, params)
     #
     #
     # return function value
     return result + params['base']
+#
+#
+#
+#
+def _raise_unknown_function(function):
+    """
+    Simple function to unify exceptions.
+    """
+    #
+    #
+    raise Exception("Unknown peak shape function \"{0:s}\".".format(function))
