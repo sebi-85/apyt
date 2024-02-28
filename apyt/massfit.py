@@ -71,16 +71,9 @@ identified through one of the following strings:
 * ``error-doubleExpDecay``: Error function activation with double exponential
   decay.
 
-If a new general peak shape function shall be implemented, the following methods
-need to be extended accordingly:
-
-* :meth:`_isotope_spectrum` for the actual analytical implementation (internal
-  use only);
-* :meth:`_estimate_fit_parameters` to estimate the initial fitting parameters
-  (internal use only);
-* :meth:`counts` to get the counts for a specific peak, i.e. the area under the
-  peak.
-
+If a new general peak shape function shall be implemented, the method
+:meth:`_peak_generic` needs to be extended accordingly. (Note that this method
+is for internal use only and is not exposed by this module.)
 
 Data type description
 ---------------------
@@ -298,28 +291,8 @@ def counts(peaks_list, function, params, data_range, bin_width,
     """
     #
     #
-    # peak shape: error function activation with exponential decay
-    if function == "error-expDecay":
-        # calculate unified area
-        unified_area = np.exp(1.0 / np.pi) * params['τ']
-    #
-    # peak shape: error function activation with double exponential decay
-    elif function == "error-doubleExpDecay":
-        # parse parameters
-        τ1 = params['τ1']
-        τ2 = params['τ2']
-        φ  = params['φ']
-        #
-        # activation parameter is fixed through maximum condition at nominal
-        # mass-to-charge ratio
-        w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
-        #
-        # calculate unified area
-        unified_area =        φ  * np.exp((w / τ1)**2 / np.pi) * τ1 + \
-                       (1.0 - φ) * np.exp((w / τ2)**2 / np.pi) * τ2
-    #
-    else:
-        _raise_unknown_function(function)
+    # get unified area for count normalization
+    area = _peak_generic(function, params, 'count', None)
     #
     #
     # loop through all peaks
@@ -334,7 +307,7 @@ def counts(peaks_list, function, params, data_range, bin_width,
         I = params[_get_intensity_name(peak)]
         #
         # calculate count
-        count = I / bin_width * unified_area
+        count = I * area / bin_width
         #
         # cumulate total counts
         total_counts += count
@@ -721,38 +694,11 @@ def _estimate_fit_parameters(data, peaks_list, function):
     params = lmfit.Parameters()
     #
     #
-    # determine maximum peak to estimate general peak shape parameters
-    print("Finding maximum peak to estimate general peak shape parameters…")
-    peak, props = find_peaks(
-        data[:, 1],
-        distance = np.iinfo(np.int32).max,
-        width = 0.0, rel_height = 1.0 - 1.0 / np.e)
-    peak_pos = data[peak[0], 0]
-    print("Position of maximum peak is {0:.2f} amu/e.".format(peak_pos))
     #
     #
-    #
-    #
-    # peak shape: error function activation with exponential decay
-    if function == "error-expDecay":
-        # estimate decay constant
-        τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
-        params.add('τ', value = τ, min = 0.0)
-        print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
-    #
-    # peak shape: error function activation with double exponential decay
-    elif function == "error-doubleExpDecay":
-        # estimate decay constant
-        τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
-        params.add('τ1', value =       τ, min = 0.0)
-        params.add('τ2', value = 0.1 * τ, min = 0.0)
-        params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
-        print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
-    #
-    else:
-        _raise_unknown_function(function)
-    #
-    #
+    # estimate general peaks shape parameters and p(0), i.e. peak shape function
+    # value at 0
+    params, p_0 = _peak_generic(function, params, 'estimate', (data))
     #
     #
     # estimate baseline
@@ -765,8 +711,6 @@ def _estimate_fit_parameters(data, peaks_list, function):
     #
     # add baseline parameter
     params.add('base', value = base)
-    #
-    #
     #
     #
     # estimate peak intensities
@@ -790,7 +734,7 @@ def _estimate_fit_parameters(data, peaks_list, function):
         #
         # estimate intensity (for entire isotopic peak group at hypothetical
         # position at unity)
-        I = 2.0 * props['peak_heights'][0] / peak['abundance'] * \
+        I = props['peak_heights'][0] / p_0 / peak['abundance'] * \
             peak['mass_charge_ratio']
         params.add(_get_intensity_name(peak), value = I, min = 0.0)
     #
@@ -919,7 +863,7 @@ def _get_molecular_isotopes_list(molecule):
         molecule, molecule, atomic_number, None, periodictable
     )
     if _is_dbg == True: print("")
-    print("Artifical atomic number for \"{0:s}\" is {1:d}.".
+    print("Artificial atomic number for \"{0:s}\" is {1:d}.".
           format(artificial_element.name, artificial_element.number))
     #
     #
@@ -979,7 +923,7 @@ def _get_nonzero_isotopes(element):
     #
     # loop through isotopes with non-zero abundances
     isotopes_list = []
-    abundances   = []
+    abundances    = []
     for isotope in element.isotopes:
         if element[isotope].abundance > 0.0:
             isotopes_list.append(isotope)
@@ -998,42 +942,7 @@ def _isotope_spectrum(x, peak, function, params):
     """
     #
     #
-    # peak shape: error function activation with exponential decay
-    if function == "error-expDecay":
-        # parse parameters
-        τ  = params['τ']
-        I  = params[_get_intensity_name(peak)]
-        x0 = peak['mass_charge_ratio']
-        #
-        #
-        # intensities are calculated for hypothetical peak position at unity to
-        # account for the scaling with the mass-to-charge ratio
-        return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / τ) \
-                                          *      _decay((x / x0 - 1.0) / τ)
-    #
-    # peak shape: error function activation with double exponential decay
-    elif function == "error-doubleExpDecay":
-        # parse parameters
-        τ1 = params['τ1']
-        τ2 = params['τ2']
-        φ  = params['φ']
-        I  = params[_get_intensity_name(peak)]
-        x0 = peak['mass_charge_ratio']
-        #
-        # activation parameter is fixed through maximum condition at nominal
-        # mass-to-charge ratio
-        w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
-        #
-        #
-        # intensities are calculated for hypothetical peak position at unity to
-        # account for the scaling with the mass-to-charge ratio
-        return I / x0 * peak['abundance'] * _activation((x / x0 - 1.0) / w) * (
-                   φ  * _decay((x / x0 - 1.0) / τ1) +
-            (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
-        )
-    #
-    else:
-        _raise_unknown_function(function)
+    return _peak_generic(function, params, 'eval', (x, peak))
 #
 #
 #
@@ -1056,10 +965,143 @@ def _model_spectrum(x, peaks_list = None, function = None, **params):
 #
 #
 #
-def _raise_unknown_function(function):
+def _peak_generic(function, params, mode, arg_tuple):
     """
-    Simple function to unify exceptions.
+    Generic handle for peak shape function.
+
+    This function is intended to serve as a generic wrapper to handle all peak
+    shape functions defined below, as given by the *function* argument. This
+    method is called from several other functions with a specified *mode* to
+    indicate whether the initial peak shape parameters should be estimated
+    (``estimate``), or whether the spectrum should be evaluated (``eval``), or
+    whether the internal intensity parameter should be converted to the actual
+    counts (``count``). New peak shape functions need to be implemented only
+    here.
     """
     #
     #
-    raise Exception("Unknown peak shape function \"{0:s}\".".format(function))
+    # check for valid mode
+    if mode != 'count' and mode != 'estimate' and mode != 'eval':
+        raise Exception("Internal error: Unknown mode \"{0:s}\".".format(mode))
+    #
+    #
+    # find maximum peak in estimation mode for *all* peak shape functions
+    if mode == 'estimate':
+        # unpack additional mode-specific arguments
+        data = arg_tuple
+        #
+        # determine maximum peak to estimate general peak shape parameters
+        print("Finding maximum peak to estimate general peak shape parameters…")
+        peak, props = find_peaks(
+            data[:, 1],
+            distance = np.iinfo(np.int32).max,
+            width = 0.0, rel_height = 1.0 - 1.0 / np.e
+        )
+        peak_pos = data[peak[0], 0]
+        print("Position of maximum peak is {0:.2f} amu/e.".format(peak_pos))
+    #
+    #
+    #
+    #
+    # peak shape: error function activation with exponential decay
+    if function == "error-expDecay":
+        # estimate general peak shape parameters
+        if mode == 'estimate':
+            # estimate decay constant
+            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+            params.add('τ', value = τ, min = 0.0)
+            print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
+            #
+            # return estimated fit parameters and p(0), i.e. peak shape function
+            # value at 0
+            return params, 0.5
+        #
+        #
+        #
+        #
+        # parse common parameters for 'count' and 'eval' mode
+        τ = params['τ']
+        #
+        #
+        # return unified area to normalize counts
+        if mode == 'count':
+            return np.exp(1.0 / np.pi) * τ
+        #
+        #
+        # evaluate function
+        if mode == 'eval':
+            # unpack additional mode-specific arguments
+            x, peak = arg_tuple
+            #
+            # parse parameters
+            I  = params[_get_intensity_name(peak)]
+            x0 = peak['mass_charge_ratio']
+            #
+            #
+            # intensities are calculated for hypothetical peak position at unity
+            # to account for the scaling with respect to the mass-to-charge
+            # ratio
+            return I / x0 * peak['abundance'] * \
+                _activation((x / x0 - 1.0) / τ) * _decay((x / x0 - 1.0) / τ)
+    #
+    #
+    #
+    #
+    # peak shape: error function activation with double exponential decay
+    elif function == "error-doubleExpDecay":
+        # estimate general peak shape parameters
+        if mode == 'estimate':
+            # estimate decay constant
+            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+            params.add('τ1', value =       τ, min = 0.0)
+            params.add('τ2', value = 0.1 * τ, min = 0.0)
+            params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
+            print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
+            #
+            # return estimated fit parameters and p(0), i.e. peak shape function
+            # value at 0
+            return params, 0.5
+        #
+        #
+        #
+        #
+        # parse common parameters for 'count' and 'eval' mode
+        τ1 = params['τ1']
+        τ2 = params['τ2']
+        φ  = params['φ']
+        #
+        # activation parameter is fixed through maximum condition at nominal
+        # mass-to-charge ratio
+        w = τ1 * τ2 / ((1.0 - φ) * τ1 + φ * τ2)
+        #
+        #
+        # return unified area to normalize counts
+        if mode == 'count':
+            return     φ  * np.exp((w / τ1)**2 / np.pi) * τ1 + \
+                (1.0 - φ) * np.exp((w / τ2)**2 / np.pi) * τ2
+        #
+        #
+        # evaluate function
+        if mode == 'eval':
+            # unpack additional mode-specific arguments
+            x, peak = arg_tuple
+            #
+            # parse parameters
+            I  = params[_get_intensity_name(peak)]
+            x0 = peak['mass_charge_ratio']
+            #
+            #
+            # intensities are calculated for hypothetical peak position at unity
+            # to account for the scaling with respect to the mass-to-charge
+            # ratio
+            return I / x0 * peak['abundance'] * \
+                _activation((x / x0 - 1.0) / w) * (
+                           φ  * _decay((x / x0 - 1.0) / τ1) +
+                    (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
+                )
+    #
+    #
+    else:
+        raise Exception(
+            "Unknown peak shape function \"{0:s}\".".format(function)
+        )
