@@ -639,7 +639,7 @@ def spectrum(x, peaks_list, function, params, elements_list = None):
     for peak in peaks_list:
         if elements_list is None or \
            _get_intensity_name(peak).split('_')[1] in elements_list:
-            y += _isotope_spectrum(x, peak, function, params)
+            y += _peak_generic(function, params, 'eval', (x, peak))
     #
     #
     return y
@@ -933,17 +933,6 @@ def _get_nonzero_isotopes(element):
 #
 #
 #
-def _isotope_spectrum(x, peak, function, params):
-    """
-    Get spectrum for isotope associated with specified peak.
-    """
-    #
-    #
-    return _peak_generic(function, params, 'eval', (x, peak))
-#
-#
-#
-#
 def _model_spectrum(x, peaks_list = None, function = None, **params):
     """
     Model function to describe complete mass spectrum.
@@ -953,7 +942,7 @@ def _model_spectrum(x, peaks_list = None, function = None, **params):
     # cumulate all peak contributions
     result = 0.0
     for peak in peaks_list:
-        result += _isotope_spectrum(x, peak, function, params)
+        result += _peak_generic(function, params, 'eval', (x, peak))
     #
     #
     # return function value
