@@ -671,15 +671,12 @@ def _decay(x):
     Exponential decay
 
     The decay constant, at which the function value is reduced to 1/e, is
-    defined to be unity.
+    defined to be unity. The caller needs to make sure that the exponential
+    growth is limited in negative direction to avoid overflow.
     """
     #
     #
-    # lower bound to limit exponential growth in negative direction
-    x_min = -10
-    #
-    #
-    return np.where(x < x_min, 0.0, np.exp(-x, where = (x >= x_min)))
+    return np.exp(-x)
 #
 #
 #
@@ -980,6 +977,34 @@ def _peak_generic(function, params, mode, arg_tuple):
     """
     #
     #
+    def get_peak_range(x, x0, Δmax):
+        """
+        Small helper function to determine the evaluation range around a peak
+        position, returned as a slice object for the input array.
+        """
+        #
+        #
+        # if input is a scalar, simply determine whether its value is within
+        # evaluation range
+        if np.isscalar(x):
+            return np.fabs(x - x0) <= Δmax
+        #
+        #
+        # calculate separation between data points
+        Δx = (x[-1] - x[0]) / (len(x) - 1)
+        #
+        # get nearest index of corresponding peak position
+        i0 = int(np.rint((x0 - x[0]) / Δx))
+        #
+        # calculate index increment to be within valid evaluation range
+        Δi = int(Δmax / Δx) + 1
+        #
+        # return array slicing object
+        return np.s_[max(0, i0 - Δi) : min(len(x) - 1, i0 + Δi + 1)]
+    #
+    #
+    #
+    #
     # check for valid mode
     if mode != 'count' and mode != 'estimate' and mode != 'eval':
         raise Exception("Internal error: Unknown mode \"{0:s}\".".format(mode))
@@ -1038,11 +1063,44 @@ def _peak_generic(function, params, mode, arg_tuple):
             x0 = peak['mass_charge_ratio']
             #
             #
-            # intensities are calculated for hypothetical peak position at unity
-            # to account for the scaling with respect to the mass-to-charge
-            # ratio
-            return I / x0 * peak['abundance'] * \
-                _activation((x / x0 - 1.0) / τ) * _decay((x / x0 - 1.0) / τ)
+            # evaluation range is limited to multiple of decay constant on
+            # either side of the peak; 0.0 elsewhere
+            # (prevents possible overflow and is considerably faster)
+            Δmax = 20.0 * τ * x0
+            #
+            #
+            # get evaluation range around peak
+            peak_range = get_peak_range(x, x0, Δmax)
+            #
+            #
+            # input was array; use slice
+            if isinstance(peak_range, slice):
+                # transform data (only in evaluation interval)
+                x_t = (x[peak_range] / x0 - 1.0) / τ
+                #
+                # pre-fill results with zeros
+                y = np.zeros_like(x)
+                #
+                # intensities are calculated for hypothetical peak position at
+                # unity to account for the scaling with respect to the mass-to-
+                # charge ratio
+                y[peak_range] = \
+                    I / x0 * peak['abundance'] * _activation(x_t) * _decay(x_t)
+                #
+                # return result
+                return y
+            #
+            # input was scalar and in evaluation range
+            elif peak_range == True:
+                # transform data
+                x_t = (x / x0 - 1.0) / τ
+                #
+                return \
+                    I / x0 * peak['abundance'] * _activation(x_t) * _decay(x_t)
+            #
+            # input was scalar, but outside evaluation range
+            elif peak_range == False:
+                return 0.0
     #
     #
     #
@@ -1091,14 +1149,48 @@ def _peak_generic(function, params, mode, arg_tuple):
             x0 = peak['mass_charge_ratio']
             #
             #
-            # intensities are calculated for hypothetical peak position at unity
-            # to account for the scaling with respect to the mass-to-charge
-            # ratio
-            return I / x0 * peak['abundance'] * \
-                _activation((x / x0 - 1.0) / w) * (
-                           φ  * _decay((x / x0 - 1.0) / τ1) +
-                    (1.0 - φ) * _decay((x / x0 - 1.0) / τ2)
-                )
+            # evaluation range is limited to multiple of decay constant on
+            # either side of the peak; 0.0 elsewhere
+            # (prevents possible overflow and is considerably faster)
+            Δmax = 20.0 * max(τ1, τ2) * x0
+            #
+            #
+            # get evaluation range around peak
+            peak_range = get_peak_range(x, x0, Δmax)
+            #
+            #
+            # input was array; use slice
+            if isinstance(peak_range, slice):
+                # transform data (only in evaluation interval)
+                x_t = x[peak_range] / x0 - 1.0
+                #
+                # pre-fill results with zeros
+                y = np.zeros_like(x)
+                #
+                # intensities are calculated for hypothetical peak position at
+                # unity to account for the scaling with respect to the mass-to-
+                # charge ratio
+                y[peak_range] = \
+                    I / x0 * peak['abundance'] * _activation(x_t / w) * (
+                        φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
+                    )
+                #
+                # return result
+                return y
+            #
+            # input was scalar and in evaluation range
+            elif peak_range == True:
+                # transform data
+                x_t = x / x0 - 1.0
+                #
+                return \
+                    I / x0 * peak['abundance'] * _activation(x_t / w) * (
+                        φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
+                    )
+            #
+            # input was scalar, but outside evaluation range
+            elif peak_range == False:
+                return 0.0
     #
     #
     else:
