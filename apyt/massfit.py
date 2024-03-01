@@ -202,7 +202,8 @@ def _add_element(name, symbol, number, table, isotopes, density):
     # add isotopes to element
     for isotope in isotopes:
         element.add_isotope(isotope[0])
-        element[isotope[0]]._abundance = isotope[1]
+        element[isotope[0]]._mass      = isotope[1]
+        element[isotope[0]]._abundance = isotope[2]
     #
     #
     # add new element to table (append 'X' to indicate custom element)
@@ -212,8 +213,10 @@ def _add_element(name, symbol, number, table, isotopes, density):
 #
 #
 # add gallium used by FIB (only one isotope!)
-_add_element("gallium (FIB)", "Gafib", 31, periodictable, [(69, 100.0)],
-             periodictable.Ga.density)
+_add_element(
+    "gallium (FIB)", "Gafib", 31, periodictable,
+    [(69, periodictable.Ga[69].mass, 100.0)], periodictable.Ga.density
+)
 #
 #
 #
