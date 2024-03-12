@@ -497,7 +497,7 @@ def fit(spectrum, peaks_list, function, verbose = False):
 #
 #
 #
-def peaks_list(element_dict, verbose = False):
+def peaks_list(element_dict, mode = 'mass', verbose = False):
     """
     Get list of all peaks for specified elements and charge states.
 
@@ -509,6 +509,11 @@ def peaks_list(element_dict, verbose = False):
 
     Keyword Arguments
     -----------------
+    mode : str
+        Which mode to use for the calculation of the mass-to-charge ratios. In
+        ``mass`` mode (recommended), the actual isotopic masses are used, while
+        in ``isotope`` mode, the mass numbers of the isotopes are used. Defaults
+        to ``mass``.
     verbose : bool
         Whether to print the content of all determined peak dictionaries.
         Defaults to ``False``.
@@ -521,7 +526,14 @@ def peaks_list(element_dict, verbose = False):
     """
     #
     #
+    # check for valid mode
+    if not (mode == 'mass' or mode == 'isotope'):
+        raise Exception("Unknown mode \"{0:s}\".".format(mode))
+    #
+    #
     # loop through elements
+    print("Using \"{0:s}\" mode for calculation of mass-to-charge ratios.\n".
+          format(mode))
     peaks_dict = {}
     for element, charge_states in element_dict.items():
         # check whether charge states contains only one element
@@ -532,9 +544,7 @@ def peaks_list(element_dict, verbose = False):
         # check for possible molecule
         counts = list(periodictable.formula(element).atoms.values())
         if len(counts) > 1 or max(counts) > 1:
-            isotopes = _get_molecular_isotopes_list(
-                element, mode = "mass_number"
-            )
+            isotopes = _get_molecular_isotopes_list(element, mode = mode)
         else:
             isotopes = periodictable.elements.symbol(element)
         #
@@ -557,20 +567,14 @@ def peaks_list(element_dict, verbose = False):
                 if isotope.abundance <= _abundance_thres * 100:
                     continue
                 #
-                #
-                # set mass-to-charge ratio from isotope name
-                if isotope.__str__() == 'D':
-                    mass_charge_ratio = 2.0 / q
-                elif isotope.__str__() == 'T':
-                    mass_charge_ratio = 3.0 / q
-                else:
-                    mass_charge_ratio = isotope.isotope / q
-                #
                 # append peak dictionary to peak list
                 peak_dict = {
                     'element':           element,
                     'charge':            q,
-                    'mass_charge_ratio': mass_charge_ratio,
+                    # set mass-to-charge ratio according to specified mode
+                    # either from actual isotopic mass ("mass") or from mass
+                    # number ("isotope")
+                    'mass_charge_ratio': getattr(isotope, mode) / q,
                     'abundance':         isotope.abundance / 100,
                     'is_max':            False
                 }
@@ -762,14 +766,14 @@ def _get_intensity_name(peak):
 #
 #
 #
-def _get_molecular_isotopes_list(molecule, mode = "mass", mass_decimals = 3):
+def _get_molecular_isotopes_list(molecule, mode = 'mass', mass_decimals = 3):
     """
     Return (artificial) Element object with all isotopes for specified molecule.
 
     *mode* determines which mode should be used when the mass-to-charge ratio is
     calculated for the molecular isotopes. ``mass`` (the default) uses the
-    actual mass of the molecular isotope, while ``mass_number`` uses the mass
-    number of the molecular isotope. The number of decimal places for the
+    actual mass of the molecular isotope, while ``isotope`` uses the mass number
+    of the molecular isotope. The number of decimal places for the
     mass-to-charge ratio in ``mass`` mode should be limited to reduce the number
     of molecular isotopes. This setting effectively groups isotopes whose masses
     do not differ by more than the specified *mass_decimals*.
@@ -870,9 +874,10 @@ def _get_molecular_isotopes_list(molecule, mode = "mass", mass_decimals = 3):
     mass_numbers_list_molecule = []
     for mn_tuple in itertools.product(*mass_numbers_list):
         mass_numbers_list_molecule.append({
-            'mass_number': np.sum( [mn['mass_number'] for mn in mn_tuple]),
-            'mass':        np.sum( [mn['mass']        for mn in mn_tuple]),
-            'abundance':   np.prod([mn['probability'] for mn in mn_tuple])
+            # use 'isotope' key in conformation with periodictable module
+            'isotope':   np.sum( [mn['mass_number'] for mn in mn_tuple]),
+            'mass':      np.sum( [mn['mass']        for mn in mn_tuple]),
+            'abundance': np.prod([mn['probability'] for mn in mn_tuple])
         })
     #
     #
@@ -892,18 +897,26 @@ def _get_molecular_isotopes_list(molecule, mode = "mass", mass_decimals = 3):
     #
     # initialize all abundances to zero
     for isotope in artificial_element:
+        isotope._mass      = 0.0
         isotope._abundance = 0.0
     #
     #
     # cumulate abundances for every molecular isotope from mass numbers list
     # (multiple mass numbers may correspond to the same isotope number)
     for mn in mass_numbers_list_molecule:
-        artificial_element[mn[mode]]._mass_number = mn['mass_number']
-        # in mass_number mode, the mass would need to be weighted accordingly;
-        # just skip it here
+        # in isotope mode, the mass would need to be weighted accordingly;
+        # simply invalidate here
         if mode == 'mass':
-            artificial_element[mn[mode]]._mass    = mn['mass']
-        artificial_element[mn[mode]]._abundance  += mn['abundance'] * 100
+            artificial_element[mn[mode]]._mass = mn['mass']
+        else:
+            artificial_element[mn[mode]]._mass = np.nan
+        #
+        # cumluate abundance
+        artificial_element[mn[mode]]._abundance += mn['abundance'] * 100
+        #
+        # mass number is only needed in debug mode
+        if _is_dbg == True:
+            artificial_element[mn[mode]]._mass_number = mn['isotope']
     #
     #
     # sum total abundance
@@ -924,6 +937,11 @@ def _get_molecular_isotopes_list(molecule, mode = "mass", mass_decimals = 3):
                 print(("{0:d}\t\t" + spec + "\t\t{2:.9f}").format(
                     isotope._mass_number, mass, isotope.abundance / 100)
                 )
+            #
+            # remove _mass_number attribute (only needed in debug mode)
+            delattr(isotope, "_mass_number")
+            #
+            #
         print("===========================================")
         print("\t\t\ttotal\t{0:.9f}\n".format(total_abundance / 100))
     #
