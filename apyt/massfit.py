@@ -779,7 +779,7 @@ def _get_molecular_isotopes_list(molecule):
         #
         #
         # get list of isotopes with non-zero abundance for current element
-        isotopes_list, abundances = _get_nonzero_isotopes(element)
+        isotopes_list, masses, abundances = _get_nonzero_isotopes(element)
         #
         #
         # calculate all possible isotope combinations (Cartesian product) (from
@@ -923,15 +923,17 @@ def _get_nonzero_isotopes(element):
     #
     # loop through isotopes with non-zero abundances
     isotopes_list = []
+    masses        = []
     abundances    = []
     for isotope in element.isotopes:
         if element[isotope].abundance > 0.0:
             isotopes_list.append(isotope)
+            masses.append(element[isotope].mass)
             abundances.append(element[isotope].abundance)
     #
     #
-    # return list of isotopes and their abundances
-    return isotopes_list, np.asarray(abundances)
+    # return list of isotopes, their masses, and their abundances
+    return isotopes_list, np.asarray(masses), np.asarray(abundances)
 #
 #
 #
