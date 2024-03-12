@@ -606,7 +606,12 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
         print("Total number of peaks is {0:d}:".format(len(peaks_list)))
         print('\t'.join(peaks_list[0].keys()))
         print("--------" * 7 + "------")
-        for peak in peaks_list:
+        #
+        # sort peaks by mass-to-charge ratio
+        peaks_list_sorted = sorted(
+            peaks_list, key = lambda peak: peak['mass_charge_ratio']
+        )
+        for peak in peaks_list_sorted:
             print("{0:s}\t{1:d}\t{2:.3f}\t\t\t{3:.6f}\t{4!r}".
                   format(*peak.values()))
         print("")
