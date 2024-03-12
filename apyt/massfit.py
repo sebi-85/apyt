@@ -532,7 +532,9 @@ def peaks_list(element_dict, verbose = False):
         # check for possible molecule
         counts = list(periodictable.formula(element).atoms.values())
         if len(counts) > 1 or max(counts) > 1:
-            isotopes = _get_molecular_isotopes_list(element)
+            isotopes = _get_molecular_isotopes_list(
+                element, mode = "mass_number"
+            )
         else:
             isotopes = periodictable.elements.symbol(element)
         #
@@ -592,7 +594,7 @@ def peaks_list(element_dict, verbose = False):
         print('\t'.join(peaks_list[0].keys()))
         print("--------" * 7 + "------")
         for peak in peaks_list:
-            print("{0:s}\t{1:d}\t{2:.2f}\t\t\t{3:.6f}\t{4!r}".
+            print("{0:s}\t{1:d}\t{2:.3f}\t\t\t{3:.6f}\t{4!r}".
                   format(*peak.values()))
         print("")
     #
@@ -760,9 +762,17 @@ def _get_intensity_name(peak):
 #
 #
 #
-def _get_molecular_isotopes_list(molecule):
+def _get_molecular_isotopes_list(molecule, mode = "mass", mass_decimals = 3):
     """
     Return (artificial) Element object with all isotopes for specified molecule.
+
+    *mode* determines which mode should be used when the mass-to-charge ratio is
+    calculated for the molecular isotopes. ``mass`` (the default) uses the
+    actual mass of the molecular isotope, while ``mass_number`` uses the mass
+    number of the molecular isotope. The number of decimal places for the
+    mass-to-charge ratio in ``mass`` mode should be limited to reduce the number
+    of molecular isotopes. This setting effectively groups isotopes whose masses
+    do not differ by more than the specified *mass_decimals*.
     """
     #
     #
@@ -803,14 +813,22 @@ def _get_molecular_isotopes_list(molecule):
         mass_numbers_list_element = []
         for ic in isotope_combinations:
             # calculate probability for current isotope combination according to
-            # multinomial distribution and store together with mass number as
-            # tuple
-            mass_numbers_list_element.append((
-                np.sum(np.asarray(isotopes_list) * np.asarray(ic)), # mass number
-                multinomial.pmf(ic, element_count, p = abundances / 100)
-            ))
+            # multinomial distribution and store together with mass number and
+            # mass as dictionary
+            mass_numbers_list_element.append({
+                'mass_number': np.sum(
+                    np.asarray(isotopes_list) * np.asarray(ic)
+                ),
+                # round mass to mass_decimals decimals to allow grouping below
+                'mass': np.round(
+                    np.sum(masses * np.asarray(ic)), decimals = mass_decimals
+                ),
+                'probability': multinomial.pmf(
+                    ic, element_count, p = abundances / 100
+                )
+            })
         # sum total probability
-        p_tot = sum([mn[1] for mn in mass_numbers_list_element])
+        p_tot = sum([mn['probability'] for mn in mass_numbers_list_element])
         #
         #
         # print debug output if requested
@@ -819,20 +837,21 @@ def _get_molecular_isotopes_list(molecule):
                   "molecule):".format(element.name, element_count))
             for isotope in isotopes_list:
                 print("#{0:s}\t".format(element[isotope].__repr__()), end = '')
-            print("mass number\tprobability\n" +
+            print("mass number\tmass\t\tprobability\n" +
                   "--------" * len(isotopes_list) +
-                  "---------------------------")
+                  "-------------------------------------------")
             #
             for ic in zip(isotope_combinations, mass_numbers_list_element):
                 # skip combinations with negligible contribution
-                if ic[1][1] < _abundance_thres:
+                if ic[1]['probability'] < _abundance_thres:
                     continue
                 #
                 print(("{:d}\t" * len(isotopes_list)).format(*ic[0]), end = '')
-                print("{0:d}\t\t{1:.9f}".format(*ic[1]))
+                print("{0:d}\t\t{1:07.3f}\t\t{2:.9f}".format(*ic[1].values()))
             print("========" * len(isotopes_list) +
-                  "===========================")
-            print("\t" * len(isotopes_list) + "\ttotal\t{0:.9f}".format(p_tot))
+                  "===========================================")
+            print("\t" * len(isotopes_list) + "\t\t\ttotal\t{0:.9f}".
+                  format(p_tot))
         #
         #
         # test whether all valid isotope combinations add up to 100%
@@ -850,12 +869,11 @@ def _get_molecular_isotopes_list(molecule):
     # for molecule
     mass_numbers_list_molecule = []
     for mn_tuple in itertools.product(*mass_numbers_list):
-        mass_numbers_list_molecule.append((
-            # sum of elemental mass numbers
-            np.sum( [mn[0] for mn in mn_tuple]),
-            # product of elemental probabilities
-            np.prod([mn[1] for mn in mn_tuple])
-        ))
+        mass_numbers_list_molecule.append({
+            'mass_number': np.sum( [mn['mass_number'] for mn in mn_tuple]),
+            'mass':        np.sum( [mn['mass']        for mn in mn_tuple]),
+            'abundance':   np.prod([mn['probability'] for mn in mn_tuple])
+        })
     #
     #
     # create new Element object
@@ -869,7 +887,7 @@ def _get_molecular_isotopes_list(molecule):
     #
     # add all possible isotopes to the artificial element
     for mn in mass_numbers_list_molecule:
-        artificial_element.add_isotope(mn[0])
+        artificial_element.add_isotope(mn[mode])
     #
     #
     # initialize all abundances to zero
@@ -880,7 +898,12 @@ def _get_molecular_isotopes_list(molecule):
     # cumulate abundances for every molecular isotope from mass numbers list
     # (multiple mass numbers may correspond to the same isotope number)
     for mn in mass_numbers_list_molecule:
-        artificial_element[mn[0]]._abundance += mn[1] * 100
+        artificial_element[mn[mode]]._mass_number = mn['mass_number']
+        # in mass_number mode, the mass would need to be weighted accordingly;
+        # just skip it here
+        if mode == 'mass':
+            artificial_element[mn[mode]]._mass    = mn['mass']
+        artificial_element[mn[mode]]._abundance  += mn['abundance'] * 100
     #
     #
     # sum total abundance
@@ -892,13 +915,17 @@ def _get_molecular_isotopes_list(molecule):
     # print debug output if requested
     if _is_dbg == True:
         print("\nIsotope combinations for molecule \"{0:s}\":".format(molecule))
-        print("mass number\tprobability\n---------------------------")
+        print("mass number\tmass\t\tprobability")
+        print("-------------------------------------------")
         for isotope in artificial_element:
             if isotope.abundance >= _abundance_thres * 100:
-                print("{0:d}\t\t{1:.9f}".
-                      format(isotope.isotope, isotope.abundance / 100))
-        print("===========================\n\ttotal\t{0:.9f}\n".
-              format(total_abundance / 100))
+                spec = '{1:07.3f}'  if mode == 'mass' else '{1:f}'
+                mass = isotope.mass if mode == 'mass' else np.nan
+                print(("{0:d}\t\t" + spec + "\t\t{2:.9f}").format(
+                    isotope._mass_number, mass, isotope.abundance / 100)
+                )
+        print("===========================================")
+        print("\t\t\ttotal\t{0:.9f}\n".format(total_abundance / 100))
     #
     #
     # test whether all isotopes add up to 100%
