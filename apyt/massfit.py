@@ -497,7 +497,7 @@ def fit(spectrum, peaks_list, function, verbose = False):
 #
 #
 #
-def peaks_list(element_dict, mode = 'mass', verbose = False):
+def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
     """
     Get list of all peaks for specified elements and charge states.
 
@@ -514,6 +514,13 @@ def peaks_list(element_dict, mode = 'mass', verbose = False):
         ``mass`` mode (recommended), the actual isotopic masses are used, while
         in ``isotope`` mode, the mass numbers of the isotopes are used. Defaults
         to ``mass``.
+    mass_decimals : int
+        The number of decimal places for the mass-to-charge ratios in ``mass``
+        mode should be limited to reduce the number of molecular isotopes. This
+        setting effectively groups isotopes whose masses do not differ by more
+        than the specified *mass_decimals*. This value should be set based on
+        the resolution of the mass spectrum. Defaults to ``3``, i.e. group
+        isotopes whose masses do not differ by more than ``0.001``.
     verbose : bool
         Whether to print the content of all determined peak dictionaries.
         Defaults to ``False``.
@@ -544,7 +551,9 @@ def peaks_list(element_dict, mode = 'mass', verbose = False):
         # check for possible molecule
         counts = list(periodictable.formula(element).atoms.values())
         if len(counts) > 1 or max(counts) > 1:
-            isotopes = _get_molecular_isotopes_list(element, mode = mode)
+            isotopes = _get_molecular_isotopes_list(
+                element, mode = mode, mass_decimals = mass_decimals
+            )
         else:
             isotopes = periodictable.elements.symbol(element)
         #
