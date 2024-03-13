@@ -165,6 +165,7 @@ import warnings
 from scipy.signal import find_peaks, peak_widths
 from scipy.special import erf
 from scipy.stats import multinomial
+from timeit import default_timer as timer
 #
 #
 #
@@ -470,6 +471,7 @@ def fit(spectrum, peaks_list, function, verbose = False):
     #
     #
     # define fit model
+    start = timer()
     model = lmfit.Model(_model_spectrum)
     #
     # estimate fit parameters
@@ -488,6 +490,7 @@ def fit(spectrum, peaks_list, function, verbose = False):
                            peaks_list = peaks_list, function = function)
     if verbose == True:
         print(result.fit_report(show_correl = False))
+        print("Fitting of mass spectrum took {0:.3f}s.".format(timer() - start))
         print("")
     #
     #
