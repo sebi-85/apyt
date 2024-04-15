@@ -950,7 +950,7 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
     #
     # convert peak positions from amu/e to corresponding SI units
     print("Selected peaks (amu/e) for automatic adjustment:"
-          "\n{0:.2f} --> {1:.2f}\n{2:.2f} --> {3:.2f}".
+          "\n{0:.3f} --> {1:.3f}\n{2:.3f} --> {3:.3f}".
           format(peaks_init[0], peaks_final[0], peaks_init[1], peaks_final[1]))
     mc_ratio_unit = constants.value('atomic mass constant') / \
                     constants.value('elementary charge')
