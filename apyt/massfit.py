@@ -437,7 +437,7 @@ def enable_debug(is_dbg):
 #
 #
 #
-def fit(spectrum, peaks_list, function, verbose = False):
+def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
     """
     Fit mass spectrum.
 
@@ -458,6 +458,13 @@ def fit(spectrum, peaks_list, function, verbose = False):
 
     Keyword Arguments
     -----------------
+    scale_width : bool
+        Whether to use a varying parameter for the peak width scaling.
+        Theoretically, the peak width in the mass-to-charge scale is expected to
+        be proportional to the square root of the peak position, but may show
+        different behavior. The parameter is implemented as an exponent.
+        Defaults to ``False``, i.e. assume square root behavior, which resembles
+        a fixed exponent value of 0.5.
     verbose : bool
         Whether to print the fit results and statistics. Defaults to
         ``False``.
@@ -475,7 +482,9 @@ def fit(spectrum, peaks_list, function, verbose = False):
     model = lmfit.Model(_model_spectrum)
     #
     # estimate fit parameters
-    parameters = _estimate_fit_parameters(spectrum, peaks_list, function)
+    parameters = _estimate_fit_parameters(
+        spectrum, peaks_list, function, **kwargs
+    )
     #
     #
     # perform fit and print results
@@ -707,7 +716,7 @@ def _decay(x):
 #
 #
 #
-def _estimate_fit_parameters(data, peaks_list, function):
+def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
     """
     Estimate initial fit parameters.
     """
@@ -717,6 +726,14 @@ def _estimate_fit_parameters(data, peaks_list, function):
     params = lmfit.Parameters()
     #
     #
+    #
+    #
+    # add peak width scaling parameter (implemented as an exponent; defaults to
+    # square root behavior, i.e. γ = 0.5)
+    params.add(
+        'γ', value = 0.5, min = 0.0, max = 2.0,
+        vary = kwargs.get('scale_width', False)
+    )
     #
     #
     # estimate general peaks shape parameters and p(0), i.e. peak shape function
@@ -1066,6 +1083,15 @@ def _peak_generic(function, params, mode, arg_tuple):
         raise Exception("Internal error: Unknown mode \"{0:s}\".".format(mode))
     #
     #
+    #
+    #
+    # peak width scaling parameter common to all peak shape functions (may be
+    # fixed to a constant value of 0.5)
+    γ = params['γ']
+    #
+    #
+    #
+    #
     # find maximum peak in estimation mode for *all* peak shape functions
     if mode == 'estimate':
         # unpack additional mode-specific arguments
@@ -1089,7 +1115,7 @@ def _peak_generic(function, params, mode, arg_tuple):
         # estimate general peak shape parameters
         if mode == 'estimate':
             # estimate decay constant
-            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos**γ
             params.add('τ', value = τ, min = 0.0)
             print("Estimated decay constant is {0:.6f} amu/e.".format(τ))
             #
@@ -1122,7 +1148,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # evaluation range is limited to multiple of decay constant on
             # either side of the peak; 0.0 elsewhere
             # (prevents possible overflow and is considerably faster)
-            Δmax = 20.0 * τ * x0
+            Δmax = 20.0 * τ * x0**γ
             #
             #
             # get evaluation range around peak
@@ -1132,7 +1158,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = (x[peak_range] / x0 - 1.0) / τ
+                x_t = (x[peak_range] - x0) / (x0**γ * τ)
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1140,8 +1166,8 @@ def _peak_generic(function, params, mode, arg_tuple):
                 # intensities are calculated for hypothetical peak position at
                 # unity to account for the scaling with respect to the mass-to-
                 # charge ratio
-                y[peak_range] = \
-                    I / x0 * peak['abundance'] * _activation(x_t) * _decay(x_t)
+                y[peak_range] = I / x0**γ * peak['abundance'] * \
+                    _activation(x_t) * _decay(x_t)
                 #
                 # return result
                 return y
@@ -1149,10 +1175,10 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = (x / x0 - 1.0) / τ
+                x_t = (x - x0) / (x0**γ * τ)
                 #
-                return \
-                    I / x0 * peak['abundance'] * _activation(x_t) * _decay(x_t)
+                return I / x0**γ * peak['abundance'] * \
+                    _activation(x_t) * _decay(x_t)
             #
             # input was scalar, but outside evaluation range
             elif peak_range == False:
@@ -1166,7 +1192,7 @@ def _peak_generic(function, params, mode, arg_tuple):
         # estimate general peak shape parameters
         if mode == 'estimate':
             # estimate decay constant
-            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos
+            τ = props['widths'][0] * (data[2, 0] - data[1, 0]) / peak_pos**γ
             params.add('τ1', value =       τ, min = 0.0)
             params.add('τ2', value = 0.1 * τ, min = 0.0)
             params.add('φ',  value = 0.5,     min = 0.0, max = 1.0)
@@ -1208,7 +1234,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # evaluation range is limited to multiple of decay constant on
             # either side of the peak; 0.0 elsewhere
             # (prevents possible overflow and is considerably faster)
-            Δmax = 20.0 * max(τ1, τ2) * x0
+            Δmax = 20.0 * max(τ1, τ2) * x0**γ
             #
             #
             # get evaluation range around peak
@@ -1218,7 +1244,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = x[peak_range] / x0 - 1.0
+                x_t = (x[peak_range] - x0) / x0**γ
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1227,7 +1253,7 @@ def _peak_generic(function, params, mode, arg_tuple):
                 # unity to account for the scaling with respect to the mass-to-
                 # charge ratio
                 y[peak_range] = \
-                    I / x0 * peak['abundance'] * _activation(x_t / w) * (
+                    I / x0**γ * peak['abundance'] * _activation(x_t / w) * (
                         φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
                     )
                 #
@@ -1237,10 +1263,10 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = x / x0 - 1.0
+                x_t = (x - x0) / x0**γ
                 #
                 return \
-                    I / x0 * peak['abundance'] * _activation(x_t / w) * (
+                    I / x0**γ * peak['abundance'] * _activation(x_t / w) * (
                         φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
                     )
             #
