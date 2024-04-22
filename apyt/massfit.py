@@ -488,7 +488,7 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
     #
     # define fit model
     start = timer()
-    model = lmfit.Model(_model_spectrum)
+    model = lmfit.Model(_model_spectrum, independent_vars = ["x"])
     #
     # estimate fit parameters
     parameters = _estimate_fit_parameters(
