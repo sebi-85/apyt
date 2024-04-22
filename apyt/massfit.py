@@ -159,6 +159,7 @@ import itertools
 import lmfit
 import numpy as np
 import periodictable
+import re
 import warnings
 #
 # import some special functions/modules
@@ -458,13 +459,21 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
 
     Keyword Arguments
     -----------------
+    oxygen_shift : bool
+        Whether to use an additional shift for the (pure) oxygen peaks. The
+        parameter is implemented as an absolute shift which scales with the
+        square root of the peak position and applies to all peaks matching the
+        regular expression ``^I_O[0-9]*_[0-9]+$``. This shift was first
+        discovered in the vanadium pentoxide measurements of Simone Bauder in
+        2024. Defaults to ``False``, i.e. do not shift oxygen peaks, which
+        resembles a fixed value of ``0.0``.
     scale_width : bool
         Whether to use a varying parameter for the peak width scaling.
         Theoretically, the peak width in the mass-to-charge scale is expected to
         be proportional to the square root of the peak position, but may show
         different behavior. The parameter is implemented as an exponent.
         Defaults to ``False``, i.e. assume square root behavior, which resembles
-        a fixed exponent value of 0.5.
+        a fixed exponent value of ``0.5``.
     verbose : bool
         Whether to print the fit results and statistics. Defaults to
         ``False``.
@@ -734,6 +743,20 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
         'γ', value = 0.5, min = 0.0, max = 2.0,
         vary = kwargs.get('scale_width', False)
     )
+    if kwargs.get('scale_width', False) == True:
+        print("Using peak width scaling γ.")
+    #
+    #
+    # add oxygen peak shift parameter (implemented as an absolute shift which
+    # scales with the square root of the peak position)
+    params.add(
+        'ΔO', value = 0.0, min = -0.1, max = 0.1,
+        vary = kwargs.get('oxygen_shift', False)
+    )
+    if kwargs.get('oxygen_shift', False) == True:
+        print("Using oxygen peak shift ΔO.")
+    #
+    #
     #
     #
     # estimate general peaks shape parameters and p(0), i.e. peak shape function
@@ -1076,6 +1099,22 @@ def _peak_generic(function, params, mode, arg_tuple):
         return np.s_[max(0, i0 - Δi) : min(len(x) - 1, i0 + Δi + 1)]
     #
     #
+    def peak_shift(peak_name, params, x0):
+        """
+        Small helper function to apply an additional specific shift based on the
+        peak name.
+        """
+        #
+        #
+        # shift all matching pure oxygen peaks (scaled with square root of peak
+        # position)
+        if re.fullmatch(r"^I_O[0-9]*_[0-9]+$", peak_name) is not None:
+            return params['ΔO'] * np.sqrt(x0)
+        # no shift for all other peaks
+        else:
+            return 0.0
+    #
+    #
     #
     #
     # check for valid mode
@@ -1145,6 +1184,10 @@ def _peak_generic(function, params, mode, arg_tuple):
             x0 = peak['mass_charge_ratio']
             #
             #
+            # set additional possible shift based on peak name
+            Δ = peak_shift(_get_intensity_name(peak), params, x0)
+            #
+            #
             # evaluation range is limited to multiple of decay constant on
             # either side of the peak; 0.0 elsewhere
             # (prevents possible overflow and is considerably faster)
@@ -1158,7 +1201,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = (x[peak_range] - x0) / (x0**γ * τ)
+                x_t = (x[peak_range] - x0 - Δ) / (x0**γ * τ)
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1175,7 +1218,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = (x - x0) / (x0**γ * τ)
+                x_t = (x - x0 - Δ) / (x0**γ * τ)
                 #
                 return I / x0**γ * peak['abundance'] * \
                     _activation(x_t) * _decay(x_t)
@@ -1231,6 +1274,10 @@ def _peak_generic(function, params, mode, arg_tuple):
             x0 = peak['mass_charge_ratio']
             #
             #
+            # set additional possible shift based on peak name
+            Δ = peak_shift(_get_intensity_name(peak), params, x0)
+            #
+            #
             # evaluation range is limited to multiple of decay constant on
             # either side of the peak; 0.0 elsewhere
             # (prevents possible overflow and is considerably faster)
@@ -1244,7 +1291,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = (x[peak_range] - x0) / x0**γ
+                x_t = (x[peak_range] - x0 - Δ) / x0**γ
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1263,7 +1310,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = (x - x0) / x0**γ
+                x_t = (x - x0 - Δ) / x0**γ
                 #
                 return \
                     I / x0**γ * peak['abundance'] * _activation(x_t / w) * (
