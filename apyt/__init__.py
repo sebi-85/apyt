@@ -16,6 +16,7 @@ Package modules
    The APyT local composition module (apyt.locomp)<apyt.locomp>
    The APyT mass spectrum fitting module (apyt.masssfit)<apyt.massfit>
    The APyT mass spectrum module (apyt.massspec)<apyt.massspec>
+   The APyT reconstruction module (apyt.reconstruction)<apyt.reconstruction>
    The APyT SDM module (apyt.sdm)<apyt.sdm>
 
 
@@ -24,4 +25,4 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['conv', 'locomp', 'massfit', 'massspec', 'sdm']
+__all__ = ['conv', 'locomp', 'massfit', 'massspec', 'reconstruction', 'sdm']

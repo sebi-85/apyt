@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'APyT'
-copyright = '2023, Sebastian M. Eich'
+copyright = '2024, Sebastian M. Eich'
 author = 'Sebastian M. Eich'
 
 # The full version, including alpha/beta/rc tags
