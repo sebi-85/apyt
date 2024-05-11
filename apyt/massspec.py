@@ -235,7 +235,6 @@ __all__ = [
 #
 #
 # import modules
-import matplotlib.pyplot as plt
 import numba
 import numpy as np
 import warnings
@@ -391,20 +390,20 @@ def get_flight_correction(data, spec_par, **kwargs):
     # get optional keyword arguments
     deg = kwargs.get('deg', 2)
     if deg < 0:
-        warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
+        warnings.warn("Polynomial degree must be positive. Resetting to \"2\".")
         deg = 2
     hist_par = kwargs.get('hist', {})
     size = kwargs.get('size', 0.3)
     if size < 0.0:
-        warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+        warnings.warn("Size must not be negative. Resetting to \"0.3\".")
         size = 0.3
     steps = kwargs.get('steps', 15)
     if steps <= 0:
-        warn.warnings("Steps must be positive. Resetting to \"15\".")
+        warnings.warn("Steps must be positive. Resetting to \"15\".")
         steps = 15
     thres = kwargs.get('thres', 0.9)
     if thres < 0.0 or thres > 1.0:
-        warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
+        warnings.warn("Peak threshold must be between 0.0 and 1.0. Resetting "
                       "to \"0.9\".")
         thres = 0.9
     #
@@ -695,21 +694,21 @@ def get_voltage_correction(data, spec_par, **kwargs):
     # get optional keyword arguments
     deg = kwargs.get('deg', 2)
     if deg < 0:
-        warn.warnings("Polynomial degree must be positive. Resetting to \"2\".")
+        warnings.warn("Polynomial degree must be positive. Resetting to \"2\".")
         deg = 2
     hist_par = kwargs.get('hist', {})
     r_max = kwargs.get('r_max', -1.0)
     size = kwargs.get('size', 0.3)
     if size < 0.0:
-        warn.warnings("Size must not be negative. Resetting to \"0.3\".")
+        warnings.warn("Size must not be negative. Resetting to \"0.3\".")
         size = 0.3
     steps = kwargs.get('steps', 20)
     if steps <= 0:
-        warn.warnings("Steps must be positive. Resetting to \"20\".")
+        warnings.warn("Steps must be positive. Resetting to \"20\".")
         steps = 20
     thres = kwargs.get('thres', 0.9)
     if thres < 0.0 or thres > 1.0:
-        warn.warnings("Peak threshold must be between 0.0 and 1.0. Resetting "
+        warnings.warn("Peak threshold must be between 0.0 and 1.0. Resetting "
                       "to \"0.9\".")
         thres = 0.9
     #
