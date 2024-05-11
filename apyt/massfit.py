@@ -163,7 +163,7 @@ import re
 import warnings
 #
 # import some special functions/modules
-from scipy.signal import find_peaks, peak_widths
+from scipy.signal import find_peaks
 from scipy.special import erf
 from scipy.stats import multinomial
 from timeit import default_timer as timer
