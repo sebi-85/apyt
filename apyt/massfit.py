@@ -559,11 +559,12 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
         raise Exception("Unknown mode \"{0:s}\".".format(mode))
     #
     #
-    # loop through elements
+    # loop through elements (element properties are passed as a tuple containing
+    # the charge states and the volume for reconstruction)
     print("Using \"{0:s}\" mode for calculation of mass-to-charge ratios.\n".
           format(mode))
     peaks_dict = {}
-    for element, charge_states in element_dict.items():
+    for element, (charge_states, volume) in element_dict.items():
         # check whether charge states contains only one element
         if type(charge_states) is not tuple:
             charge_states = (charge_states, )
@@ -606,7 +607,8 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
                     # number ("isotope")
                     'mass_charge_ratio': getattr(isotope, mode) / q,
                     'abundance':         isotope.abundance / 100,
-                    'is_max':            False
+                    'is_max':            False,
+                    'volume':            volume
                 }
                 if isotope == isotope_max:
                     peak_dict['is_max'] = True
@@ -626,14 +628,14 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
     if verbose == True:
         print("Total number of peaks is {0:d}:".format(len(peaks_list)))
         print('\t'.join(peaks_list[0].keys()))
-        print("--------" * 7 + "------")
+        print("--------" * 8 + "--------")
         #
         # sort peaks by mass-to-charge ratio
         peaks_list_sorted = sorted(
             peaks_list, key = lambda peak: peak['mass_charge_ratio']
         )
         for peak in peaks_list_sorted:
-            print("{0:s}\t{1:d}\t{2:.3f}\t\t\t{3:.6f}\t{4!r}".
+            print("{0:s}\t{1:d}\t{2:.3f}\t\t\t{3:.6f}\t{4!r}\t{5:.6f}".
                   format(*peak.values()))
         print("")
     #
