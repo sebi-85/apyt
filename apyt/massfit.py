@@ -99,6 +99,8 @@ The peak dictionary consists of the following keys:
 * ``abundance``: The isotope abundance (as a decimal fraction).
 * ``is_max``: Whether this peak has maximum abundance for the associated
   element.
+* ``volume``: The atomic volume (in nm³) of the associated element required for
+  reconstruction.
 
 Element count dictionary
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -123,6 +125,7 @@ The following methods are provided:
 * :meth:`counts`: Get counts for all elements.
 * :meth:`enable_debug`: Enable or disable debug output.
 * :meth:`fit`: Fit mass spectrum.
+* :meth:`map_ids`: Map mass-to-charge ratios to chemical IDs.
 * :meth:`peaks_list`: Get list of all peaks for specified elements and
   charge states.
 * :meth:`spectrum`: Calculate spectrum for specified list of elements.
@@ -147,6 +150,7 @@ __all__ = [
     'counts',
     'enable_debug',
     'fit',
+    'map_ids',
     'peaks_list',
     'spectrum'
 ]
@@ -157,6 +161,7 @@ __all__ = [
 # import modules
 import itertools
 import lmfit
+import numba
 import numpy as np
 import periodictable
 import re
@@ -514,6 +519,106 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
     #
     # return fit results
     return result
+#
+#
+#
+#
+def map_ids(mc_ratio, r, x, peaks_list, function, params):
+    """
+    Map mass-to-charge ratios to chemical IDs.
+
+    This function calculates a probability vector which contains the
+    probabilities to find a specific element associated with the given peaks in
+    *peaks_list* (including background) at every position *x* in the
+    mass-to-charge spectrum. These probabilities are eventually used for peak
+    de-convolution and background subtraction to assign the corresponding
+    chemical IDs.
+
+    Parameters
+    ----------
+    mc_ratio : ndarray, shape (n,)
+        The mass-to-charge ratios of the *n* events.
+    r : ndarray, shape (n,)
+        The *n* random numbers (between ``0.0`` and ``1.0``) required for
+        mapping the probability vector to an actual chemical ID.
+    x : ndarray, shape (m,)
+        The positions at which the probability vectors are calculated. The
+        elements of the array must be equidistant.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    function : str
+        The string identifying the general peak shape function, as described in
+        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
+    params : dict
+        The dictionary with the fit parameter names as keys, and best-fit values
+        as values, as described in the |best_params| |model_result| attribute of
+        the |lmfit| module.
+
+    Returns
+    -------
+    ids : ndarray, shape (n,)
+        The chemical IDs of the *n* events.
+    """
+    #
+    #
+    def _bin_mapper(x_0, x_ref):
+        """
+        Simple function to map positions *x_0* into the corresponding bin number
+        based on the reference positions *x_ref*.
+        """
+        #
+        #
+        delta = (x_ref[-1] - x_ref[0]) / (len(x_ref) - 1)
+        return ((x_0 - (x_ref[0] - delta / 2)) // delta).astype(int)
+    #
+    #
+    @numba.njit(cache = True)
+    def _get_ids(bin_ids, p, r):
+        """
+        Simple helper function which performs the actual chemical mapping from
+        the probability vectors to an ID.
+
+        This function could be further optimized for speed, but this may come
+        at the cost of higher memory usage. Linear interpolation between the
+        probability vectors may also increase the accuracy.
+        """
+        #
+        #
+        # loop through all events
+        ids = np.empty(len(bin_ids), dtype = np.int16)
+        for i in range(len(bin_ids)):
+            ids[i] = np.argmax(p[bin_ids[i]] >= r[i])
+        #
+        #
+        # return chemical IDs
+        return ids
+    #
+    #
+    #
+    #
+    # loop through peaks to calculate probability vectors (one vector for each
+    # x-position containing the probabilities for every peak (element, charge
+    # state, abundance))
+    p_vec = np.zeros((len(x), len(peaks_list) + 1))
+    for i in range(len(peaks_list)):
+        p_vec[:, i] = spectrum(x, [peaks_list[i]], function, params)
+    # set background counts (always *last* entry)
+    p_vec[:, -1] = params['base']
+    #
+    # normalize probability vector
+    p_vec /= np.sum(p_vec, axis = 1)[:, np.newaxis]
+    #
+    # calculate cumulated probability vector
+    p_vec = np.cumsum(p_vec, axis = 1)
+    #
+    #
+    # map mass-to-charge ratios into the corresponding bin number
+    bin_ids = _bin_mapper(mc_ratio, x)
+    #
+    #
+    # return chemical IDs of each event
+    return _get_ids(bin_ids, p_vec, r)
 #
 #
 #
