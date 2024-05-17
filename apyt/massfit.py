@@ -523,7 +523,7 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
 #
 #
 #
-def map_ids(mc_ratio, r, x, peaks_list, function, params):
+def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
     """
     Map mass-to-charge ratios to chemical IDs.
 
@@ -554,6 +554,9 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params):
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
         the |lmfit| module.
+    verbose : bool
+        Whether to print a list of all chemical IDs and their fractions in
+        relation to the total counts (with background). Defaults to ``False``.
 
     Returns
     -------
@@ -600,6 +603,8 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params):
     # loop through peaks to calculate probability vectors (one vector for each
     # x-position containing the probabilities for every peak (element, charge
     # state, abundance))
+    print("Performing chemical mapping…")
+    start = timer()
     p_vec = np.zeros((len(x), len(peaks_list) + 1))
     for i in range(len(peaks_list)):
         p_vec[:, i] = spectrum(x, [peaks_list[i]], function, params)
@@ -617,8 +622,40 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params):
     bin_ids = _bin_mapper(mc_ratio, x)
     #
     #
-    # return chemical IDs of each event
-    return _get_ids(bin_ids, p_vec, r)
+    # get chemical IDs of each event
+    ids = _get_ids(bin_ids, p_vec, r)
+    #
+    #
+    # print counts of all IDs if requested
+    if verbose == True:
+        print("\nid\telement\tcharge\tabundance\t   count\tfraction\tvolume")
+        print("--------" * 9 + "--------")
+        #
+        # loop through all peaks
+        for i in range(len(peaks_list)):
+            peak  = peaks_list[i]
+            count = np.count_nonzero(ids == i)
+            #
+            print(
+                "{0:3d}\t{1:s}\t{2:d}\t{3:.6f}\t{4:8d}\t{5:.4f}\t\t{6:.6f}".
+                format(
+                    i, peak['element'], peak['charge'], peak['abundance'],
+                    count, count / len(ids), peak['volume']
+                )
+            )
+        #
+        # background counts
+        count = np.count_nonzero(ids == len(peaks_list))
+        print("{0:3d}\tBackground\t\t\t{1:8d}\t{2:.4f}".
+            format(len(peaks_list), count, count / len(mc_ratio)))
+        #
+        print("========" * 9 + "========")
+        print("\t\t\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
+    #
+    #
+    # return chemical IDs
+    print("Chemical mapping took {0:.3f}s.".format(timer() - start))
+    return ids
 #
 #
 #
