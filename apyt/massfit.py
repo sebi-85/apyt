@@ -573,25 +573,24 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
         #
         #
         delta = (x_ref[-1] - x_ref[0]) / (len(x_ref) - 1)
-        return ((x_0 - (x_ref[0] - delta / 2)) // delta).astype(int)
+        return ((x_0 - (x_ref[0] - delta / 2)) / delta).astype(np.int32)
     #
     #
-    @numba.njit(cache = True)
+    @numba.njit("i2[:](i4[:], f8[:,:], f8[:])", cache = True, parallel = True)
     def _get_ids(bin_ids, p, r):
         """
         Simple helper function which performs the actual chemical mapping from
         the probability vectors to an ID.
 
-        This function could be further optimized for speed, but this may come
-        at the cost of higher memory usage. Linear interpolation between the
-        probability vectors may also increase the accuracy.
+        Instead of mapping the mass-to-charge ratios into fixed bins, linear
+        interpolation between the probability vectors may increase the accuracy.
         """
         #
         #
         # loop through all events
         ids = np.empty(len(bin_ids), dtype = np.int16)
-        for i in range(len(bin_ids)):
-            ids[i] = np.argmax(p[bin_ids[i]] >= r[i])
+        for i in numba.prange(len(bin_ids)):
+            ids[i] = np.searchsorted(p[bin_ids[i]], r[i])
         #
         #
         # return chemical IDs
@@ -628,14 +627,15 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
     #
     # print counts of all IDs if requested
     if verbose == True:
+        # get counts for all IDs
+        counts = np.bincount(ids)
+        #
+        #
         print("\nid\telement\tcharge\tabundance\t   count\tfraction\tvolume")
         print("--------" * 9 + "--------")
         #
         # loop through all peaks
-        for i in range(len(peaks_list)):
-            peak  = peaks_list[i]
-            count = np.count_nonzero(ids == i)
-            #
+        for i, count, peak in zip(range(len(counts)), counts, peaks_list):
             print(
                 "{0:3d}\t{1:s}\t{2:d}\t{3:.6f}\t{4:8d}\t{5:.4f}\t\t{6:.6f}".
                 format(
@@ -644,10 +644,9 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
                 )
             )
         #
-        # background counts
-        count = np.count_nonzero(ids == len(peaks_list))
+        # background counts (always last entry)
         print("{0:3d}\tBackground\t\t\t{1:8d}\t{2:.4f}".
-            format(len(peaks_list), count, count / len(mc_ratio)))
+            format(len(peaks_list), counts[-1], counts[-1] / len(mc_ratio)))
         #
         print("========" * 9 + "========")
         print("\t\t\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
