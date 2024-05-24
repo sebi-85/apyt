@@ -221,7 +221,7 @@ def _add_element(name, symbol, number, table, isotopes, density):
 #
 # add gallium used by FIB (only one isotope!)
 _add_element(
-    "gallium (FIB)", "Gafib", 31, periodictable,
+    "gallium (FIB)", "Gx", 31, periodictable,
     [(69, periodictable.Ga[69].mass, 100.0)], periodictable.Ga.density
 )
 #
