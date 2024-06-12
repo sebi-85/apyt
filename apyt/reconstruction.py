@@ -111,7 +111,7 @@ def align_evaporation_field(V, U, params_in, E_0, θ_m, num_points = 10000):
     E_0 : float
         The target evaporation field for alignment.
     θ_m : float
-        The (full) aperture angle (in radians).
+        The (half) aperture angle (in radians).
     num_points : int
         The number of points used to sample the evaporation field over the given
         entire data set. The curve can be considered to change only slowly so
@@ -307,7 +307,7 @@ def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
         related to the taper angle :math:`\\alpha` through the relation
         :math:`\\theta = \\frac{\\pi - \\alpha}{2}`.
     θ_m : float
-        The (full) aperture angle (in radians).
+        The (half) aperture angle (in radians).
     use_numba : bool
         Whether to use the Numba njit'ed function. For low overall computational
         costs, calling the Numba function may cause too much overhead so that

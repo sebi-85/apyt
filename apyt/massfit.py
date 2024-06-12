@@ -85,8 +85,10 @@ Element dictionary
 ^^^^^^^^^^^^^^^^^^
 
 The element dictionary consists of key--value pairs, where each key represents
-one element (may also be a molecule) and the value is a tuple containing the
-occurring charge states of the respective element.
+one element (may also be a molecule) and the value is a (nested) tuple
+containing the occurring charge states of the respective element (also as a
+tuple) and the corresponding nominal volume (in nm³) of the element/molecule
+used for reconstruction.
 
 Peak dictionary
 ^^^^^^^^^^^^^^^
