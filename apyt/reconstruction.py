@@ -89,7 +89,7 @@ This flag can be set through the :meth:`enable_debug` function."""
 # public functions
 #
 ################################################################################
-def align_evaporation_field(V, U, params_in, E_0, num_points = 10000):
+def align_evaporation_field(V, U, params_in, E_0, θ_m, num_points = 10000):
     """
     Automatically align evaporation field for taper geometry.
 
@@ -110,6 +110,8 @@ def align_evaporation_field(V, U, params_in, E_0, num_points = 10000):
         initial guess (float) and whether the parameter should be varied (bool).
     E_0 : float
         The target evaporation field for alignment.
+    θ_m : float
+        The (full) aperture angle (in radians).
     num_points : int
         The number of points used to sample the evaporation field over the given
         entire data set. The curve can be considered to change only slowly so
@@ -123,7 +125,7 @@ def align_evaporation_field(V, U, params_in, E_0, num_points = 10000):
     """
     #
     #
-    def _squared_residuals(p, params, V, U, E_0):
+    def _squared_residuals(p, params, V, U, E_0, θ_m):
         """
         Least squares minimizer function.
 
@@ -154,7 +156,7 @@ def align_evaporation_field(V, U, params_in, E_0, num_points = 10000):
         #
         #
         # calculate radii of curvature for taper geometry
-        _, r = get_taper_geometry(V, r_0, θ, use_numba = False)
+        _, r = get_taper_geometry(V, r_0, θ, θ_m, use_numba = False)
         #
         #
         # return sum of squared residuals
@@ -191,7 +193,8 @@ def align_evaporation_field(V, U, params_in, E_0, num_points = 10000):
     # minimize squared residuals
     print("Aligning evaporation field to {0:.1f} V/nm…".format(E_0))
     res = minimize(
-        _squared_residuals, np.asarray(init), args = (params_in, V, U, E_0),
+        _squared_residuals, np.asarray(init),
+        args = (params_in, V, U, E_0, θ_m),
         bounds = bounds, method = 'Nelder-Mead', options = {'xatol': 1e-2}
     )
     #
@@ -282,7 +285,7 @@ def get_evaporation_field(U, r, β):
 #
 #
 #
-def get_taper_geometry(V, r_0, θ, use_numba = True):
+def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
     """
     Calculate taper geometry.
 
@@ -303,6 +306,8 @@ def get_taper_geometry(V, r_0, θ, use_numba = True):
         The polar angle of the hemispherical cap (in radians). This angle is
         related to the taper angle :math:`\\alpha` through the relation
         :math:`\\theta = \\frac{\\pi - \\alpha}{2}`.
+    θ_m : float
+        The (full) aperture angle (in radians).
     use_numba : bool
         Whether to use the Numba njit'ed function. For low overall computational
         costs, calling the Numba function may cause too much overhead so that
@@ -331,10 +336,10 @@ def get_taper_geometry(V, r_0, θ, use_numba = True):
     # this decorator decides whether to use the Numba njit'ed function or pure
     # Python function depending on the value of 'use_numba'
     @numba.njit(
-        "Tuple((f8[:], f8[:], f8))(f8[:], f8, f8, b1)",
+        "Tuple((f8[:], f8[:], f8))(f8[:], f8, f8, f8, b1)",
         cache = True, parallel = True
     ) if use_numba == True else lambda obj: obj
-    def _get_taper_geometry(V, r_0, θ, is_dbg):
+    def _get_taper_geometry(V, r_0, θ, θ_m, is_dbg):
         """
         Small helper function which solves the cubic equation.
         """
@@ -344,17 +349,20 @@ def get_taper_geometry(V, r_0, θ, use_numba = True):
         # handled separately to avoid divergence of the solution below; simply
         # return results for a perfect cylinder
         if np.abs(θ - np.pi / 2) < np.finfo(np.float32).eps:
-            return V / np.pi * r_0**2, np.full_like(V, r_0), 0.0
+            return \
+                V / (np.pi * (r_0 * np.sin(θ_m))**2), np.full_like(V, r_0), 0.0
         #
         #
         #
         #
         # set coefficients for cubic equation a * z^3 + b * z^2 + c * z + d = 0;
         # a is equal to unity by definition
-        b = 6.0 * r_0 * np.cos(θ) / (1.0 + np.cos(2.0 * θ))
-        c = 6.0 * r_0**2 / (1.0 + np.cos(2.0 * θ))
-        d = -3.0 * V / \
-            (2.0 * np.pi * np.sin(θ / 2.0)**4 * (1.0 + np.cos(2.0 * θ)))
+        b = 3.0 * r_0 / np.cos(θ)
+        c = 3.0 * (r_0 / np.cos(θ))**2
+        d = -3.0 * V / (
+            4.0 * np.pi * np.cos(θ)**2 *
+            np.sin(θ_m / 2.0)**2 * (np.cos(θ_m / 2.0)**2 - np.cos(θ))
+        )
         #
         #
         # calculate intermediate values (δ is positive for this specific
@@ -383,8 +391,16 @@ def get_taper_geometry(V, r_0, θ, use_numba = True):
     #
     #
     #
+    # limit aperture angle if required due to tip geometry
+    # (should not occur realistically)
+    if θ_m > θ:
+        print("Reducing aperture angle to {0:.2f}° due to taper geometry.".
+              format(np.rad2deg(θ)))
+        θ_m = θ
+    #
+    #
     # call helper function to calculate taper geometry
-    z, r, δ_max = _get_taper_geometry(V, r_0, θ, _is_dbg)
+    z, r, δ_max = _get_taper_geometry(V, r_0, θ, θ_m, _is_dbg)
     #
     #
     # in debug mode, check the solutions for consistency
