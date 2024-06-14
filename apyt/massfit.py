@@ -1222,13 +1222,22 @@ def _peak_generic(function, params, mode, arg_tuple):
         """
         Small helper function to determine the evaluation range around a peak
         position, returned as a slice object for the input array.
+
+        Δmax can be either a list or tuple to determine individual ranges to the
+        left and right, respectively, or a scalar where the the same range is
+        used on both sides. Note that all ranges are positive.
         """
+        #
+        #
+        # convert scalar to tuple with identical ranges on both sides
+        if not isinstance(Δmax, (list, tuple)):
+            Δmax = (Δmax, Δmax)
         #
         #
         # if input is a scalar, simply determine whether its value is within
         # evaluation range
         if np.isscalar(x):
-            return np.fabs(x - x0) <= Δmax
+            return -Δmax[0] <= x - x0 and x - x0 <= Δmax[1]
         #
         #
         # calculate separation between data points
@@ -1237,11 +1246,11 @@ def _peak_generic(function, params, mode, arg_tuple):
         # get nearest index of corresponding peak position
         i0 = int(np.rint((x0 - x[0]) / Δx))
         #
-        # calculate index increment to be within valid evaluation range
-        Δi = int(Δmax / Δx) + 1
+        # calculate index increments to be within valid evaluation range
+        Δi = (int(Δmax[0] / Δx) + 1, int(Δmax[1] / Δx) + 1)
         #
         # return array slicing object
-        return np.s_[max(0, i0 - Δi) : min(len(x) - 1, i0 + Δi + 1)]
+        return np.s_[max(0, i0 - Δi[0]) : min(len(x) - 1, i0 + Δi[1] + 1)]
     #
     #
     def peak_shift(peak_name, params, x0):
@@ -1423,10 +1432,11 @@ def _peak_generic(function, params, mode, arg_tuple):
             Δ = peak_shift(_get_intensity_name(peak), params, x0)
             #
             #
-            # evaluation range is limited to multiple of decay constant on
-            # either side of the peak; 0.0 elsewhere
-            # (prevents possible overflow and is considerably faster)
-            Δmax = 20.0 * max(τ1, τ2) * x0**γ
+            # evaluation range is limited to multiple of width of error function
+            # onset on the left side and largest decay constant on the right
+            # side; 0.0 elsewhere (prevents possible overflow and is
+            # considerably faster)
+            Δmax = (20.0 * w * x0**γ, 20.0 * max(τ1, τ2) * x0**γ)
             #
             #
             # get evaluation range around peak
