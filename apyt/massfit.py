@@ -525,16 +525,18 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
 #
 #
 #
-def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
+def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
+            verbose = False):
     """
     Map mass-to-charge ratios to chemical IDs.
 
     This function calculates a probability vector which contains the
-    probabilities to find a specific element associated with the given peaks in
-    *peaks_list* (including background) at every position *x* in the
-    mass-to-charge spectrum. These probabilities are eventually used for peak
-    de-convolution and background subtraction to assign the corresponding
-    chemical IDs.
+    probabilities to find a specific element (with individual charge state if
+    requested) associated with the given peaks in *peaks_list* (including
+    background) at every position *x* in the mass-to-charge spectrum. These
+    probabilities are eventually used for peak de-convolution and background
+    subtraction to assign the corresponding chemical IDs. The atomic volumes of
+    the events are also mapped and returned.
 
     Parameters
     ----------
@@ -556,6 +558,9 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
         the |lmfit| module.
+    group_charge : bool
+        Whether to group all charge states of an individual element. Defaults to
+        ``True``.
     verbose : bool
         Whether to print a list of all chemical IDs and their fractions in
         relation to the total counts (with background). Defaults to ``False``.
@@ -564,6 +569,8 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
     -------
     ids : ndarray, shape (n,)
         The chemical IDs of the *n* events.
+    Ω : ndarray, shape (n,)
+        The atomic volumes of the *n* events.
     """
     #
     #
@@ -601,16 +608,24 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
     #
     #
     #
-    # loop through peaks to calculate probability vectors (one vector for each
-    # x-position containing the probabilities for every peak (element, charge
-    # state, abundance))
+    # start timer
     print("Performing chemical mapping…")
     start = timer()
-    p_vec = np.zeros((len(x), len(peaks_list) + 1))
-    for i in range(len(peaks_list)):
-        p_vec[:, i] = spectrum(x, [peaks_list[i]], function, params)
-    # set background counts (always *last* entry)
-    p_vec[:, -1] = params['base']
+    #
+    #
+    # group peaks for the same element (and charge state if requested)
+    peak_groups = _group_peaks(peaks_list, group_charge)
+    #
+    #
+    # set background counts (always *first* entry)
+    p_vec = np.zeros((len(x), len(peak_groups) + 1))
+    p_vec[:, 0] = params['base']
+    #
+    # loop through peak groups to calculate probability vectors (one vector for
+    # each x-position containing the probabilities for every peak group
+    for i in range(len(peak_groups)):
+        p_vec[:, i + 1] = spectrum(x, peak_groups[i], function, params)
+    #
     #
     # normalize probability vector
     p_vec /= np.sum(p_vec, axis = 1)[:, np.newaxis]
@@ -633,30 +648,35 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, verbose = False):
         counts = np.bincount(ids)
         #
         #
-        print("\nid\telement\tcharge\tabundance\t   count\tfraction\tvolume")
-        print("--------" * 9 + "--------")
+        print("\nid\telement\tcharge\t   count\tfraction\tvolume")
+        print("--------" * 7 + "--------")
+        #
+        # background counts (always first entry)
+        print("{0:3d}\tBackground\t{1:8d}\t{2:.4f}".
+            format(0, counts[0], counts[0] / len(mc_ratio)))
         #
         # loop through all peaks
-        for i, count, peak in zip(range(len(counts)), counts, peaks_list):
+        for i, group in zip(range(1, len(peak_groups) + 1), peak_groups):
             print(
-                "{0:3d}\t{1:s}\t{2:d}\t{3:.6f}\t{4:8d}\t{5:.4f}\t\t{6:.6f}".
+                "{0:3d}\t{1:s}\t{2:d}\t{3:8d}\t{4:.4f}\t\t{5:.6f}".
                 format(
-                    i, peak['element'], peak['charge'], peak['abundance'],
-                    count, count / len(ids), peak['volume']
+                    i, group[0]['element'],
+                    0 if group_charge == True else group[0]['charge'],
+                    counts[i], counts[i] / len(ids), group[0]['volume']
                 )
             )
         #
-        # background counts (always last entry)
-        print("{0:3d}\tBackground\t\t\t{1:8d}\t{2:.4f}".
-            format(len(peaks_list), counts[-1], counts[-1] / len(mc_ratio)))
-        #
-        print("========" * 9 + "========")
-        print("\t\t\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
+        print("========" * 7 + "========")
+        print("\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
     #
     #
-    # return chemical IDs
+    # map atomic volumes (prepend zero volume for background events)
+    Ω = np.append(0.0, [group[0]['volume'] for group in peak_groups])[ids]
+    #
+    #
+    # return chemical IDs and atomic volumes
     print("Chemical mapping took {0:.3f}s.".format(timer() - start))
-    return ids
+    return ids, Ω
 #
 #
 #
@@ -1181,6 +1201,59 @@ def _get_nonzero_isotopes(element):
     #
     # return list of isotopes, their masses, and their abundances
     return isotopes_list, np.asarray(masses), np.asarray(abundances)
+#
+#
+#
+#
+def _group_peaks(peaks_list, group_charge):
+    """
+    Group all peaks (isotopes) belonging to the same element (and charge state
+    if requested).
+
+    Parameters
+    ----------
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    group_charge : bool
+        Whether to group all charge states of an individual element.
+
+    Returns
+    -------
+    peak_groups : list of lists
+        The list of all peak groups, where each group is a list of the
+        corresponding peaks (isotopes) of the same element (and charge state).
+    """
+    #
+    #
+    # loop through all peaks for grouping
+    peak_groups  = []
+    peaks        = []
+    element      = peaks_list[0]['element']
+    charge_state = peaks_list[0]['charge']
+    for peak in peaks_list:
+        # if peak belongs to same element (and charge state), append to current
+        # peak group
+        if peak['element'] == element and (
+            peak['charge'] == charge_state or group_charge == True
+        ):
+            peaks.append(peak)
+        # otherwise continue with next element (and charge state)
+        else:
+            # append previous peak group and start new peak group
+            peak_groups.append(peaks)
+            peaks = [peak]
+            #
+            # reset element and charge state
+            element      = peak['element']
+            charge_state = peak['charge']
+    #
+    # append last peak group
+    peak_groups.append(peaks)
+    #
+    #
+    # return peak groups
+    return peak_groups
 #
 #
 #
