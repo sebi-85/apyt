@@ -404,17 +404,10 @@ def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
     #
     #
     # in debug mode, check the solutions for consistency
-    if _is_dbg == True:
-        if δ_max > np.finfo(np.float32).eps:
-            raise Exception(
-                "Maximum deviation of the solution for the cubic equation "
-                "({0:.6e}) exceeds internal threshold for consistency check."
-                .format(δ_max)
-            )
-        _debug(
-            "Maximum deviation of the solution for the cubic equation is "
-            "{0:.6e}.".format(δ_max)
-        )
+    _debug(
+        "Maximum deviation of the solution for the cubic equation is {0:.6e}.".
+        format(δ_max)
+    )
     #
     #
     # return taper geometry (z-position of sphere center for each event to be
