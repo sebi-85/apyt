@@ -347,18 +347,18 @@ def counts(peaks_list, function, params, data_range, bin_width,
               format(total_counts))
         print("Number of background counts is {0:.0f} ({1:.1f}%).\n".format(
               background, background / (total_counts + background) * 100))
-        print("element\tcharge\t   count\tfraction")
-        print("--------" * 4 + "--------")
+        print("element\t\tcharge\t   count\tfraction")
+        print("--------" * 5 + "--------")
         for count in counts_list:
-            print("{0:s}\t{1:d}\t{2:8.0f}\t{3:.4f}".
+            print("{0:12s}\t{1:d}\t{2:8.0f}\t{3:.4f}".
                   format(*count.values()))
-        print("========" * 4 + "========")
-        print("\ttotal\t{0:8.0f}\n".format(total_counts))
+        print("========" * 5 + "========")
+        print("\t\ttotal\t{0:8.0f}\n".format(total_counts))
         #
         #
         # combine counts for different charge states for individual elements
-        print("element\t   count\tfraction")
-        print("--------" * 3 + "--------")
+        print("element\t\t   count\tfraction")
+        print("--------" * 4 + "--------")
         element_count = 0
         element       = counts_list[0]['element']
         for count in counts_list:
@@ -366,15 +366,15 @@ def counts(peaks_list, function, params, data_range, bin_width,
                 element_count += count['count']
             else:
                 # print previous element and reset
-                print("{0:s}\t{1:8.0f}\t{2:.4f}".format(
+                print("{0:12s}\t{1:8.0f}\t{2:.4f}".format(
                       element, element_count, element_count / total_counts))
                 element_count = count['count']
                 element       = count['element']
         # print last element
-        print("{0:s}\t{1:8.0f}\t{2:.4f}".
+        print("{0:12s}\t{1:8.0f}\t{2:.4f}".
               format(element, element_count, element_count / total_counts))
-        print("========" * 3 + "========")
-        print("total\t{0:8.0f}\n".format(total_counts))
+        print("========" * 4 + "========")
+        print("total\t\t{0:8.0f}\n".format(total_counts))
         #
         #
         # break down molecules into individual elements
@@ -413,14 +413,14 @@ def counts(peaks_list, function, params, data_range, bin_width,
         #
         # only print if molecule found or ignore list active
         if is_molecule == True or len(ignore_list) > 0:
-            print("element\t   count\tfraction")
+            print("element\t    count\tfraction")
             print("--------" * 3 + "--------")
             for element, element_count in count_dict.items():
-                print("{0:s}\t{1:8.0f}\t{2:.4f}".
+                print("{0:s}\t{1:9.0f}\t{2:.4f}".
                       format(element, element_count,
                              element_count / sum(count_dict.values())))
             print("========" * 3 + "========")
-            print("total\t{0:8.0f}\n".format(sum(count_dict.values())))
+            print("total\t{0:9.0f}\n".format(sum(count_dict.values())))
     #
     #
     # return element counts, total counts, and background counts
@@ -645,20 +645,20 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     # print counts of all IDs if requested
     if verbose == True:
         # get counts for all IDs
-        counts = np.bincount(ids)
+        counts = np.bincount(ids, minlength = p_vec.shape[1])
         #
         #
-        print("\nid\telement\tcharge\t   count\tfraction\tvolume")
-        print("--------" * 7 + "--------")
+        print("\nid\telement\t\tcharge\t   count\tfraction\tvolume")
+        print("--------" * 8 + "--------")
         #
         # background counts (always first entry)
-        print("{0:3d}\tBackground\t{1:8d}\t{2:.4f}".
+        print("{0:3d}\tBackground\t\t{1:8d}\t{2:.4f}".
             format(0, counts[0], counts[0] / len(mc_ratio)))
         #
         # loop through all peaks
         for i, group in zip(range(1, len(peak_groups) + 1), peak_groups):
             print(
-                "{0:3d}\t{1:s}\t{2:d}\t{3:8d}\t{4:.4f}\t\t{5:.6f}".
+                "{0:3d}\t{1:12s}\t{2:d}\t{3:8d}\t{4:.4f}\t\t{5:.6f}".
                 format(
                     i, group[0]['element'],
                     0 if group_charge == True else group[0]['charge'],
@@ -666,8 +666,8 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
                 )
             )
         #
-        print("========" * 7 + "========")
-        print("\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
+        print("========" * 8 + "========")
+        print("\t\t\ttotal\t{0:8d}\n".format(len(mc_ratio)))
     #
     #
     # map atomic volumes (prepend zero volume for background events)
