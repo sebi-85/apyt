@@ -470,16 +470,20 @@ def reconstruct(xy_det, z_0, r, L, ξ):
     # calculate tip angles
     θ_tip = np.arctan(r_det / L) * ξ
     #
+    # handle special case of r_det = 0 (0/0 --> NaN); the exact mathematical
+    # result is tmp = r * ξ / L, but we multiple by zero below, so it is safe to
+    # set tmp to zero here for performance reasons (note that the np.isnan()
+    # filter would erroneously also catch all other sources for NaN)
+    tmp = r * np.sin(θ_tip) / r_det
+    tmp[np.isnan(tmp)] = 0.0
+    #
     #
     # infer the precision of the reconstructed positions from the input data
     # type; as of now, the raw measurement file is stored as float32, so it
     # wouldn't make sense to use higher precision for the reconstructed data
     # (which also reduces memory and should speed up some calculations)
+    # (same units as z_0, r)
     xyz_tip = np.empty((len(xy_det), 3), dtype = xy_det.dtype)
-    #
-    #
-    # tip positions (same units as z_0, r)
-    tmp = r * np.sin(θ_tip) / r_det
     xyz_tip[:, 0] = tmp * x
     xyz_tip[:, 1] = tmp * y
     xyz_tip[:, 2] = z_0 - r * np.cos(θ_tip)
