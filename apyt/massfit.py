@@ -547,7 +547,8 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
         mapping the probability vector to an actual chemical ID.
     x : ndarray, shape (m,)
         The positions at which the probability vectors are calculated. The
-        elements of the array must be equidistant.
+        elements of the array must be equidistant and would typically represent
+        the histogram bin centers.
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
         :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
@@ -574,32 +575,31 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     """
     #
     #
-    def _bin_mapper(x_0, x_ref):
-        """
-        Simple function to map positions *x_0* into the corresponding bin number
-        based on the reference positions *x_ref*.
-        """
-        #
-        #
-        delta = (x_ref[-1] - x_ref[0]) / (len(x_ref) - 1)
-        return ((x_0 - (x_ref[0] - delta / 2)) / delta).astype(np.int32)
-    #
-    #
-    @numba.njit("i2[:](i4[:], f8[:,:], f8[:])", cache = True, parallel = True)
+    @numba.njit("i2[:](f4[:], f8[:,:], f8[:])", cache = True, parallel = True)
     def _get_ids(bin_ids, p, r):
         """
         Simple helper function which performs the actual chemical mapping from
         the probability vectors to an ID.
 
-        Instead of mapping the mass-to-charge ratios into fixed bins, linear
-        interpolation between the probability vectors may increase the accuracy.
+        The probability vectors are linearly interpolated based on the
+        fractional bin ID of each event in the mass spectrum.
         """
+        #
+        #
+        # get integral and fractional part required for interpolation
+        integ = np.floor(bin_ids)
+        frac  = bin_ids - integ
+        integ = integ.astype(np.int32)
         #
         #
         # loop through all events
         ids = np.empty(len(bin_ids), dtype = np.int16)
         for i in numba.prange(len(bin_ids)):
-            ids[i] = np.searchsorted(p[bin_ids[i]], r[i])
+            # interpolate probability vector
+            p_i = (1.0 - frac[i]) * p[integ[i]] + frac[i] * p[integ[i] + 1]
+            #
+            # map probability vector to chemical ID
+            ids[i] = np.searchsorted(p_i, r[i])
         #
         #
         # return chemical IDs
@@ -611,6 +611,11 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     # start timer
     print("Performing chemical mapping…")
     start = timer()
+    #
+    #
+    # add one grid point at either end to allow interpolation at margin
+    Δx = (x[-1] - x[0]) / (len(x) - 1)
+    x  = np.concatenate(([x[0] - Δx], x, [x[-1] + Δx]))
     #
     #
     # group peaks for the same element (and charge state if requested)
@@ -634,12 +639,9 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     p_vec = np.cumsum(p_vec, axis = 1)
     #
     #
-    # map mass-to-charge ratios into the corresponding bin number
-    bin_ids = _bin_mapper(mc_ratio, x)
-    #
-    #
     # get chemical IDs of each event
-    ids = _get_ids(bin_ids, p_vec, r)
+    # (map mass-to-charge ratios to fractional bin IDs)
+    ids = _get_ids((mc_ratio - x[0]) / Δx, p_vec, r)
     #
     #
     # print counts of all IDs if requested
