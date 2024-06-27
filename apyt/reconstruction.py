@@ -28,7 +28,8 @@ The following methods are provided:
   taper geometry.
 * :meth:`enable_debug`: Enable or disable debug output.
 * :meth:`get_evaporation_field`: Calculate evaporation field.
-* :meth:`get_taper_geometry`: Calculate taper geometry.
+* :meth:`get_geometry_classic`: Calculate tip geometry through 'classic' scheme.
+* :meth:`get_geometry_taper`: Calculate taper geometry.
 * :meth:`reconstruct`: Reconstruct :math:`xyz` tip positions.
 
 
@@ -45,7 +46,8 @@ __all__ = [
     'align_evaporation_field',
     'enable_debug',
     'get_evaporation_field',
-    'get_taper_geometry',
+    'get_geometry_classic',
+    'get_geometry_taper',
     'reconstruct'
 ]
 #
@@ -156,7 +158,7 @@ def align_evaporation_field(V, U, params_in, E_0, θ_m, num_points = 10000):
         #
         #
         # calculate radii of curvature for taper geometry
-        _, r = get_taper_geometry(V, r_0, θ, θ_m, use_numba = False)
+        _, r = get_geometry_taper(V, r_0, θ, θ_m, use_numba = False)
         #
         #
         # return sum of squared residuals
@@ -285,7 +287,58 @@ def get_evaporation_field(U, r, β):
 #
 #
 #
-def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
+@numba.njit(
+    "Tuple((f8[:], f8[:]))(f8[:], f8[:], f8)", cache = True, parallel = True
+)
+def get_geometry_classic(Ω, r, θ_m):
+    """
+    Calculate tip geometry through 'classic' scheme.
+
+    This function calculates the tip geometry (current :math:`z`-position of
+    sphere center and radius of curvature) through the classical scheme for each
+    event to be reconstructed. The reconstructed volume between two events is
+    calculated exactly with the aid of a local taper geometry according to the
+    two consecutive radii of curvature.
+
+
+    Parameters
+    ----------
+    Ω : ndarray, shape (n,)
+        The individual atomic volumes for the *n* events.
+    r : ndarray, shape (n,)
+        The calculated radii of curvature for the *n* events.
+    θ_m : float
+        The (half) aperture angle (in radians).
+
+    Returns
+    -------
+    z : ndarray, shape (n,)
+        The :math:`z`-positions of the sphere centers.
+    r : ndarray, shape (n,)
+        The corresponding radii of curvature.
+    """
+    #
+    #
+    # set consecutive radii of curvature for each local taper
+    r_0 = r[:-1]
+    r_1 = r[1:]
+    #
+    #
+    # calculate local z-increment
+    γ = 4.0 / 3.0 * np.pi * (r_0**2 + r_0 * r_1 + r_1**2) * np.sin(θ_m / 2.0)**2
+    Δz     = np.empty_like(r)
+    Δz[0]  = 0.0
+    Δz[1:] = (Ω[:-1] / γ + (r_1 - r_0)) / np.cos(θ_m / 2.0)**2
+    #
+    #
+    # return tip geometry (z-position of sphere center for each event to be
+    # reconstructed and corresponding radius of curvature)
+    return np.cumsum(Δz), r
+#
+#
+#
+#
+def get_geometry_taper(V, r_0, θ, θ_m, use_numba = True):
     """
     Calculate taper geometry.
 
@@ -339,7 +392,7 @@ def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
         "Tuple((f8[:], f8[:], f8))(f8[:], f8, f8, f8, b1)",
         cache = True, parallel = True
     ) if use_numba == True else lambda obj: obj
-    def _get_taper_geometry(V, r_0, θ, θ_m, is_dbg):
+    def _get_geometry_taper(V, r_0, θ, θ_m, is_dbg):
         """
         Small helper function which solves the cubic equation.
         """
@@ -400,7 +453,7 @@ def get_taper_geometry(V, r_0, θ, θ_m, use_numba = True):
     #
     #
     # call helper function to calculate taper geometry
-    z, r, δ_max = _get_taper_geometry(V, r_0, θ, θ_m, _is_dbg)
+    z, r, δ_max = _get_geometry_taper(V, r_0, θ, θ_m, _is_dbg)
     #
     #
     # in debug mode, check the solutions for consistency
