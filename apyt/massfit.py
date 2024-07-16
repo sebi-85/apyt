@@ -131,6 +131,7 @@ The following methods are provided:
 * :meth:`peaks_list`: Get list of all peaks for specified elements and
   charge states.
 * :meth:`spectrum`: Calculate spectrum for specified list of elements.
+* :meth:`split_molecules`: Split molecular events into individual atoms.
 
 
 .. |periodictable| raw:: html
@@ -154,7 +155,8 @@ __all__ = [
     'fit',
     'map_ids',
     'peaks_list',
-    'spectrum'
+    'spectrum',
+    'split_molecules'
 ]
 #
 #
@@ -854,6 +856,190 @@ def spectrum(x, peaks_list, function, params, elements_list = None):
     #
     #
     return y
+#
+#
+#
+#
+def split_molecules(ids, xyz, peaks_list,
+                    group_charge = True, shuffle = False, verbose = False):
+    """
+    Split molecular events into individual atoms.
+
+    This function examines all events for potential molecules and decomposes
+    them into their constituent atoms. The chemical IDs are remapped to unique
+    elements in alphabetical order, and the three-dimensional coordinates of
+    each molecule are assigned to all its individual atoms. The optional
+    argument *shuffle* allows for random reordering of the atoms within a
+    molecule.
+
+    Parameters
+    ----------
+    ids : ndarray, shape (n,)
+        The chemical IDs of the *n* events.
+    xyz : ndarray, shape (n, 3)
+        The three-dimensional reconstructed positions of the *n* events.
+    peaks_list : list of dicts
+        The list of all occurring peaks in the mass spectrum, as described in
+        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+    group_charge : bool
+        Whether to group all charge states of an individual element. Defaults to
+        ``True``.
+    shuffle : bool
+        Whether to randomly shuffle the order of the atoms after splitting.
+        Defaults to ``False``.
+    verbose : bool
+        Whether to print a list of all chemical IDs and their fractions in
+        relation to the total counts (with background). Defaults to ``False``.
+
+    Returns
+    -------
+    ids_split : ndarray, shape (m,)
+        The chemical IDs of the *m* events after splitting.
+    xyz_split : ndarray, shape (m, 3)
+        The three-dimensional reconstructed positions of the *m* events after
+        splitting.
+    """
+    #
+    #
+    # start timer
+    start = timer()
+    print("Splitting molecules…")
+    #
+    #
+    #
+    #
+    # get all molecule names from peak groups
+    molecules = [
+        group[0]['element']
+            for group in _group_peaks(peaks_list, group_charge)
+    ]
+    #
+    # get counts of all occurring molecular IDs (including background)
+    molecule_counts = np.bincount(ids, minlength = len(molecules) + 1)
+    #
+    #
+    # break down all molecules into list of individual elements
+    # (with possible repetition)
+    elements = [
+        element.symbol
+            for molecule in molecules
+                for element in periodictable.formula(molecule).atoms.keys()
+    ]
+    #
+    # convert unique, sorted elements into PeriodicTable element objects
+    elements = [
+        periodictable.elements.symbol(element)
+            for element in sorted(set(elements))
+    ]
+    if verbose == True:
+        print("\tList of unique elements is:", elements)
+    #
+    #
+    # calculate total number of individual atoms *after* splitting
+    # (including background)
+    count_tot = molecule_counts[0]
+    for molecule, count in zip(molecules, molecule_counts[1:]):
+        count_tot += \
+            count * np.sum(list(periodictable.formula(molecule).atoms.values()))
+    #
+    #
+    # initialize arrays for split events (infer datatype from original arrays)
+    ids_split = np.empty(count_tot, dtype = ids.dtype)
+    xyz_split = np.empty((count_tot, xyz.shape[1]), dtype = xyz.dtype)
+    #
+    #
+    #
+    #
+    # set background counts (id = 0)
+    offset = molecule_counts[0]
+    ids_split[0:offset] = 0
+    xyz_split[0:offset] = xyz[(ids == 0)]
+    #
+    #
+    # loop through all (unique) elements
+    for element, element_id in zip(elements, range(1, len(elements) + 1)):
+        if verbose == True:
+            print("\tProcessing element '{0:s}' with new id {1:d}…".
+                  format(element.symbol, element_id))
+        # loop through all molecules
+        for molecule, molecule_id, molecule_count in zip(
+            molecules, range(1, len(molecules) + 1), molecule_counts[1:]):
+            # test whether molecule contains element
+            if element in periodictable.formula(molecule).atoms.keys():
+                # set element count
+                element_count = periodictable.formula(molecule).atoms[element]
+                if verbose == True:
+                    print(
+                        "\t\tFound in molecule {0:>8s} with original id {1:2d} "
+                        "({2:d} x {3:8d} counts).".
+                        format("'" + molecule + "'", molecule_id, element_count,
+                               molecule_count)
+                )
+                #
+                #
+                # remap element ID and assign molecule position to its
+                # individual atoms
+                sl = np.index_exp[offset:offset+molecule_count*element_count]
+                ids_split[sl] = element_id
+                xyz_split[sl] = np.repeat(
+                    xyz[(ids == molecule_id)], element_count, axis = 0
+                )
+                #
+                #
+                # increment offset position
+                offset += molecule_count * element_count
+    #
+    #
+    #
+    #
+    # randomize order if requested
+    if shuffle == True:
+        print("Randomizing order…")
+        #
+        # initialize random number generator
+        rng = np.random.default_rng(seed = 0)
+        #
+        # get random permutation
+        permutation = rng.permutation(len(ids_split))
+        #
+        # shuffle IDs and corresponding positions
+        ids_split = np.take(ids_split, permutation, axis = 0)
+        xyz_split = np.take(xyz_split, permutation, axis = 0)
+    #
+    #
+    #
+    #
+    # print counts of all IDs if requested
+    if verbose == True:
+        # get counts for all IDs (including background)
+        counts = np.bincount(ids_split, minlength = len(elements) + 1)
+        #
+        #
+        print("\nid\telement\t\t   count\tfraction")
+        print("--------" * 5 + "--------")
+        #
+        # background counts (always first entry)
+        print("{0:2d}\tBackground\t{1:8d}\t{2:.4f}".format(
+            0, counts[0], counts[0] / count_tot
+        ))
+        #
+        # loop through all elements
+        for i, element in zip(range(1, len(elements) + 1), elements):
+            print("{0:2d}\t{1:12s}\t{2:8d}\t{3:.4f}".format(
+                i, element.symbol, counts[i], counts[i] / count_tot
+            ))
+        #
+        print("========" * 5 + "========")
+        print("\t\ttotal\t{0:8d}\n".format(count_tot))
+    #
+    #
+    #
+    #
+    print(
+        "Splitting of {0:d} molecules into {1:d} atoms took {2:.3f}s.".
+        format(len(ids), count_tot, timer() - start)
+    )
+    return ids_split, xyz_split
 #
 #
 #
