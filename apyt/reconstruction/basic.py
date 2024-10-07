@@ -1,10 +1,9 @@
 """
-The APyT reconstruction module
-==============================
+The APyT basic reconstruction module
+====================================
 
-This module enables the reconstruction of raw measurement data including some
-automatization and optimization routines to obtain the three-dimensional tip
-coordinates including chemical identification.
+This module provides methods for the 'classic' and 'taper' geometry
+reconstruction scheme.
 
 
 Howto
