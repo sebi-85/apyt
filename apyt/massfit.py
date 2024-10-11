@@ -1147,6 +1147,15 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
             data_sel[:, 1],
             distance = np.iinfo(np.int32).max, height = 0.0)
         #
+        # check for correctly identified peak
+        if len(props['peak_heights']) == 0:
+            raise Exception(
+                "No peak found for element '{0:s}' with maximum at "
+                "{1:.3f} amu/e. You may want to check the alignment of the "
+                "mass spectrum.".
+                format(peak['element'], peak['mass_charge_ratio'])
+            )
+        #
         #
         # estimate intensity (for entire isotopic peak group at hypothetical
         # position at unity)
