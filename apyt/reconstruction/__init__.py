@@ -15,6 +15,8 @@ Package modules
 
    The APyT basic reconstruction module \
    (apyt.reconstruction.basic)<apyt.reconstruction.basic>
+   The APyT advanced reconstruction module \
+   (apyt.reconstruction.non_spherical)<apyt.reconstruction.non_spherical>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -22,4 +24,4 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['basic']
+__all__ = ['basic', 'non_spherical']
