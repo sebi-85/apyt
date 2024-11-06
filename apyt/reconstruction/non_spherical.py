@@ -44,6 +44,7 @@ __all__ = ['CurvatureReconstructor']
 #   - uncomment Numba njit'ed decorator
 #   - check preconditioning for Krylov root solver
 #     (https://docs.scipy.org/doc/scipy/tutorial/optimize.html#still-too-slow-preconditioning)
+#   - use kernel density estimators for triangulation of detector density?
 #
 #
 #
@@ -52,16 +53,18 @@ __all__ = ['CurvatureReconstructor']
 import matplotlib.pyplot as plt
 import numba
 import numpy as np
+import sys
 import warnings
 #
 # import some special functions/modules
 from findiff import FinDiff
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.polynomial.polynomial import polyval2d, polyvander2d
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, interpn
 from scipy.ndimage import gaussian_filter
-from scipy.optimize import root
-from scipy.spatial import ConvexHull, Delaunay
+from scipy.optimize import minimize, root
+from scipy.spatial import Delaunay
+from scipy.stats import binned_statistic_2d
 from timeit import default_timer as timer
 #
 #
@@ -82,6 +85,8 @@ class CurvatureReconstructor:
     ----------
     xy_data: ndarray, shape (n, 2)
         The *x* and *y* detector positions of **all** events.
+    ids: ndarray, shape (n,)
+        The chemical IDs of **all** events used for the reconstruction.
     V_at: ndarray, shape (n,)
         The volumes of **all** events used for the reconstruction.
     R0: float
@@ -92,31 +97,11 @@ class CurvatureReconstructor:
         The distance between tip and detector (in mm)
     ξ: float
         The image compression factor.
-    num_points_det: int
-        The number of points used for the construction of the detector grid.
-        Must be an odd number. Defaults to ``25``.
+    ζ: float
+        The detection efficiency.
     num_points_tip: int
         The number of points used for the construction of the tip grid. Must be
         an odd number. Defaults to ``101``.
-    maxiter: int
-        The maximum number of iterations for the root solver. See also
-        :attr:`maxiter`. Defaults to ``100``.
-    tol: float
-        The maximum absolute relative curvature residual allowed for the
-        reconstruction of the height profile. See also :attr:`tol`. Defaults to
-        ``0.01``.
-
-
-    The following instance attributes can be accessed and modified:
-
-    Attributes
-    ----------
-    maxiter: int
-        The maximum number of iterations for the root solver. Defaults to
-        ``100``.
-    tol: float
-        The maximum absolute relative curvature residual allowed for the
-        reconstruction of the height profile. Defaults to ``0.01``.
 
 
     The following class methods are provided:
@@ -124,21 +109,13 @@ class CurvatureReconstructor:
     * :meth:`debug_plot`: Show plots for debugging.
     * :meth:`reconstruct_height_profile`: Reconstruct tip
       height profile based on Gaussian curvature.
+    * :meth:`reconstruct_positions`: Reconstruct three-dimensional tip
+      positions.
 
 
     The following **general** instance properties can be accessed (*read-only*):
 
     * :attr:`ω`: The aperture angle.
-
-
-    The following **detector-related** instance properties can be accessed
-    (*read-only*):
-
-    * :attr:`X_det`: The *x* positions of the detector grid.
-    * :attr:`Y_det`: The *y* positions of the detector grid.
-    * :attr:`mask_det`: The Boolean mask specifying valid circular points.
-    * :attr:`tri`: The detector triangulation.
-    * :attr:`Ω`: The triangulated solid angles.
 
 
     The **following tip-related** instance properties can be accessed
@@ -157,40 +134,34 @@ class CurvatureReconstructor:
     #
     #
     def __init__(
-        self, xy_data, V_at, R0, r0, L0, ξ,
-        num_points_det = 25, num_points_tip = 101, maxiter = 100, tol = 1e-2
+        self, xy_data, ids, V_at, R0, r0, L0, ξ, ζ, num_points_tip = 101
     ):
         #
         #
         # set instance attributes
-        self._V_at   = V_at
-        self._r0     = r0
-        self._L0     = L0
-        self._ξ      = ξ
-        self.maxiter = maxiter
-        self.tol     = tol
+        self._xy_data = xy_data
+        self._ids     = ids
+        self._V_at    = V_at
+        self._R0      = R0
+        self._r0      = r0
+        self._L0      = L0
+        self._ξ       = ξ
+        self._ζ       = ζ
+        #
+        #
+        # correct volumes for detection efficiency
+        self._V_at /= ζ
         #
         #
         # set aperture angle
-        self._ω = np.arctan(R0 / self._L0) * self._ξ
-        print("(Half) aperture angle is {0:.2f}°.\n".format(np.rad2deg(self._ω)))
-        #
-        #
-        # set up detector grid
-        self._setup_detector(xy_data, R0, num_points_det, L0, ξ)
+        self._ω = np.arctan(self._R0 / self._L0) * self._ξ
+        print(
+            "(Half) aperture angle is {0:.2f}°.\n".format(np.rad2deg(self._ω))
+        )
         #
         #
         # set up tip grid
-        self._setup_tip(r0, num_points_tip, 0.5)
-        #
-        #
-        # initialize finite differences
-        acc = 2
-        self._d_dx    = FinDiff(0, self._δ, 1, acc = acc)
-        self._d_dy    = FinDiff(1, self._δ, 1, acc = acc)
-        self._d2_dx2  = FinDiff(0, self._δ, 2, acc = acc)
-        self._d2_dy2  = FinDiff(1, self._δ, 2, acc = acc)
-        self._d2_dxdy = FinDiff((0, self._δ, 1), (1, self._δ, 1), acc = acc)
+        self._setup_tip(self._r0, num_points_tip, 0.5)
     #
     #
     #
@@ -210,81 +181,6 @@ class CurvatureReconstructor:
             The (half) aperture angle (in radians).
         """
         return self._ω
-    #
-    #
-    ############################################################################
-    ###                                                                      ###
-    ###     Detector-related properties                                      ###
-    ###                                                                      ###
-    ############################################################################
-    @property
-    def X_det(self):
-        """Getter for the internal ``_X_det`` attribute (*read-only*).
-
-        Returns
-        -------
-        X_det: ndarray, shape (N, N)
-            The *x* positions of the detector grid, as returned by the
-            ``numpy.meshgrid()`` function.
-        """
-        return self._X_det
-    #
-    @property
-    def Y_det(self):
-        """Getter for the internal ``_Y_det`` attribute (*read-only*).
-
-        Returns
-        -------
-        Y_det: ndarray, shape (N, N)
-            The *y* positions of the detector grid, as returned by the
-            ``numpy.meshgrid()`` function.
-        """
-        return self._Y_det
-    #
-    @property
-    def mask_det(self):
-        """Getter for the internal ``_mask_det`` attribute (*read-only*).
-
-        Returns
-        -------
-        mask_det: ndarray, shape (N, N)
-            The Boolean mask specifying valid circular points on the square
-            detector grid.
-        """
-        return self._mask_det
-    #
-    @property
-    def tri(self):
-        """Getter for the internal ``_tri`` attribute (*read-only*).
-
-        Returns
-        -------
-        tri: class
-            The Delaunay tessellation of the detector, as returned by
-            |delaunay|. See :meth:`CurvatureReconstructor.debug_plot` on how to
-            use this in plots.
-
-
-        .. |delaunay| raw:: html
-
-            <a href="https://docs.scipy.org/doc/scipy/reference/generated/
-            scipy.spatial.Delaunay.html"
-            target="_blank">scipy.spatial.Delaunay()</a>
-        """
-        return self._tri
-    #
-    @property
-    def Ω(self):
-        """Getter for the internal ``_Ω`` attribute (*read-only*).
-
-        Returns
-        -------
-        Ω :ndarray, shape (M,)
-            The triangulated solid angles. See
-            :meth:`CurvatureReconstructor.debug_plot` on how to use this in
-            plots.
-        """
-        return self._Ω
     #
     #
     ############################################################################
@@ -336,21 +232,14 @@ class CurvatureReconstructor:
     ###     Public class-level methods                                       ###
     ###                                                                      ###
     ############################################################################
-    def debug_plot(self, sl, H, Δz, results):
+    def debug_plot(self, results):
         """
         Show plots for debugging.
 
         Parameters
         ----------
-        sl: NumPy IndexExpression object
-            The NumPy slice representing the data range to use.
-        ΔH: ndarray, shape (n, n)
-            The reconstructed tip height profile.
-        Δz: float
-            The corresponding :math:`\\Delta z` increment for the given data
-            range (in nm).
         results: dict
-            A dictionary containing various results for the reconstruction of
+            The dictionary containing various results for the reconstruction of
             the height profile. See :meth:`reconstruct_height_profile()` for
             details.
         """
@@ -368,29 +257,34 @@ class CurvatureReconstructor:
                 )
             )
         #
-        #
-        def _hull_plotter(ax):
+        def _color_bar(obj, ax):
             """
-            Simple helper to plot the convex hull of the tip boundary as seen by
-            the detector.
+            Simple helper to place color bar next to plot object.
             """
             #
-            for simplex in hull.simplices:
-                ax.plot(
-                    mapped_points[simplex, 0], mapped_points[simplex, 1], 'k-'
+            fig.colorbar(
+                obj,
+                cax = make_axes_locatable(ax).append_axes(
+                    "right", size = "5%", pad = 0.10
                 )
+            )
+        #
+        def _tri_plotter(ax):
+            """
+            Simple helper to plot mapped detector triangulation.
+            """
+            ax.triplot(
+                *tri_map.T, results['tri']['tri'].simplices,
+                color = 'w', linewidth = 0.25
+            )
         #
         #
         #
         #
-        # stack mapped tip points, shape (m, 2)
-        mapped_points = np.column_stack((
-                self._X_tip[results['mask_mapped']],
-                self._Y_tip[results['mask_mapped']]
-        ))
-        #
-        # create convex hull for mapped tip points
-        hull = ConvexHull(mapped_points)
+        # map detector triangulation to tip grid
+        tri_map = self._map_detector_triangulation_to_tip(
+            results['ΔH'], results['tri']['tri']
+        )
         #
         #
         #
@@ -403,7 +297,7 @@ class CurvatureReconstructor:
         )
         fig.suptitle(
             "Debug plots for data interval represented by the object "
-            "\"{0:s}\".".format(str(sl))
+            "\"{0:s}\".".format(str(results['sl']))
         )
         #
         #
@@ -417,17 +311,11 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{det}$ (mm)')
         ax.set_ylabel('$y_\mathrm{det}$ (mm)')
         tric = ax.tripcolor(
-            self._X_det[self._mask_det],
-            self._Y_det[self._mask_det],
-            self._tri.simplices,
-            facecolors = results['det_dens']
+            *results['tri']['tri'].points.T, results['tri']['tri'].simplices,
+            facecolors = results['ρ_det'],
+            edgecolors = 'w'
         )
-        fig.colorbar(
-            tric,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(tric, ax)
         #
         #
         # triangulated Gaussian curvature (detector)
@@ -437,18 +325,12 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{det}$ (mm)')
         ax.set_ylabel('$y_\mathrm{det}$ (mm)')
         tric = ax.tripcolor(
-            self._X_det[self._mask_det],
-            self._Y_det[self._mask_det],
-            self._tri.simplices,
-            facecolors = results['det_curv'],
-            vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
+            *results['tri']['tri'].points.T, results['tri']['tri'].simplices,
+            facecolors = results['K_det'],
+            edgecolors = 'w'#,
+            #vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
         )
-        fig.colorbar(
-            tric,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(tric, ax)
         #
         #
         # mapped tip target Gaussian curvature
@@ -458,18 +340,13 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
         ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
-            self._X_tip, self._Y_tip, results['tip_curv_from_det'],
-            shading = 'nearest',
-            vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
+            self._X_tip, self._Y_tip, results['K_tip_from_det'],
+            shading = 'nearest'#,
+            #vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
         )
-        _hull_plotter(ax)
+        _tri_plotter(ax)
         _boundary_plotter(ax)
-        fig.colorbar(
-            pcm,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(pcm, ax)
         #
         #
         # reconstructed tip Gaussian curvature
@@ -479,18 +356,13 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
         ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
-            self._X_tip, self._Y_tip, results['tip_curv_from_height'],
-            shading = 'nearest',
-            vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
+            self._X_tip, self._Y_tip, results['K_tip_from_height'],
+            shading = 'nearest'#,
+            #vmin = 0.5 / self._r0**2, vmax = 2.0 / self._r0**2
         )
-        _hull_plotter(ax)
+        _tri_plotter(ax)
         _boundary_plotter(ax)
-        fig.colorbar(
-            pcm,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(pcm, ax)
         #
         #
         # relative curvature residuals
@@ -500,18 +372,13 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
         ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
-            self._X_tip, self._Y_tip, results['curv_residuals'],
+            self._X_tip, self._Y_tip, results['ΔK'],
             shading = 'nearest',
-            vmin = -2.0 * self.tol, vmax = 2.0 * self.tol
+            vmin = -2.0 * results['tol'], vmax = 2.0 * results['tol']
         )
-        _hull_plotter(ax)
+        _tri_plotter(ax)
         _boundary_plotter(ax)
-        fig.colorbar(
-            pcm,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(pcm, ax)
         #
         #
         # reconstructed height profile
@@ -521,16 +388,12 @@ class CurvatureReconstructor:
         ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
         ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
-            self._X_tip, self._Y_tip, H - self._H_sphere, shading = 'nearest'
+            self._X_tip, self._Y_tip, results['H'] - self._H_sphere,
+            shading = 'nearest'
         )
-        _hull_plotter(ax)
+        _tri_plotter(ax)
         _boundary_plotter(ax)
-        fig.colorbar(
-            pcm,
-            cax = make_axes_locatable(ax).append_axes(
-                "right", size = "5%", pad = 0.10
-            )
-        )
+        _color_bar(pcm, ax)
         #
         #
         #
@@ -542,7 +405,8 @@ class CurvatureReconstructor:
     #
     #
     def reconstruct_height_profile(
-        self, sl, H_0 = None, verbose = False, debug_plot = False
+        self, i1, i2, ΔH_0 = None, N_simp = 500, maxiter = 100, tol = 1e-2,
+        tri = None, verbose = False, debug_plot = False
     ):
         """
         Reconstruct tip height profile for given data interval.
@@ -553,15 +417,30 @@ class CurvatureReconstructor:
 
         Parameters
         ----------
-        sl: NumPy IndexExpression object
-            The NumPy slice representing the data range to use, as obtained by
-            ``numpy.s_[]``.
-        H_0: ndarray, shape (n, n)
-            The initial guess of the height profile. Defaults to a perfect
-            hemisphere if not provided.
+        i1: int
+            The index of the *first* event to use (inclusive).
+        i2: int
+            The index of the *last* event to use (exclusive).
+        ΔH_0: ndarray, shape (n, n)
+            The height profile of the tip surface, expressed as the deviation
+            :math:`\\Delta H` from a perfect sphere. If not provided, a perfect
+            hemisphere is assumed for the height profile.
+        N_simp: int
+            The (approximate) target number of simplices for the detector
+            triangulation. Defaults to ``500``.
+        maxiter: int
+            The maximum number of iterations for the root solver. See also
+            :attr:`maxiter`. Defaults to ``100``.
+        tol: float
+            The maximum absolute relative curvature residual allowed for the
+            reconstruction of the height profile. See also :attr:`tol`. Defaults
+            to ``0.01``.
+        tri: class
+            The custom detector triangulation, as obtained by |delaunay|.
+            Defaults to ``None``, i.e. use internal adaptive triangulation. This
+            option may be useful if the internal triangulation fails.
         verbose: bool
-            Whether to print the status after each iteration of the root solver.
-            Defaults to ``False``.
+            Whether to print additional information. Defaults to ``False``.
         debug_plot: bool
             Whether to show debug plots with various information. Defaults to
             ``False``. Setting this parameter to ``True`` is equivalent to
@@ -569,15 +448,12 @@ class CurvatureReconstructor:
 
         Returns
         -------
-        H: ndarray, shape (n, n)
-            The reconstructed height profile.
-        Δz: float
-            The corresponding :math:`\\Delta z` increment for the given data
-            range.
         results: dict
-            A dictionary containing various results for the reconstruction of
-            the height profile. Use ``results.keys()`` to get a list of the
-            dictionary content.
+            The dictionary containing various results for the reconstruction of
+            the height profile, e.g. the reconstructed height profile and
+            information on the detector triangulation. Use ``results.keys()`` to
+            get a complete list of the dictionary content. This dictionary can
+            be passed directly to :meth:`debug_plot()`.
 
 
         .. |krylov| raw:: html
@@ -592,7 +468,22 @@ class CurvatureReconstructor:
         """
         #
         #
+        def _tab_write(msg):
+            """
+            Small helper to overload sys.stdout.write and append tabulator to
+            output.
+            """
+            sys_stdout_write("\t" + msg)
+        #
+        #
+        #
+        #
+        # start timer
         start = timer()
+        #
+        #
+        # set slice object representing the data range to use
+        sl = np.s_[i1:i2]
         print(
             "Processing data interval specified by object \"{0:s}\"…".
             format(str(sl))
@@ -600,35 +491,51 @@ class CurvatureReconstructor:
         #
         #
         # initialize height profile if not provided
-        if H_0 is None:
+        if ΔH_0 is None:
             ΔH_0 = np.zeros_like(self._X_tip)
-        else:
-            ΔH_0 = H_0 - self._H_sphere
         #
         #
         #
         #
-        # calculate cumulated detector volumes
-        V = self._get_detector_volume(sl)
+        # triangulate detector events for given slice object
+        T = self._triangulate_detector(sl, N_simp, "height", tri, verbose)
+        if T == None:
+            return {"success": False}
+        #
+        #
+        # calculate cumulated detector volumes for each simplex (filter invalid
+        # events outside triangulation), shape (N_simp,)
+        V = np.bincount(
+            T['s'][T['is_valid']], weights = self._V_at[sl][T['is_valid']]
+        )
         #
         # calculate relative Gaussian curvature based on detector density,
-        # shape (M,); indexing is based on detector triangulation
-        κ_det = self._Ω * np.cos(self._θ_det) / V
+        # shape (N_simp,)
+        κ_det = T['Ω'] * np.cos(T['θ']) / V
         #
         #
         #
         #
         # use Krylov root finding algorithm for height profile reconstruction
+        print("Reconstructing height profile …")
+        #
+        # store and overload write function
+        sys_stdout_write     = sys.__stdout__.write
+        sys.__stdout__.write = _tab_write
+        #
         sol = root(
             self._calculate_curvature_residuals, ΔH_0[self._mask_tip],
-            args = (κ_det,),
+            args = (T, κ_det),
             method = 'krylov',
             options = {
-                'maxiter': self.maxiter,
-                'fatol'  : self.tol,
+                'maxiter': maxiter,
+                'fatol'  : tol,
                 'disp'   : verbose
             }
         )
+        #
+        # restore original write function
+        sys.__stdout__.write = sys_stdout_write
         #
         #
         #
@@ -637,8 +544,8 @@ class CurvatureReconstructor:
         ΔH = self._extrapolate_height_profile(sol.x)
         #
         # calculate curvature from detector view
-        K_from_det, Δz, mask_mapped = \
-            self._get_tip_curvature_from_detector_view(κ_det, ΔH)
+        K_from_det, Δz = \
+            self._get_tip_curvature_from_detector_view(ΔH, T, κ_det)
         #
         # calculate curvature from height profile
         K_from_height = self._get_tip_curvature_from_height_profile(ΔH)
@@ -646,17 +553,23 @@ class CurvatureReconstructor:
         # calculate curvature residuals, shape (n, n)
         residuals = np.full_like(self._X_tip, np.nan)
         residuals[self._mask_tip] = \
-            self._calculate_curvature_residuals(ΔH[self._mask_tip], (κ_det))
+            self._calculate_curvature_residuals(ΔH[self._mask_tip], T, κ_det)
         #
         #
         # collect all relevant results in a dictionary
-        results_dict = {
-            'det_dens'            : self._get_detector_volume(sl) / self._Ω,
-            'det_curv'            : κ_det * Δz,
-            'tip_curv_from_det'   : K_from_det,
-            'tip_curv_from_height': K_from_height,
-            'curv_residuals'      : residuals,
-            'mask_mapped'         : mask_mapped
+        results = {
+            'sl'                : sl,
+            'tri'               : T,
+            'ρ_det'             : V / T['Ω'],
+            'K_det'             : κ_det * Δz,
+            'K_tip_from_det'    : K_from_det,
+            'K_tip_from_height' : K_from_height,
+            'ΔK'                : residuals,
+            'H'                 : ΔH + self._H_sphere,
+            'ΔH'                : ΔH,
+            'Δz'                : Δz,
+            'tol'               : tol,
+            'success'           : sol.success
         }
         #
         #
@@ -671,18 +584,26 @@ class CurvatureReconstructor:
                 format(str(sl), np.abs(sol.fun).max())
             )
         else:
+            if verbose:
+                print(
+                    "\tSolver found a solution with maximum absolute relative "
+                    "curvature residual of {0:.6f} "
+                    "(mean: {1:.6f}; std: {2:.6f}).".
+                    format(
+                        np.abs(sol.fun).max(), np.mean(sol.fun), np.std(sol.fun)
+                    )
+                )
+        if verbose:
             print(
-                "Solver found a solution with maximum absolute relative "
-                "curvature residual of {0:.6f} "
-                "(mean: {1:.6f}; standard deviation: {2:.6f}).".
-                format(np.abs(sol.fun).max(), np.mean(sol.fun), np.std(sol.fun))
+                "\tΔz increment is {0:.3f} nm (spherical estimate is "
+                "{1:.3f} nm).".
+                format(
+                    Δz, np.sum(V) / (np.pi * (self._r0 * np.sin(self._ω))**2)
+                )
             )
         print(
-            "Δz increment is {0:.3f} nm (spherical estimate is {1:.3f} nm).".
-            format(Δz, np.sum(V) / (np.pi * (self._r0 * np.sin(self._ω))**2)))
-        print(
-            "Surface reconstruction took {0:.3f} s ({1:d} iterations).\n".
-            format(timer() - start, sol.nit)
+            "Height profile reconstruction took {0:.3f} s "
+            "({1:d} iterations).\n".format(timer() - start, sol.nit)
         )
         #
         #
@@ -690,13 +611,13 @@ class CurvatureReconstructor:
         #
         # show debug plots if requested
         if debug_plot == True:
-            self.debug_plot(sl, self._H_sphere + ΔH, Δz, results_dict)
+            self.debug_plot(results)
         #
         #
         #
         #
-        # return height profile, Δz increment, and results dictionary
-        return self._H_sphere + ΔH, Δz, results_dict
+        # return results dictionary
+        return results
     #
     #
     #
@@ -708,15 +629,15 @@ class CurvatureReconstructor:
     ############################################################################
     def _calculate_curvature_residuals(self, ΔH_in, *args):
         """
-        Calculate residuals of Gaussian curvature
+        Calculate residuals of Gaussian curvature.
 
         Parameters
         ----------
         ΔH_in: ndarray, shape (m,)
-            A NumPy array representing the surface.
-        args: tuple of length 1
-            The one-tuple containing the relative Gaussian curvature based on
-            the detector view.
+            The height profile for the (valid) tip points.
+        args: tuple of length 2
+            The tuple containing the detector triangulation and the relative
+            Gaussian curvature based on the detector view.
 
         Returns
         -------
@@ -725,36 +646,31 @@ class CurvatureReconstructor:
         """
         #
         #
-        # set relative Gaussian curvature based on detector view
-        κ_det = args[0]
-        #
-        #
         # extrapolate height profile to allow calculation of finite differences,
         # shape (n, n)
         ΔH = self._extrapolate_height_profile(ΔH_in)
         #
         #
-        # get target Gaussian curvature of tip based on detector view
-        K_from_det, _, _ = self._get_tip_curvature_from_detector_view(κ_det, ΔH)
+        # get target Gaussian curvature of tip based on detector view,
+        # shape (n, n)
+        K_from_det, _ = self._get_tip_curvature_from_detector_view(ΔH, *args)
         #
         #
-        # get current Gaussian curvature based on height profile
+        # get current Gaussian curvature based on height profile, shape (n, n)
         K_from_height = self._get_tip_curvature_from_height_profile(ΔH)
         #
         #
-        # calculate relative curvature residuals
+        # calculate relative curvature residuals, shape (n, n)
         res = (K_from_height - K_from_det) / K_from_det
         #
         #
-        # return residuals for variation points
+        # return residuals for variation points, shape (m,)
         return res[self._mask_tip]
     #
     #
     #
     #
-    def _extrapolate_curvature(
-        self, κ, mask_mapped, mode = "generic", apply_filter = True
-    ):
+    def _extrapolate_curvature(self, κ, mode = "generic", apply_filter = True):
         """
         Extrapolate relative Gaussian curvature.
 
@@ -764,8 +680,6 @@ class CurvatureReconstructor:
             The Relative Gaussian curvature
             :math:`\\kappa = \\frac{K}{\\Delta z}`. Invalid points are
             represented by ``numpy.nan``.
-        mask_mapped: ndarray, shape (n, n)
-            The mask specifying the mapped positions on the tip.
         mode: str
             The mode used to extrapolate the relative curvature. Supported modes
             are: ``"generic"``. Defaults to ``"generic"``.
@@ -782,18 +696,23 @@ class CurvatureReconstructor:
         """
         #
         #
+        # set mask specifying valid tip grid points, i.e. seen by the detector
+        is_valid = ~np.isnan(κ)
+        #
+        #
+        #
+        #
         # generic extrapolation using fit
         if mode == "generic":
             # fit 2d surface to relative curvature
             c = self._polyfit2d(
-                self._X_tip[mask_mapped], self._Y_tip[mask_mapped],
-                κ[mask_mapped], 1
+                self._X_tip[is_valid], self._Y_tip[is_valid], κ[is_valid], 0
             )
             #
             #
             # extrapolate relative curvature using fit
-            κ[~mask_mapped] = polyval2d(
-                self._X_tip[~mask_mapped], self._Y_tip[~mask_mapped], c
+            κ[~is_valid] = polyval2d(
+                self._X_tip[~is_valid], self._Y_tip[~is_valid], c
             )
         #
         #
@@ -864,57 +783,93 @@ class CurvatureReconstructor:
         )
         #
         #
+        # set center of height profile to zero
+        ΔH -= \
+            ΔH[(np.isclose(self._X_tip, 0.0)) & (np.isclose(self._Y_tip, 0.0))]
+        #
+        #
         # return extrapolated height profile for entire grid
         return ΔH
     #
     #
     #
     #
-    def _get_detector_volume(self, sl):
+    @staticmethod
+    def _get_barycentric_coordinates(T, P):
         """
-        Calculate detector volume.
+        Calculate barycentric coordinates for given points *P*.
+
+        This vectorized version of the example given in |delaunay| is taken from
+        |barycentric_vectorized|.
+
 
         Parameters
         ----------
-        sl: NumPy IndexExpression object
-            The NumPy slice representing the data range to use.
+        T: dict
+            The dictionary containing the triangulation results. See
+            :meth:`_triangulate_detector()` for details.
+        P: ndarray, shape (N, 2)
+            The :math:`x` and :math:`y` positions of the triangulated points.
 
         Returns
         -------
-        V_det: shape (m,)
-            The detector volumes, indexed by the triangulation of the detector.
+        B: ndarray, shape (N, 3)
+            The barycentric coordinates for the points given by *P*. Note that
+            invalid points outside the triangulation are filtered.
+        T: dict
+            The dictionary containing the triangulation results. See
+            :meth:`_triangulate_detector()` for details.
+
+
+        .. |barycentric_vectorized| raw:: html
+
+            <a href="https://stackoverflow.com/a/57866557"
+            target="_blank">How to vectorize calculation of barycentric
+            coordinates in python</a>
         """
         #
         #
-        simplex_indices = self._simplex_indices[sl]
-        #
-        # filter invalid measurement data not covered by triangulation
-        # (close to detector edge)
-        mask = (simplex_indices != -1)
-        simplex_indices = simplex_indices[mask]
-        #
-        #
-        # cumulate atomic volumes in each simplex
-        V = np.bincount(simplex_indices, weights = self._V_at[sl][mask])
+        # if simplex indices are not part of the triangulation dictionary, we
+        # perform the search here and update the dictionary accordingly
+        if 's' not in T:
+            T['s']        = T['tri'].find_simplex(P)
+            T['is_valid'] = (T['s'] != -1)
         #
         #
-        # return cumulated atomic volumes
-        return V
+        # filter invalid points
+        s = T['s'][T['is_valid']]
+        P = P[T['is_valid']]
+        #
+        #
+        # calculate barycentric coordinates
+        B = np.sum(
+            T['tri'].transform[s, :2].transpose([1, 0, 2]) * \
+                (P - T['tri'].transform[s, 2]),
+            axis = 2
+        ).T
+        B = np.c_[B, 1.0 - B.sum(axis = 1)]
+        #
+        #
+        # return barycentric coordinates and (updated) triangulation dictionary
+        return B, T
     #
     #
     #
     #
-    def _get_tip_curvature_from_detector_view(self, κ_det, ΔH):
+    def _get_tip_curvature_from_detector_view(self, ΔH, T, κ_det):
         """
         Calculate Gaussian curvature based on detector view.
 
         Parameters
         ----------
-        κ_det: ndarray, shape (M,)
-            The relative Gaussian curvature based on detector view.
         ΔH: ndarray, shape (n, n)
             The height profile of the tip surface, expressed as the deviation
             :math:`\\Delta H` from a perfect sphere.
+        T: dict
+            The dictionary containing the detector triangulation. See
+            :meth:`_triangulate_detector()` for details.
+        κ_det: ndarray, shape (M,)
+            The relative Gaussian curvature based on detector view.
 
         Returns
         -------
@@ -922,19 +877,17 @@ class CurvatureReconstructor:
             The corresponding Gaussian curvature of the height profile.
         Δz: float
             The normalization factor.
-        mask_mapped: ndarray, shape (n, n)
-            The mask specifying the mapped positions on the tip.
         """
         #
         #
         # get relative Gaussian curvature based on detector view *and* current
         # height profile, shape (n, n)
-        κ_map, mask_mapped = self._map_curvatures(κ_det, ΔH)
+        κ_map = self._map_curvatures(ΔH, T, κ_det)
         #
         #
-        # get target Gaussian curvature based on detector view, extrapolation, and
-        # normalization
-        κ_ext = self._extrapolate_curvature(κ_map, mask_mapped)
+        # get target Gaussian curvature based on detector view, extrapolation,
+        # and normalization
+        κ_ext = self._extrapolate_curvature(κ_map)
         #
         #
         # normalize curvature
@@ -946,8 +899,8 @@ class CurvatureReconstructor:
         )
         #
         #
-        # return normalized curvature,normalization factor, and mapping mask
-        return K, Δz, mask_mapped
+        # return normalized curvature and normalization factor
+        return K, Δz
     #
     #
     #
@@ -1090,56 +1043,36 @@ class CurvatureReconstructor:
     #
     #
     #
-    def _map_curvatures(self, κ_det, ΔH):
+    def _map_curvatures(self, ΔH, T, κ_det):
         """
         Map relative Gaussian curvature from detector view to tip.
 
         Parameters
         ----------
-        κ_det: ndarray, shape (m,)
-            The relative Gaussian curvature from detector view.
         ΔH: ndarray, shape (n, n)
             The height profile of the tip surface, expressed as the deviation
             :math:`\\Delta H` from a perfect sphere.
+        T: dict
+            The dictionary containing the detector triangulation. See
+            :meth:`_triangulate_detector()` for details.
+        κ_det: ndarray, shape (m,)
+            The relative Gaussian curvature from detector view.
 
         Returns
         -------
         κ_map: ndarray, shape (n, n)
             The relative Gaussian curvature mapped back to the tip.
-        mask_mapped: ndarray, shape (n, n)
-            The mask specifying the mapped positions on the tip.
         """
         #
         #
-        # calculate gradient of tip surface (reference sphere plus deviation ΔH)
-        H_x = (self._grad_sphere[0] + self._d_dx(ΔH))[self._mask_tip]
-        H_y = (self._grad_sphere[1] + self._d_dy(ΔH))[self._mask_tip]
-        #
-        #
-        #
-        #
-        # get detection angle and radial distance
-        θ_tip = np.arctan(np.sqrt(H_x**2 + H_y**2))
-        r_det = np.tan(θ_tip / self._ξ) * self._L0
-        #
-        # detector coordinate system is defined from view towards tip; this
-        # translates into a rotation of 180° with respect to tip coordinate system
-        Φ_det = np.arctan2(H_y, H_x)# + np.pi
-        #
-        #
         # set xy detector position
-        x_det = r_det * np.cos(Φ_det)
-        y_det = r_det * np.sin(Φ_det)
-        #
-        #
+        xy_det = self._map_tip_grid_to_detector(ΔH)
         #
         #
         # find simplex index for each xy detector position; -1 indicates invalid
         # simplex, i.e. outside detector view of tip
         tri_indices = np.full(ΔH.shape, -1, dtype = int)
-        tri_indices[self._mask_tip] = self._tri.find_simplex(
-            np.column_stack((x_det, y_det))
-        )
+        tri_indices[self._mask_tip] = T['tri'].find_simplex(xy_det)
         #
         #
         # map simplex indices to respective curvatures; NaN indicates invalid
@@ -1151,7 +1084,99 @@ class CurvatureReconstructor:
         #
         #
         # return mapped tip curvatures
-        return κ_map, ~np.isnan(κ_map)
+        return κ_map
+    #
+    #
+    #
+    #
+    def _map_detector_triangulation_to_tip(self, ΔH, tri_det):
+        """
+        Map detector triangulation to tip grid.
+
+        Parameters
+        ----------
+        ΔH: ndarray, shape (n, n)
+            The height profile of the tip surface, expressed as the deviation
+            :math:`\\Delta H` from a perfect sphere.
+        tri_det:
+            The detector triangulation, as obtained by |delaunay|.
+
+        Returns
+        -------
+        xy: ndarray, shape (n, n)
+            The x and y tip positions of the *real* detector triangulation
+            points.
+
+
+        .. |delaunay| raw:: html
+
+            <a href="https://docs.scipy.org/doc/scipy/reference/generated/
+            scipy.spatial.Delaunay.html"
+            target="_blank">scipy.spatial.Delaunay()</a>
+        """
+        #
+        #
+        # valid tip positions, shape (m, 2)
+        xy_tip = np.column_stack((
+            self._X_tip[self._mask_tip], self._Y_tip[self._mask_tip]
+        ))
+        #
+        # barycentric coordinates of the *real* detector triangulation points in
+        # terms of the mapped tip grid triangulation, shape (m, 3)
+        B, T = self._get_barycentric_coordinates(
+            {'tri': Delaunay(self._map_tip_grid_to_detector(ΔH))},
+            tri_det.points
+        )
+        #
+        # the vertices of the *real* detector triangulation points mapped back
+        # *to* the tip, shape (m, 3, 2)
+        V_tip = xy_tip[T['tri'].simplices[T['s']]]
+        #
+        #
+        # x and y tip positions of the *real* detector triangulation points,
+        # shape (m, 2)
+        return np.einsum('ijk,ij->ik', V_tip, B)
+    #
+    #
+    #
+    #
+    def _map_tip_grid_to_detector(self, ΔH):
+        """
+        Map :math:`x` and :math:`y` tip grid positions to corresponding detector
+        plane positions.
+
+        Note that the mapped detector positions may be located beyond the
+        physical detector size.
+
+        Parameters
+        ----------
+        ΔH: ndarray, shape (n, n)
+            The height profile of the tip surface, expressed as the deviation
+            :math:`\\Delta H` from a perfect sphere.
+
+        Returns
+        -------
+        xy_det: ndarray, shape (m, 2)
+            The corresponding :math:`x` and :math:`y` detector positions of the
+            tip grid.
+        """
+        #
+        #
+        # calculate gradient of tip surface (reference sphere plus deviation ΔH)
+        H_x = (self._grad_sphere[0] + self._d_dx(ΔH))[self._mask_tip]
+        H_y = (self._grad_sphere[1] + self._d_dy(ΔH))[self._mask_tip]
+        #
+        #
+        # calculate detection angle and radial distance
+        θ_tip = np.arctan(np.sqrt(H_x**2 + H_y**2))
+        r_det = np.tan(θ_tip / self._ξ) * self._L0
+        #
+        # calculate detector polar angle
+        Φ_det = np.arctan2(H_y, H_x)
+        #
+        #
+        # set xy detector positions
+        return np.column_stack((r_det * np.cos(Φ_det), r_det * np.sin(Φ_det)))
     #
     #
     #
@@ -1316,83 +1341,6 @@ class CurvatureReconstructor:
     #
     #
     #
-    def _setup_detector(self, xy_data, R0, N, L0, ξ):
-        """
-        Set up detector grid.
-
-        Parameters
-        ----------
-        xy_data: ndarray, shape (n, 2)
-            The *x* and *y* detector positions of **all** events.
-        R0: float
-            The detector radius (in mm)
-        N: int
-            The number of points used for the construction of the detector grid.
-        L0: float
-            The distance between tip and detector (mm)
-        ξ: float
-            The image compression factor.
-        """
-        #
-        #
-        # start timer for triangulation
-        print("Setting up detector grid …")
-        start = timer()
-        #
-        #
-        # construct detector grid
-        print("Using {0:d} x {0:d} points for detector grid.".format(N))
-        self._X_det, self._Y_det = np.meshgrid(
-            *[np.linspace(-R0, R0, N) for i in range(2)],
-            indexing = 'ij'
-        )
-        #
-        # set circular detector mask
-        self._mask_det = (self._X_det**2 + self._Y_det**2 <= R0**2)
-        #
-        #
-        # convert numpy.meshgrid to points of shape (M, 2)
-        P = np.column_stack(
-            (self._X_det[self._mask_det], self._Y_det[self._mask_det])
-        )
-        #
-        # triangulate detector grid
-        self._tri = Delaunay(P)
-        #
-        #
-        # calculate geometric center of each simplex
-        C = np.sum(P[self._tri.simplices], axis = 1) / 3.0
-        #
-        # calculate corresponding detection angle of each simplex
-        self._θ_det = np.arctan(np.linalg.norm(C, axis = 1) / L0) * ξ
-        #
-        #
-        # calculate solid angles
-        self._Ω = self._get_triangulated_solid_angles(
-            P[self._tri.simplices], L0, ξ
-        )
-        print(
-            "Expected solid angle based on aperture is {0:.3f} sr "
-            "({1:.1f}% of hemisphere).\n"
-            "Total solid angle based on triangulation is {2:.3f} sr.".format(
-                2.0 * np.pi * (1.0 - np.cos(self._ω)),
-                (1.0 - np.cos(self._ω)) * 100,
-                np.sum(self._Ω)
-            )
-        )
-        #
-        #
-        # find simplex indices for *all* events
-        print("Triangulating data …")
-        self._simplex_indices = self._tri.find_simplex(xy_data)
-        print(
-            "Detector triangulation took {0:.3f} s.\n".
-            format(timer() - start)
-        )
-    #
-    #
-    #
-    #
     def _setup_tip(self, r0, n, ν):
         """
         Set up tip grid.
@@ -1529,3 +1477,278 @@ class CurvatureReconstructor:
             self._weights[ :-1, :-1] + self._weights[ :-1, 1:] +
             self._weights[1:,   :-1] + self._weights[1:,   1:]
         ).flatten()[self._mask_norm]
+        #
+        #
+        #
+        #
+        # initialize finite differences
+        acc = 2
+        self._d_dx    = FinDiff(0, self._δ, 1, acc = acc)
+        self._d_dy    = FinDiff(1, self._δ, 1, acc = acc)
+        self._d2_dx2  = FinDiff(0, self._δ, 2, acc = acc)
+        self._d2_dy2  = FinDiff(1, self._δ, 2, acc = acc)
+        self._d2_dxdy = FinDiff((0, self._δ, 1), (1, self._δ, 1), acc = acc)
+    #
+    #
+    #
+    #
+    def _triangulate_detector(self, sl, N_simp, mode, tri, verbose):
+        """
+        Triangulate detector events.
+
+        Parameters
+        ----------
+        sl: NumPy IndexExpression object
+            The NumPy slice representing the data range to use, as obtained by
+            ``numpy.s_[]``.
+        N_simp: int
+            The (approximate) target number of simplices for the detector
+            triangulation.
+        mode: str
+            The triangulation mode. Must be either ``height`` or ``positions``
+            for the reconstruction of the height profile or three-dimensional
+            atomic positions, respectively.
+        tri: class
+            The custom detector triangulation.
+        verbose: bool
+            Whether to print additional information.
+
+        Returns
+        -------
+        tri: dict
+            The dictionary for the detector triangulation. If an internal error
+            occurred, ``None`` is returned.
+        """
+        #
+        #
+        def _printv(msg):
+            """
+            Small helper for printing messages only in verbose mode.
+            """
+            if verbose: print(msg)
+        #
+        #
+        def _triangulate(N_simp):
+            """
+            Helper for the adaptive triangulation of the detector.
+            """
+            #
+            #
+            # set target number for events per simplex
+            N_ref = len(self._xy_data[sl]) // N_simp
+            _printv(
+                "\tTarget number of events per simplex is {0:d}.".format(N_ref)
+            )
+            #
+            #
+            # empirical guess for the number of grid points; the number of
+            # (square) grid segments amounts to approximately 6 times the number
+            # of requested simplices
+            N_grid = int(np.sqrt(N_simp * 6.0 * 4.0 / np.pi))
+            _printv(
+                "\tUsing square grid with {0:d} points for estimation of "
+                "detector density.".format(N_grid)
+            )
+            #
+            # set grid spacing
+            δ = 2.0 * self._R0 / (N_grid - 1.0)
+            #
+            #
+            #
+            #
+            # calculate 2d histogram data and bin centers
+            counts, x_edge, y_edge, _ = binned_statistic_2d(
+                *self._xy_data[sl].T, values = None,
+                statistic = 'count', bins = N_grid,
+                range = ([(-self._R0 - δ / 2, self._R0 + δ / 2)] * 2)
+            )
+            x_c = (x_edge[1:] + x_edge[:-1]) / 2
+            y_c = (y_edge[1:] + y_edge[:-1]) / 2
+            #
+            #
+            # calculate corresponding detector densities
+            ϱ = counts / δ**2
+            #
+            #
+            #
+            #
+            # create initial (coarse) detector triangulation
+            #
+            #
+            # polar angles for points on circumference
+            n_φ = 24
+            φ   = np.linspace(0.0, 2.0 * np.pi, num = n_φ, endpoint = False)
+            #
+            # inner ring
+            R1 = self._R0 * (1.0 - 2.0 * np.pi / n_φ)
+            #
+            # inner square grid
+            X, Y = np.meshgrid(
+                *[np.linspace(-R1 / 2, R1 / 2, 3) for i in range(2)]
+            )
+            #
+            # stack all points
+            P = np.vstack((
+                # outer polar grid
+                np.column_stack((self._R0 * np.cos(φ), self._R0 * np.sin(φ))),
+                # inner polar grid
+                np.column_stack((R1 * np.cos(φ), R1 * np.sin(φ))),
+                # inner square grid
+                np.column_stack((X.ravel(), Y.ravel()))
+            ))
+            #
+            #
+            # triangulate detector grid
+            tri = Delaunay(P, incremental = True)
+            #
+            #
+            #
+            #
+            # iteratively sub-divide simplices to obtain approximately the same
+            # number of events in each simplex
+            for i in range(15):
+                # set vertices, shape (n, 3, 2)
+                vertices = tri.points[tri.simplices]
+                #
+                #
+                # interpolate density at vertices, shape (n, 3)
+                ϱ_vertices = np.column_stack(
+                    [interpn((x_c, y_c), ϱ, vertices[:, i]) for i in range(3)]
+                )
+                #
+                # calculate average density, shape (n,)
+                ϱ_tri = np.mean(ϱ_vertices, axis = 1)
+                #
+                #
+                # approximate events in each simplex, shape (n,)
+                N_tri = ϱ_tri * 0.5 * np.abs(np.cross(
+                    vertices[:, 2] - vertices[:, 0],
+                    vertices[:, 1] - vertices[:, 0]
+                ))
+                #
+                #
+                # set mask specifying simplices to be further divided
+                is_divide = (N_tri / N_ref > 2.0)
+                if np.count_nonzero(is_divide) == 0:
+                    break
+                #
+                # add points to existing triangulation
+                tri.add_points(np.mean(vertices, axis = 1)[is_divide])
+            #
+            #
+            # finalize triangulation
+            tri.close()
+            _printv(
+                "\tNumber of triangulated vertices/simplices is {0:d}/{1:d}."
+                .format(len(tri.points), len(tri.simplices))
+            )
+            #
+            #
+            # return detector triangulation
+            return tri
+        #
+        #
+        #
+        #
+        # start timer for triangulation
+        print("Triangulating events …")
+        start = timer()
+        #
+        #
+        # check mode for internal consistency
+        if mode != "height" and mode != "positions":
+            raise Exception(
+                "Internal error: Invalid mode \"{0:s}\" specified.".format(mode)
+            )
+        #
+        #
+        #
+        #
+        # use adaptive triangulation if not provided
+        if tri is None:
+            _printv("\tUsing internal adaptive triangulation.")
+            tri = _triangulate(N_simp)
+        else:
+            _printv("\tUsing user-provided triangulation.")
+        #
+        #
+        #
+        #
+        # triangulate data
+        simplex_indices = tri.find_simplex(self._xy_data[sl])
+        #
+        # set mask specifying valid events inside triangulation
+        is_valid = (simplex_indices != -1)
+        #
+        #
+        # get number of events in each simplex
+        counts = np.bincount(
+            simplex_indices[is_valid], minlength = len(tri.simplices)
+        )
+        _printv(
+            "\tNumber of triangulated events is {0:d} (outside: {1:d})."
+            .format(np.sum(counts), len(simplex_indices) - np.sum(counts))
+        )
+        _printv(
+            "\tAverage number of events per simplex is {0:.1f} "
+            "(min/max: {1:d}/{2:d}; std: {3:.1f}).".
+            format(np.mean(counts), counts.min(), counts.max(), np.std(counts))
+        )
+        #
+        #
+        # check for empty segments in "height" mode; detector density would
+        # diverge
+        if mode == "height" and np.count_nonzero(counts == 0) > 0:
+            warnings.warn(
+                "Empty detector segment detected. You may want to decrease the "
+                "number of simplices using the \"N_simp\" argument or provide "
+                "a custom triangulation using the \"tri\" argument."
+            )
+            return None
+        #
+        #
+        #
+        #
+        # for "positions" mode, we do not need the solid angles
+        if mode == "positions":
+            print("\tTriangulation took {0:.3f} s.".format(timer() - start))
+            return {
+                'tri'     : tri,
+                's'       : simplex_indices,
+                'is_valid': is_valid,
+            }
+        #
+        #
+        #
+        #
+        # calculate geometric center of each simplex
+        C = np.mean(tri.points[tri.simplices], axis = 1)
+        #
+        # calculate corresponding detection angle of each simplex
+        θ_det = np.arctan(np.linalg.norm(C, axis = 1) / self._L0) * self._ξ
+        #
+        #
+        # calculate solid angles
+        Ω = self._get_triangulated_solid_angles(
+            tri.points[tri.simplices], self._L0, self._ξ
+        )
+        _printv(
+            "\tExpected solid angle based on aperture is {0:.3f} sr "
+            "({1:.1f}% of hemisphere).\n"
+            "\tTotal solid angle based on triangulation is {2:.3f} sr.".format(
+                2.0 * np.pi * (1.0 - np.cos(self._ω)),
+                (1.0 - np.cos(self._ω)) * 100,
+                np.sum(Ω)
+            )
+        )
+        #
+        #
+        # return detector triangulation dictionary
+        _printv("\tTriangulation took {0:.3f} s.".format(timer() - start))
+        return {
+            'tri'     : tri,
+            's'       : simplex_indices,
+            'is_valid': is_valid,
+            'θ'       : θ_det,
+            'Ω'       : Ω
+        }
