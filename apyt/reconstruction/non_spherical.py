@@ -62,7 +62,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from numpy.polynomial.polynomial import polyval2d, polyvander2d
 from scipy.interpolate import griddata, interpn
 from scipy.ndimage import gaussian_filter
-from scipy.optimize import minimize, root
+from scipy.optimize import root, root_scalar
 from scipy.spatial import Delaunay
 from scipy.stats import binned_statistic_2d
 from timeit import default_timer as timer
@@ -485,8 +485,8 @@ class CurvatureReconstructor:
         # set slice object representing the data range to use
         sl = np.s_[i1:i2]
         print(
-            "Processing data interval specified by object \"{0:s}\"…".
-            format(str(sl))
+            "Reconstructing height profile for data interval specified by "
+            "object \"{0:s}\".".format(str(sl))
         )
         #
         #
@@ -517,7 +517,7 @@ class CurvatureReconstructor:
         #
         #
         # use Krylov root finding algorithm for height profile reconstruction
-        print("Reconstructing height profile …")
+        print("Optimizing height profile…")
         #
         # store and overload write function
         sys_stdout_write     = sys.__stdout__.write
@@ -618,6 +618,303 @@ class CurvatureReconstructor:
         #
         # return results dictionary
         return results
+    #
+    #
+    #
+    #
+    def reconstruct_positions(
+        self, p_list, N_simp = 500, extrapolate = False, tri_list = None,
+        verbose = False
+    ):
+        """
+        Reconstruct three-dimensional atomic positions between height profiles.
+
+        This method takes a list of reconstructed height profiles, obtained from
+        :meth:`reconstruct_height_profile()`, and iteratively reconstructs the
+        three-dimensional atomic positions between each consecutive pair of
+        height profiles.
+
+        The height increment :math:`\Delta z` between consecutive height profile
+        pairs is determined such that the total reconstructed volume matches
+        exactly the volume spanned by the triangulated upper and lower height
+        profiles. Each triangulated simplex, corresponding to both height
+        profiles, forms a distorted prism.
+
+        The volumes of these distorted prisms are calculated as follows:
+        Consider two simplices, :math:`(A_1, B_1, C_1)` from the upper profile
+        and :math:`(A_2, B_2, C_2)` from the lower profile. The lateral surface
+        of this distorted prism is triangulated through the edges
+        :math:`(A_1, B_2)`, :math:`(B_2, C_1)`, and :math:`(C_1, A_2)`.
+
+        The volume of the prism can be divided into three tetrahedra:
+
+        .. math::
+
+            T_1 &= (A_1, B_1, C_1, B_2) \\\\
+            T_2 &= (A_2, B_2, C_2, C_1) \\\\
+            T_3 &= (A_1, C_1, A_2, B_2).
+
+
+        The total volume is then calculated as the sum of the volumes of these
+        three tetrahedra.
+
+
+        Parameters
+        ----------
+        p_list: list
+            The list of the reconstructed height profiles, as obtained by
+            :meth:`reconstruct_height_profile()`.
+        N_simp: int
+            The (approximate) target number of simplices for the detector
+            triangulation. Defaults to ``500``.
+        extrapolate: bool
+            Whether to reconstruct the positions extrapolated beyond the first
+            and last height profile.
+        tri_list: list
+            The list of custom detector triangulations, as obtained by
+            |delaunay|. One triangulation is needed for every reconstruction
+            interval. Defaults to ``None``, i.e. use internal adaptive
+            triangulation. This option may be useful if the internal
+            triangulation fails.
+        verbose: bool
+            Whether to print additional information. Defaults to ``False``.
+
+        Returns
+        -------
+        ids, xyz: (structured) ndarray, shape (N,)
+            The IDs and three-dimensional :math:`xyz` tip positions of the
+            :math:`N` reconstructed events, given as a structured array with
+            fields ``id``, ``x``, ``y``, and ``z``.
+        """
+        #
+        #
+        def _volume_residual(Δz, V_0, r_1, r_2, tri):
+            """
+            Helper to calculate volume residual for given height profile shift
+            :math:`\Delta z`.
+            """
+            #
+            #
+            # shift second height profile
+            r_2[:, 2] -= Δz
+            #
+            #
+            # group corresponding simplex vertices for both triangulated height
+            # profiles, shape(N_simp, 6, 3)
+            vert = np.concatenate(
+                (r_1[tri.simplices], r_2[tri.simplices]), axis = 1
+            )
+            #
+            # calculate volumes between the two height profiles for all
+            # simplices; tetrahedron volume with vertices a,b,c,d is given by
+            # V = |det(a-d, b-d, c-d)| / 6
+            V = 1.0 / 6.0 * (
+                np.abs(np.linalg.det(np.dstack((
+                    vert[:,0] - vert[:,4],
+                    vert[:,1] - vert[:,4],
+                    vert[:,2] - vert[:,4]
+                )))) +
+                np.abs(np.linalg.det(np.dstack((
+                    vert[:,3] - vert[:,2],
+                    vert[:,4] - vert[:,2],
+                    vert[:,5] - vert[:,2]
+                )))) +
+                np.abs(np.linalg.det(np.dstack((
+                    vert[:,0] - vert[:,4],
+                    vert[:,2] - vert[:,4],
+                    vert[:,3] - vert[:,4]
+                ))))
+            )
+            #
+            #
+            # restore original array (would otherwise be modified iteratively)
+            r_2[:, 2] += Δz
+            #
+            #
+            # return volume residual
+            return np.sum(V) - V_0
+        #
+        #
+        def _get_position_vectors(ΔH, xy_tri, T, B):
+            """
+            Simple helper to obtain three-dimensional tip positions from
+            barycentric coordinates with respect to detector triangulation.
+            """
+            #
+            #
+            # calculate xy tip position based on barycentric coordinates
+            xy = np.einsum(
+                'ijk,ij->ik',
+                xy_tri[T['tri'].simplices][T['s'][T['is_valid']]], B
+            )
+            #
+            # calculate corresponding height
+            z = interpn(
+                (self.X_tip[:, 0], self.Y_tip[0]), self._H_sphere + ΔH, xy
+            )
+            #
+            #
+            # return three-dimensional tip positions
+            return np.c_[xy, z]
+        #
+        #
+        def _interpolate_height(ΔH, xy):
+            """
+            Simple helper to interpolate position for given height profile.
+            """
+            #
+            #
+            # interpolate heights
+            z = interpn(
+                (self.X_tip[:, 0], self.Y_tip[0]), self._H_sphere + ΔH, xy
+            )
+            #
+            #
+            # return three-dimensional position vectors
+            return np.c_[xy, z]
+        #
+        #
+        # start timer
+        start = timer()
+        #
+        #
+        #
+        #
+        # loop through height profile pairs
+        current_index = 0
+        ids = np.empty(len(self._xy_data))
+        xyz = np.empty((len(self._xy_data), 3))
+        for p1, p2 in zip(p_list[:-1], p_list[1:]):
+            # check order of height profiles
+            if p1['sl'].start >= p2['sl'].start:
+                raise Exception("Height profiles must be ordered.")
+            #
+            #
+            # use central events from each height profile to determine
+            # reconstruction range
+            sl = np.s_[
+                (p1['sl'].start + p1['sl'].stop) // 2 :
+                (p2['sl'].start + p2['sl'].stop) // 2
+            ]
+            print(
+                "Reconstructing positions for data interval specified by "
+                "object \"{0:s}\".".format(str(sl))
+            )
+            #
+            #
+            # triangulate data
+            T = self._triangulate_detector(
+                sl, N_simp, "positions", None, verbose
+            )
+            #
+            #
+            # calculate cumulated volume for all *valid* reconstructed events,
+            # shape (N_rec,)
+            print("Reconstructing positions…")
+            V_cum = np.cumsum(self._V_at[sl][T['is_valid']])
+            #
+            #
+            #
+            #
+            # x and y tip positions of the detector triangulation vertices,
+            # shape (N_vert, 2)
+            xy_tri_1 = \
+                self._map_detector_triangulation_to_tip(p1['ΔH'], T['tri'])
+            xy_tri_2 = \
+                self._map_detector_triangulation_to_tip(p2['ΔH'], T['tri'])
+            #
+            #
+            # get barycentric coordinates of reconstructed events,
+            # shape (N_rec, 3)
+            B, _ = self._get_barycentric_coordinates(T, self._xy_data[sl])
+            #
+            # get three-dimensional position vectors for reconstructed events
+            # for both height profiles, shape (N_rec, 3)
+            r_1 = _get_position_vectors(p1['ΔH'], xy_tri_1, T, B)
+            r_2 = _get_position_vectors(p2['ΔH'], xy_tri_2, T, B)
+            #
+            #
+            #
+            #
+            # initial guess for height profile shift (total reconstructed volume
+            # divided by total cross-sectional area)
+            vertices = xy_tri_1[T['tri'].simplices]
+            Δz = V_cum[-1] / (0.5 * np.sum(np.abs(np.cross(
+                vertices[:, 2] - vertices[:, 0],
+                vertices[:, 1] - vertices[:, 0])
+            )))
+            #
+            # find shift for height profile to match reconstructed volume
+            Δz = root_scalar(
+                _volume_residual,
+                args = (
+                    V_cum[-1],
+                    _interpolate_height(p1['ΔH'], xy_tri_1),
+                    _interpolate_height(p2['ΔH'], xy_tri_2),
+                    T['tri']
+                ),
+                method = 'secant', x0 = Δz
+            ).root
+            if verbose:
+                print("\tHeight profile increment is {0:.3f} nm.".format(Δz))
+            #
+            #
+            # shift second height profile
+            r_2[:, 2] -= Δz
+            #
+            #
+            #
+            #
+            # calculate fractional Δz-increment based on cumulated reconstructed
+            # volumes, interval (0.0, 1.0]
+            Δz_rel = V_cum / V_cum[-1]
+            #
+            #
+            # calculate three-dimensional reconstructed positions for all
+            # events, shape (N_rec, 3)
+            xyz[current_index : current_index + len(r_1)] = \
+                r_1 + Δz_rel[:, np.newaxis] * (r_2 - r_1)
+            #
+            #
+            # set corresponding chemical IDs
+            ids[current_index : current_index + len(r_1)] = \
+                self._ids[sl][T['is_valid']]
+            #
+            #
+            # increment current index
+            current_index += len(r_1)
+        #
+        #
+        #
+        #
+        # drop remaining array elements (events outside triangulation are not
+        # reconstructed)
+        xyz = xyz[0:current_index]
+        ids = ids[0:current_index]
+        #
+        #
+        # create structured array
+        id_xyz = np.empty(
+            len(ids),
+            dtype=np.dtype(
+                [('id', 'i8'), ('x', 'f8'), ('y', 'f8'), ('z', 'f8')]
+            )
+        )
+        id_xyz['id'] = ids
+        id_xyz['x'] = xyz[:, 0]
+        id_xyz['y'] = xyz[:, 1]
+        id_xyz['z'] = xyz[:, 2]
+        #
+        #
+        #
+        #
+        # return structured array containing chemical IDs and reconstructed
+        # positions
+        print(
+            "Reconstruction of {0:d} events took {1:.3f} s.".
+            format(len(ids), timer() - start)
+        )
+        return id_xyz
     #
     #
     #
@@ -1359,7 +1656,7 @@ class CurvatureReconstructor:
         #
         # construct tip grid; use 'ij' indexing so that x increases along first
         # axis, y along second axis
-        print("Setting up tip grid …")
+        print("Setting up tip grid…")
         print("Using {0:d} x {0:d} points for tip grid.".format(n))
         self._X_tip, self._Y_tip = np.meshgrid(
             *[np.linspace(-r0, r0, n) for i in range(2)],
@@ -1651,7 +1948,7 @@ class CurvatureReconstructor:
         #
         #
         # start timer for triangulation
-        print("Triangulating events …")
+        print("Triangulating events…")
         start = timer()
         #
         #
@@ -1711,7 +2008,7 @@ class CurvatureReconstructor:
         #
         # for "positions" mode, we do not need the solid angles
         if mode == "positions":
-            print("\tTriangulation took {0:.3f} s.".format(timer() - start))
+            _printv("\tTriangulation took {0:.3f} s.".format(timer() - start))
             return {
                 'tri'     : tri,
                 's'       : simplex_indices,
