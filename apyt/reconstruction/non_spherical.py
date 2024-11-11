@@ -674,7 +674,9 @@ class CurvatureReconstructor:
             The list of custom detector triangulations, as obtained by
             |delaunay|. One triangulation is needed for every reconstruction
             interval. Defaults to ``None``, i.e. use internal adaptive
-            triangulation. This option may be useful if the internal
+            triangulation. The list may contain ``None`` for individual
+            reconstruction intervals to switch between user-provided and
+            internal triangulation. This option may be useful if the internal
             triangulation fails.
         verbose: bool
             Whether to print additional information. Defaults to ``False``.
@@ -780,21 +782,60 @@ class CurvatureReconstructor:
         #
         #
         #
+        # extrapolate first and last height profile if requested
+        if extrapolate == True:
+            print("Using extrapolation beyond first and last height profile.")
+            #
+            #
+            # extrapolation of *first* height profile
+            Δ = (p_list[0]['sl'].stop - p_list[0]['sl'].start) // 2
+            p_first = {
+                'ΔH': p_list[0]['ΔH'],
+                'sl': np.s_[
+                    p_list[0]['sl'].start - Δ :
+                    p_list[0]['sl'].stop  - Δ
+                ]
+            }
+            #
+            # extrapolation of *last* height profile
+            Δ = (p_list[-1]['sl'].stop - p_list[-1]['sl'].start) // 2
+            p_last = {
+                'ΔH': p_list[-1]['ΔH'],
+                'sl': np.s_[
+                    p_list[-1]['sl'].start + Δ :
+                    p_list[-1]['sl'].stop  + Δ
+                ]
+            }
+            #
+            #
+            # join profiles
+            p_list = [p_first] + p_list + [p_last]
+        #
+        #
+        # initialize triangulation list if not provided; each defaults to None,
+        # i.e. internal triangulation
+        if tri_list == None:
+            tri_list = [None] * (len(p_list) - 1)
+        #
+        #
+        #
+        #
         # loop through height profile pairs
         current_index = 0
         ids = np.empty(len(self._xy_data))
         xyz = np.empty((len(self._xy_data), 3))
-        for p1, p2 in zip(p_list[:-1], p_list[1:]):
+        for p1, p2, tri in zip(p_list[:-1], p_list[1:], tri_list):
             # check order of height profiles
             if p1['sl'].start >= p2['sl'].start:
                 raise Exception("Height profiles must be ordered.")
             #
             #
             # use central events from each height profile to determine
-            # reconstruction range
+            # reconstruction range; make sure to be in data range in case of
+            # extrapolation
             sl = np.s_[
-                (p1['sl'].start + p1['sl'].stop) // 2 :
-                (p2['sl'].start + p2['sl'].stop) // 2
+                max((p1['sl'].start + p1['sl'].stop) // 2, 0) :
+                min((p2['sl'].start + p2['sl'].stop) // 2, len(self._xy_data))
             ]
             print(
                 "Reconstructing positions for data interval specified by "
@@ -804,7 +845,7 @@ class CurvatureReconstructor:
             #
             # triangulate data
             T = self._triangulate_detector(
-                sl, N_simp, "positions", None, verbose
+                sl, N_simp, "positions", tri, verbose
             )
             #
             #
