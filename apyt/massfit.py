@@ -124,6 +124,8 @@ from histogram data.
 
 The following methods are provided:
 
+* :meth:`check_compatibility`: Check compatibility of given version against
+  current module version.
 * :meth:`counts`: Get counts for all elements.
 * :meth:`enable_debug`: Enable or disable debug output.
 * :meth:`fit`: Fit mass spectrum.
@@ -132,6 +134,7 @@ The following methods are provided:
   charge states.
 * :meth:`spectrum`: Calculate spectrum for specified list of elements.
 * :meth:`split_molecules`: Split molecular events into individual atoms.
+* :meth:`version`: Get version of this module.
 
 
 .. |periodictable| raw:: html
@@ -148,15 +151,17 @@ The following methods are provided:
 #
 #
 #
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 __all__ = [
+    'check_compatibility',
     'counts',
     'enable_debug',
     'fit',
     'map_ids',
     'peaks_list',
     'spectrum',
-    'split_molecules'
+    'split_molecules',
+    'version'
 ]
 #
 #
@@ -172,6 +177,7 @@ import re
 import warnings
 #
 # import some special functions/modules
+from packaging.version import Version
 from scipy.signal import find_peaks
 from scipy.special import erf
 from scipy.stats import multinomial
@@ -237,6 +243,36 @@ _add_element(
 # public functions
 #
 ################################################################################
+def check_compatibility(version):
+    """
+    Check compatibility of given version against current module version.
+
+    Raises
+    ------
+    Exception
+        An exception is raised in case of incompatibility.
+    """
+    #
+    #
+    # identical version is always compatible
+    if Version(version) == Version(__version__):
+        return
+    #
+    #
+    # version 0.2.0 breaks backward compatibility due to change in analytic
+    # description of background
+    if Version(__version__) >= Version('0.2.0') and \
+       Version('0.2.0') > Version(version):
+        raise Exception(
+            "Version incompatibility in {0:s}: Analytic description of "
+            "background has been changed in version 0.2.0 (your version is "
+            "{1:s}). You need to re-fit the mass spectrum.".
+            format(__name__, version)
+        )
+#
+#
+#
+#
 def counts(peaks_list, function, params, data_range, bin_width,
            ignore_list = [], verbose = False):
     """
@@ -258,9 +294,10 @@ def counts(peaks_list, function, params, data_range, bin_width,
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
         the |lmfit| module.
-    data_range : float
-        The covered data range of the spectrum, i.e. the difference between
-        maximum and minimum.
+    data_range : tuple
+        The covered data range, i.e. the minimum and maximum of the mass
+        spectrum. This interval is required for analytical integration of the
+        background counts.
     bin_width : float
         The histogram bin width.
 
@@ -340,7 +377,8 @@ def counts(peaks_list, function, params, data_range, bin_width,
     #
     #
     # calculate background
-    background = params['base'] * data_range / bin_width
+    background = 2.0 * params['base'] / bin_width * \
+        (np.sqrt(data_range[1]) - np.sqrt(data_range[0]))
     #
     #
     # print element counts if requested
@@ -495,6 +533,12 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
     """
     #
     #
+    # check mass spectrum for valid range (strictly positive)
+    _check_spectrum_range(spectrum[:, 0])
+    #
+    #
+    #
+    #
     # define fit model
     start = timer()
     model = lmfit.Model(_model_spectrum, independent_vars = ["x"])
@@ -610,6 +654,12 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     #
     #
     #
+    # check mass spectrum for valid range (strictly positive)
+    _check_spectrum_range(x)
+    #
+    #
+    #
+    #
     # start timer
     print("Performing chemical mapping…")
     start = timer()
@@ -626,7 +676,7 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
     #
     # set background counts (always *first* entry)
     p_vec = np.zeros((len(x), len(peak_groups) + 1))
-    p_vec[:, 0] = params['base']
+    p_vec[:, 0] = params['base'] / np.sqrt(x)
     #
     # loop through peak groups to calculate probability vectors (one vector for
     # each x-position containing the probabilities for every peak group
@@ -1044,6 +1094,21 @@ def split_molecules(ids, xyz, peaks_list,
 #
 #
 #
+def version():
+    """
+    Get version of this module.
+
+    Returns
+    -------
+    version : str
+        The version string of this module.
+    """
+    #
+    return __version__
+#
+#
+#
+#
 ################################################################################
 #
 # private module-level functions
@@ -1074,6 +1139,22 @@ def _decay(x):
     #
     #
     return np.exp(-x)
+#
+#
+#
+#
+def _check_spectrum_range(spectrum_range):
+    """
+    Simple helper to check strictly positive mass spectrum range.
+    """
+    #
+    #
+    if spectrum_range.min() <= 0.0:
+        raise Exception(
+            "Mass spectrum range must be strictly positive due to divergence "
+            "of background. (Minimum is {0:.3f} amu/e.)".
+            format(spectrum_range.min())
+        )
 #
 #
 #
@@ -1118,12 +1199,12 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
     #
     #
     # estimate baseline
-    _, props = find_peaks(
+    peaks, props = find_peaks(
         data[:, 1],
         distance = np.iinfo(np.int32).max,
         width = np.finfo(np.float32).eps, rel_height = 1.0)
-    base = props['width_heights'][0]
-    print("Estimated base line is {0:.1f}.".format(base))
+    base = props['width_heights'][0] * np.sqrt(data[:, 0][peaks[0]])
+    print("Estimated background at 1.0 amu/e is {0:.1f}.".format(base))
     #
     # add baseline parameter
     params.add('base', value = base)
@@ -1468,7 +1549,7 @@ def _model_spectrum(x, peaks_list = None, function = None, **params):
     #
     #
     # return function value
-    return result + params['base']
+    return result + params['base'] / np.sqrt(x)
 #
 #
 #
