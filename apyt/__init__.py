@@ -12,6 +12,7 @@ Sub-packages
 .. toctree::
    :maxdepth: 1
 
+   The APyT analysis sub-package (apyt.analysis)<apyt.analysis>
    The APyT reconstruction sub-package \
    (apyt.reconstruction)<apyt.reconstruction>
 
