@@ -89,7 +89,7 @@ The mass-to-charge spectrum is calculated by the |numpy.histogram| function. The
 following parameters (given as a dictionary) can be passed through to that
 function:
 
-- ``range``: The lower and upper range of the bins.
+- ``range``: The lower and upper bounds for the range of the bins.
 - ``width``: The desired bin width (will be translated into the ``bins``
   parameter). Defaults to 0.05 amu/e.
 
