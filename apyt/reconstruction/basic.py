@@ -495,7 +495,7 @@ def reconstruct(xy_det, z_0, r, L, ξ):
         the unit of the :math:`xy` detector positions.
     ξ : float
         The image compression factor which is defined as :math:`\\xi =
-        \\frac{\\theta_{\\textnormal{crys}}}{\\theta_{\\textnormal{obs}}}`.
+        \\frac{\\theta_{\\textnormal{crys}}}{\\tan\\theta_{\\textnormal{obs}}}`.
 
     Returns
     -------
@@ -520,7 +520,7 @@ def reconstruct(xy_det, z_0, r, L, ξ):
     r_det = np.sqrt(x * x + y * y)
     #
     # calculate tip angles
-    θ_tip = np.arctan(r_det / L) * ξ
+    θ_tip = r_det / L * ξ
     #
     # handle special case of r_det = 0 (0/0 --> NaN); the exact mathematical
     # result is tmp = r * ξ / L, but we multiple by zero below, so it is safe to
