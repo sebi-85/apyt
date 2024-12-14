@@ -37,17 +37,17 @@ The spectrum of the mass-to-charge ratio is calculated according to
 
 .. math::
     \\frac m q = \\alpha \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
-                               {(L_0^2 + x^2 + y^2) \psi(x, y)},
+                               {(L_0^2 + x^2 + y^2) \\psi(x, y)},
 
 where :math:`\\varphi(U)` accounts for the correction of the measured voltage,
 :math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal) distance
-between tip and detector, and :math:`\psi(x, y)` accounts for the deviation of
+between tip and detector, and :math:`\\psi(x, y)` accounts for the deviation of
 the actual flight length from Pythagoras, depending on the detector hit position
 :math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific machine
 parameters.
 
 Note that the correction in the center of the detector is zero by definition,
-i.e. :math:`\psi(0, 0) \\equiv 1`. Also, by definition, the fix point of the
+i.e. :math:`\\psi(0, 0) \\equiv 1`. Also, by definition, the fix point of the
 voltage correction, :math:`U_\\textnormal{fix}`, i.e. the voltage at which no
 correction is applied (:math:`\\varphi(U_\\textnormal{fix}) = 0`), is determined
 as demonstrated in the following figure:
@@ -64,7 +64,7 @@ voltage subranges (data points). The weighted average (with respect to the
 number of events) of all voltage subranges is then set to be the peak target
 position for the voltage correction (black line). The intersection eventually
 determines the fix point of the voltage correction
-(:math:`U_\\textnormal{fix} \\approx 12\,\\textnormal{kV}` in the figure).
+(:math:`U_\\textnormal{fix} \\approx 12\\,\\textnormal{kV}` in the figure).
 
 Since the actual values for the voltage correction and flight length :math:`L_0`
 cannot be determined unambiguously, but are rather prescribed by the procedure,
@@ -73,7 +73,7 @@ scaling factor :math:`\\alpha`, which is a free parameter along with :math:`t_0`
 for the final adjustment of the peak positions in the mass spectrum (cf.
 :meth:`peak_align`).
 
-:math:`\\varphi(U)` and :math:`\psi(x, y)` are given by 1d and 2d polynomials
+:math:`\\varphi(U)` and :math:`\\psi(x, y)` are given by 1d and 2d polynomials
 with coefficients as described in |polyval| and |polyval2d| from the *numpy*
 module, respectively. The spectrum parameters are expected to be a tuple with
 *(t_0, L_0, (voltage_coeffs, flight_coeffs), alpha)*, where the coefficients are
@@ -132,24 +132,24 @@ XML parameter file format
 The generated XML parameter file contains all relevant information necessary to
 reconstruct the high-quality mass spectrum with external tools. However, for
 historic reasons, the (internal) correction functions :math:`\\varphi` and
-:math:`\psi` are used to construct an evenly spaced grid with support points for
-the voltage (1d) and flight length correction (2d), which shall then be applied
-by external tools using interpolation (legacy mode). The correction functions in
-this mode are supposed to be multiplicative factors of the form
+:math:`\\psi` are used to construct an evenly spaced grid with support points
+for the voltage (1d) and flight length correction (2d), which shall then be
+applied by external tools using interpolation (legacy mode). The correction
+functions in this mode are supposed to be multiplicative factors of the form
 
 .. math::
     \\frac m q = \\frac{2 U (t - t_0)^2} {L_0^2}
-                  \\hat\\varphi(U) \\hat\psi(x, y),
+                  \\hat\\varphi(U) \\hat\\psi(x, y),
 
-where :math:`\\hat\\varphi(U)` and :math:`\\hat\psi(x, y)` are obtained from the
-(internal) correction functions :math:`\\varphi(U)` and :math:`\psi(x, y)`,
+where :math:`\\hat\\varphi(U)` and :math:`\\hat\\psi(x, y)` are obtained from the
+(internal) correction functions :math:`\\varphi(U)` and :math:`\\psi(x, y)`,
 respectively. The :math:`n` voltage grid points are written as a comma-separated
 list with
 
 .. math::
     \\hat\\varphi(U_\\textnormal{min}), \
-    \\hat\\varphi(U_\\textnormal{min} + \Delta U), \\ldots, \
-    \\hat\\varphi(U_\\textnormal{min} + (n - 1)\Delta U) = \
+    \\hat\\varphi(U_\\textnormal{min} + \\Delta U), \\ldots, \
+    \\hat\\varphi(U_\\textnormal{min} + (n - 1)\\Delta U) = \
     \\hat\\varphi(U_\\textnormal{max}).
 
 The constant spectrum scaling parameter :math:`\\alpha` is incorporated into the
@@ -159,21 +159,21 @@ Similarly, the :math:`m_x \\times m_y` flight length correction points are
 written as a comma-separated list according to
 
 .. math::
-    &\\hat\psi(x_\\textnormal{min}, y_\\textnormal{min}), \\ldots, \
-    \\hat\psi(x_\\textnormal{min}, y_\\textnormal{max}), \\\\
+    &\\hat\\psi(x_\\textnormal{min}, y_\\textnormal{min}), \\ldots, \
+    \\hat\\psi(x_\\textnormal{min}, y_\\textnormal{max}), \\\\
     \\hookrightarrow\\quad & \
-    \\hat\psi(x_\\textnormal{min} + \Delta x, y_\\textnormal{min}), \\ldots, \
-    \\hat\psi(x_\\textnormal{min} + \Delta x, y_\\textnormal{max})), \\\\
+    \\hat\\psi(x_\\textnormal{min} + \\Delta x, y_\\textnormal{min}), \\ldots, \
+    \\hat\\psi(x_\\textnormal{min} + \\Delta x, y_\\textnormal{max})), \\\\
     \\hookrightarrow\\quad &\\ldots, \\\\
     \\hookrightarrow\\quad &
-    \\hat\psi(x_\\textnormal{max}, y_\\textnormal{min}), \\ldots, \
-    \\hat\psi(x_\\textnormal{max}, y_\\textnormal{max}).
+    \\hat\\psi(x_\\textnormal{max}, y_\\textnormal{min}), \\ldots, \
+    \\hat\\psi(x_\\textnormal{max}, y_\\textnormal{max}).
 
 Further details can be obtained by inspecting a self-explanatory XML parameter
 file.
 
 For higher precision and without the need of interpolation, the coefficients of
-the correction functions :math:`\\varphi` and :math:`\psi` are also written
+the correction functions :math:`\\varphi` and :math:`\\psi` are also written
 directly to the XML parameter file which can then be used by external tools to
 apply a continuous correction (default mode; recommended).
 
@@ -1777,7 +1777,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, alpha, hist_par,
 def _poly2d_coeff_mat_to_vec(M):
     """Convert 2d coefficient matrix to sparse vector representation.
 
-    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \\leq d`
     are used, i.e. the 2d coefficient matrix contains zeros in the lower right
     corner.
 
@@ -1811,7 +1811,7 @@ def _poly2d_coeff_mat_to_vec(M):
 def _poly2d_coeff_vec_to_mat(v):
     """Convert sparse vector representation to 2d coefficient matrix.
 
-    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \\leq d`
     are used, i.e. the returned 2d coefficient matrix will contain zeros in the
     lower right corner.
 
@@ -1845,7 +1845,7 @@ def _poly2d_coeff_vec_to_mat(v):
 def _polyfit2d(x, y, f, deg, **kwargs):
     """Custom 2d fitting routine to allow for optional weights.
 
-    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \leq d`
+    Note that only polynomial terms :math:`x^i y^j` with :math:`i + j \\leq d`
     are used, i.e. the returned 2d coefficient matrix will contain zeros in the
     lower right corner.
 

@@ -305,11 +305,11 @@ class CurvatureReconstructor:
         ax = axes[0][0]
         ax.set_title(
             "Triangulated detector density "
-            "($\\frac{\mathrm{nm}^3}{\mathrm{sr}}$)"
+            "($\\frac{\\mathrm{nm}^3}{\\mathrm{sr}}$)"
         )
         ax.set_aspect('equal')
-        ax.set_xlabel('$x_\mathrm{det}$ (mm)')
-        ax.set_ylabel('$y_\mathrm{det}$ (mm)')
+        ax.set_xlabel('$x_\\mathrm{det}$ (mm)')
+        ax.set_ylabel('$y_\\mathrm{det}$ (mm)')
         tric = ax.tripcolor(
             *results['tri']['tri'].points.T, results['tri']['tri'].simplices,
             facecolors = results['ρ_det'],
@@ -320,10 +320,12 @@ class CurvatureReconstructor:
         #
         # triangulated Gaussian curvature (detector)
         ax = axes[0][1]
-        ax.set_title("Triangulated Gaussian curvature $K$ ($\mathrm{nm}^{-2}$)")
+        ax.set_title(
+            "Triangulated Gaussian curvature $K$ ($\\mathrm{nm}^{-2}$)"
+        )
         ax.set_aspect('equal')
-        ax.set_xlabel('$x_\mathrm{det}$ (mm)')
-        ax.set_ylabel('$y_\mathrm{det}$ (mm)')
+        ax.set_xlabel('$x_\\mathrm{det}$ (mm)')
+        ax.set_ylabel('$y_\\mathrm{det}$ (mm)')
         tric = ax.tripcolor(
             *results['tri']['tri'].points.T, results['tri']['tri'].simplices,
             facecolors = results['K_det'],
@@ -336,9 +338,9 @@ class CurvatureReconstructor:
         # mapped tip target Gaussian curvature
         ax = axes[0][2]
         ax.set_aspect('equal')
-        ax.set_title("Mapped target tip curvature $K$ ($\mathrm{nm}^{-2}$)")
-        ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
-        ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
+        ax.set_title("Mapped target tip curvature $K$ ($\\mathrm{nm}^{-2}$)")
+        ax.set_xlabel('$x_\\mathrm{tip}$ (nm)')
+        ax.set_ylabel('$y_\\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
             self._X_tip, self._Y_tip, results['K_tip_from_det'],
             shading = 'nearest'#,
@@ -352,9 +354,9 @@ class CurvatureReconstructor:
         # reconstructed tip Gaussian curvature
         ax = axes[1][0]
         ax.set_aspect('equal')
-        ax.set_title("Reconstructed tip curvature $K$ ($\mathrm{nm}^{-2}$)")
-        ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
-        ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
+        ax.set_title("Reconstructed tip curvature $K$ ($\\mathrm{nm}^{-2}$)")
+        ax.set_xlabel('$x_\\mathrm{tip}$ (nm)')
+        ax.set_ylabel('$y_\\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
             self._X_tip, self._Y_tip, results['K_tip_from_height'],
             shading = 'nearest'#,
@@ -369,8 +371,8 @@ class CurvatureReconstructor:
         ax = axes[1][1]
         ax.set_aspect('equal')
         ax.set_title("Relative curvature residuals")
-        ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
-        ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
+        ax.set_xlabel('$x_\\mathrm{tip}$ (nm)')
+        ax.set_ylabel('$y_\\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
             self._X_tip, self._Y_tip, results['ΔK'],
             shading = 'nearest',
@@ -384,9 +386,9 @@ class CurvatureReconstructor:
         # reconstructed height profile
         ax = axes[1][2]
         ax.set_aspect('equal')
-        ax.set_title("Reconstructed height profile $\Delta H$ ($\mathrm{nm}$)")
-        ax.set_xlabel('$x_\mathrm{tip}$ (nm)')
-        ax.set_ylabel('$y_\mathrm{tip}$ (nm)')
+        ax.set_title("Reconstructed height profile $\\Delta H$ ($\\mathrm{nm}$)")
+        ax.set_xlabel('$x_\\mathrm{tip}$ (nm)')
+        ax.set_ylabel('$y_\\mathrm{tip}$ (nm)')
         pcm = ax.pcolormesh(
             self._X_tip, self._Y_tip, results['H'] - self._H_sphere,
             shading = 'nearest'
@@ -455,6 +457,12 @@ class CurvatureReconstructor:
             get a complete list of the dictionary content. This dictionary can
             be passed directly to :meth:`debug_plot()`.
 
+
+        .. |delaunay| raw:: html
+
+            <a href="https://docs.scipy.org/doc/scipy/reference/generated/
+            scipy.spatial.Delaunay.html"
+            target="_blank">scipy.spatial.Delaunay()</a>
 
         .. |krylov| raw:: html
 
@@ -634,10 +642,10 @@ class CurvatureReconstructor:
         three-dimensional atomic positions between each consecutive pair of
         height profiles.
 
-        The height increment :math:`\Delta z` between consecutive height profile
-        pairs is determined such that the total reconstructed volume matches
-        exactly the volume spanned by the triangulated upper and lower height
-        profiles. Each triangulated simplex, corresponding to both height
+        The height increment :math:`\\Delta z` between consecutive height
+        profile pairs is determined such that the total reconstructed volume
+        matches exactly the volume spanned by the triangulated upper and lower
+        height profiles. Each triangulated simplex, corresponding to both height
         profiles, forms a distorted prism.
 
         The volumes of these distorted prisms are calculated as follows:
@@ -693,7 +701,7 @@ class CurvatureReconstructor:
         def _volume_residual(Δz, V_0, r_1, r_2, tri):
             """
             Helper to calculate volume residual for given height profile shift
-            :math:`\Delta z`.
+            :math:`\\Delta z`.
             """
             #
             #
@@ -1252,7 +1260,7 @@ class CurvatureReconstructor:
 
         .. math::
             K = \\frac{
-                    \\frac{\\partial^2 H}{\\partial x^2} \,
+                    \\frac{\\partial^2 H}{\\partial x^2} \\,
                     \\frac{\\partial^2 H}{\\partial y^2} -
                     \\left(
                         \\frac{\\partial^2 H}{\\partial x \\partial y}

@@ -18,11 +18,11 @@ spatial information in the lateral directions can still be obtained from atom
 probe data using so-called spatial distribution maps (SDMs).
 
 An SDM is a two-dimensional histogram visualization of all interatomic distance
-vectors :math:`\Delta \\vec r_{ij} = (\Delta x_{ij}, \Delta y_{ij}, \Delta
-z_{ij})^T`, where the lateral components, i.e. :math:`\Delta x_{ij}` and
-:math:`\Delta y_{ij}`, are chosen for the two-dimensional histogram data.
+vectors :math:`\\Delta \\vec r_{ij} = (\\Delta x_{ij}, \\Delta y_{ij}, \\Delta
+z_{ij})^T`, where the lateral components, i.e. :math:`\\Delta x_{ij}` and
+:math:`\\Delta y_{ij}`, are chosen for the two-dimensional histogram data.
 Depending on the lattice type and orientation, preferred combinations
-:math:`(\Delta x_{ij}, \Delta y_{ij})` exist which will be seen as maxima in the
+:math:`(\\Delta x_{ij}, \\Delta y_{ij})` exist which will be seen as maxima in the
 histogram.
 
 
@@ -30,9 +30,9 @@ General procedure
 -----------------
 
 As shown by |Geiser|, the lateral resolution is optimized if the
-:math:`(\Delta x_{ij}, \Delta y_{ij})` are chosen for atomic pairs within a very
-narrow :math:`\Delta z`-separation, which requires an optimal alignment of the
-sample in :math:`z`-direction. The SDMs created this way do show distinct
+:math:`(\\Delta x_{ij}, \\Delta y_{ij})` are chosen for atomic pairs within a
+very narrow :math:`\\Delta z`-separation, which requires an optimal alignment of
+the sample in :math:`z`-direction. The SDMs created this way do show distinct
 maxima, however, their positions are still distorted. Since the real
 crystallographic positions of these maxima are known, a system of linear
 equations can be solved which transforms the distorted SDM into its correct
@@ -206,10 +206,10 @@ def rdf_lateral(data, min, max, w, dir_key, r_0, δ):
 
     The RDF is calculated for the directions which are orthogonal to the normal
     direction specified in *dir_key*, but the lateral RDF is restricted to all
-    pairs for which the distance in normal direction :math:`r_\mathrm n` is
-    limited to the range :math:`r_0 - \\frac{\delta}{2} \leq r_\mathrm n \leq
-    r_0 + \\frac{\delta}{2}`, i.e. all pairs are chosen which fall in a narrow
-    distance window centered at :math:`r_0` in normal direction.
+    pairs for which the distance in normal direction :math:`r_\\mathrm n` is
+    limited to the range :math:`r_0 - \\frac{\\delta}{2} \\leq r_\\mathrm n
+    \\leq r_0 + \\frac{\\delta}{2}`, i.e. all pairs are chosen which fall in a
+    narrow distance window centered at :math:`r_0` in normal direction.
 
     The lateral RDF may reveal peaks for highly precise atomic positions, but
     this is unlikely for APT data and rather applies to simulation data. The
@@ -287,11 +287,12 @@ def rdf(r, N, n, w, sigma, d):
     The RDF is modeled as
 
     .. math::
-        \mathrm{rdf}(r) = N\, n\, (n - 1)\, w\, f(r, 0, \sigma)
-               + \sum_{i = 1}^{N - 1} (N - i)\, n^2\, w\, f(r, i\, d, \sigma),
+        \\mathrm{rdf}(r) = N\\, n\\, (n - 1)\\, w\\, f(r, 0, \\sigma)
+               + \\sum_{i = 1}^{N - 1} (N - i)\\, n^2\\, w\\,
+               f(r, i, d, \\sigma),
 
-    where :math:`f(r, r_0, \sigma)` is the Gaussian distribution centered at
-    :math:`r_0` with standard deviation :math:`\sigma`. The fist term
+    where :math:`f(r, r_0, \\sigma)` is the Gaussian distribution centered at
+    :math:`r_0` with standard deviation :math:`\\sigma`. The fist term
     represents the contribution from atomic pairs within the same atomic layer
     and the second term stems from the contributions of atoms in different
     atomic layers.
@@ -537,16 +538,16 @@ def sdm(data, max, n, dir_key, d_0, δ, plt_title, use_filter):
     The SDMs are calculated for the directions which are orthogonal to the
     normal direction specified in *dir_key*, but the (lateral) SDM is restricted
     to all pairs for which the distance in normal direction :math:`d` is limited
-    to the range :math:`i\, d_0 - \\frac{\delta_j}{2} \leq d \leq
-    i\, d_0 + \\frac{\delta_j}{2}`, i.e. all pairs are chosen which fall in a
-    narrow distance window centered at :math:`i\, d_0` in normal direction. The
-    SDMs are created for :math:`i \in (0,1,2,3)`, i.e. for pairs in the same
+    to the range :math:`i\\, d_0 - \\frac{\\delta_j}{2} \\leq d \\leq
+    i\\, d_0 + \\frac{\\delta_j}{2}`, i.e. all pairs are chosen which fall in a
+    narrow distance window centered at :math:`i\\, d_0` in normal direction. The
+    SDMs are created for :math:`i \\in (0,1,2,3)`, i.e. for pairs in the same
     layer (:math:`i = 0`) to pairs separated by up to three lattice spacings
     (:math:`i = 3`).
 
-    Different window widths :math:`\delta_j` in normal direction can be
-    provided. For each :math:`\delta_j`, a common plot is generated and shown
-    for all :math:`i \in (0,1,2,3)`.
+    Different window widths :math:`\\delta_j` in normal direction can be
+    provided. For each :math:`\\delta_j`, a common plot is generated and shown
+    for all :math:`i \\in (0,1,2,3)`.
 
     The two-dimensional histogram data of all processed SDMs is returned as a
     list.
@@ -820,10 +821,10 @@ def _gaussian(x, μ, σ):
     The Gaussian distribution is given by
 
     .. math::
-        f(x) = \\frac{1}{\sigma \sqrt{2\pi}}
-               \exp\\bigg(-\\frac 1 2\\frac{(x - \mu)^2}{\sigma^2}\\bigg),
+        f(x) = \\frac{1}{\\sigma \\sqrt{2\\pi}}
+               \\exp\\bigg(-\\frac 1 2\\frac{(x - \\mu)^2}{\\sigma^2}\\bigg),
 
-    where :math:`\mu` and :math:`\sigma` are the expectation value and the
+    where :math:`\\mu` and :math:`\\sigma` are the expectation value and the
     standard deviation, respectively, of the Gaussian distribution.
 
     Parameters
@@ -954,10 +955,10 @@ def _sdm(data, max, n, dir_key, r0, δ):
 
     The SDM is calculated for the directions which are orthogonal to the normal
     direction specified in *dir_key*, but the (lateral) SDM is restricted to all
-    pairs for which the distance in normal direction :math:`r_\mathrm n` is
-    limited to the range :math:`r_0 - \\frac{\delta}{2} \leq r_\mathrm n \leq
-    r_0 + \\frac{\delta}{2}`, i.e. all pairs are chosen which fall in a narrow
-    distance window centered at :math:`r_0` in normal direction.
+    pairs for which the distance in normal direction :math:`r_\\mathrm n` is
+    limited to the range :math:`r_0 - \\frac{\\delta}{2} \\leq r_\\mathrm n
+    \\leq r_0 + \\frac{\\delta}{2}`, i.e. all pairs are chosen which fall in a
+    narrow distance window centered at :math:`r_0` in normal direction.
 
     Parameters
     ----------
@@ -1118,9 +1119,9 @@ def _gaussian_2d(x, y, A, x0, y0, a, b, c, z0):
     The general form of the two-dimensional Gaussian function is given
 
     .. math::
-        f(x, y) = z_0 + A \exp\Big(-\\big(  a (x - x_0)^2 +
-                                          2 b (x - x_0) (y - y_0) +
-                                            c (y - y_0)^2\\big)\Big).
+        f(x, y) = z_0 + A \\exp\\Big(-\\big(  a (x - x_0)^2 +
+                                            2 b (x - x_0) (y - y_0) +
+                                              c (y - y_0)^2\\big)\\Big).
 
     Returns
     -------
