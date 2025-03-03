@@ -42,6 +42,7 @@ __all__ = ['CurvatureReconstructor']
 #
 # TODO:
 #   - uncomment Numba njit'ed decorator
+#   - implement shaft angle
 #   - check preconditioning for Krylov root solver
 #     (https://docs.scipy.org/doc/scipy/tutorial/optimize.html#still-too-slow-preconditioning)
 #   - use kernel density estimators for triangulation of detector density?
@@ -102,6 +103,15 @@ class CurvatureReconstructor:
     num_points_tip: int
         The number of points used for the construction of the tip grid. Must be
         an odd number. Defaults to ``101``.
+    local_efficiency_correction: callable
+        A user-provided function to locally correct the detection efficiency
+        (e.g., accounting for possible blind spots, etc.). This function is
+        expected to take two arguments: the *x* and *y* coordinates of the
+        detector, each represented as an *ndarray* of shape *(n,)*. The return
+        values are considered correction factors for the specific positions.
+        Note that the detected atomic volumes are **multiplied** by the output
+        of this function to artificially mimic a homogeneous density
+        distribution.
 
 
     The following class methods are provided:
@@ -134,7 +144,8 @@ class CurvatureReconstructor:
     #
     #
     def __init__(
-        self, xy_data, ids, V_at, R0, r0, L0, ξ, ζ, num_points_tip = 101
+        self, xy_data, ids, V_at, R0, r0, L0, ξ, ζ,
+        num_points_tip = 101, local_efficiency_correction = None
     ):
         #
         #
@@ -149,8 +160,21 @@ class CurvatureReconstructor:
         self._ζ       = ζ
         #
         #
-        # correct volumes for detection efficiency
+        #
+        #
+        # correct atomic volumes for detection efficiency globally
         self._V_at /= ζ
+        #
+        #
+        # correct detection efficiency/atomic volumes locally (blind spot etc.)
+        if local_efficiency_correction is not None:
+            print(
+                "Correcting detection efficiency locally with user-provided "
+                "function…"
+            )
+            self._V_at *= local_efficiency_correction(*xy_data.T)
+        #
+        #
         #
         #
         # set aperture angle
