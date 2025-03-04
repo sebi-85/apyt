@@ -855,6 +855,7 @@ class CurvatureReconstructor:
         #
         # loop through height profile pairs
         current_index = 0
+        Δz_tot = 0.0
         ids = np.empty(len(self._xy_data))
         xyz = np.empty((len(self._xy_data), 3))
         for p1, p2, tri in zip(p_list[:-1], p_list[1:], tri_list):
@@ -933,8 +934,12 @@ class CurvatureReconstructor:
                 print("\tHeight profile increment is {0:.3f} nm.".format(Δz))
             #
             #
-            # shift second height profile
-            r_2[:, 2] -= Δz
+            # shift height profiles
+            r_1[:, 2] += Δz_tot
+            r_2[:, 2] += Δz_tot + Δz
+            #
+            # update total Δz increment
+            Δz_tot += Δz
             #
             #
             #
@@ -1761,8 +1766,9 @@ class CurvatureReconstructor:
         #
         #
         # spherical reference height profile, shape (n, n)
-        # the tip direction derived from the detector coordinate system points
-        # into -z direction, so we need to use the negative height profile
+        # (The natural reconstruction direction is in +z direction (top to
+        # bottom of the tip), so that the hemispherical cap points into -z
+        # direction. Thus, we need to use the *negative* height profile.)
         self._H_sphere = np.full_like(self._X_tip, np.nan)
         self._H_sphere[self._mask_tip] = \
             -np.sqrt(r0**2 - self._R_tip[self._mask_tip]**2)
