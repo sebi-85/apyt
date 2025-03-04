@@ -126,6 +126,8 @@ class CurvatureReconstructor:
 
     The following **general** instance properties can be accessed (*read-only*):
 
+    * :attr:`mask_reconstruction`: The mask specifying valid reconstructed
+      events.
     * :attr:`ω`: The aperture angle.
 
 
@@ -159,6 +161,10 @@ class CurvatureReconstructor:
         self._L0      = L0
         self._ξ       = ξ
         self._ζ       = ζ
+        #
+        #
+        # initialize other instance attributes
+        self._mask_reconstruction = None
         #
         #
         #
@@ -196,6 +202,24 @@ class CurvatureReconstructor:
     ###     General properties                                               ###
     ###                                                                      ###
     ############################################################################
+    @property
+    def mask_reconstruction(self):
+        """
+        Getter for the internal ``_mask_reconstruction`` attribute
+        (*read-only*).
+
+        Events outside the detector triangulation are not reconstructed. The
+        :meth:`reconstruct_positions` method tracks the reconstructed events by
+        setting this attribute with corresponding Boolean values, which can then
+        be used as a mask for filtering other properties.
+
+        Returns
+        -------
+        mask_reconstruction: ndarray, shape (N,)
+            The mask specifying valid reconstructed events.
+        """
+        return self._mask_reconstruction
+    #
     @property
     def ω(self):
         """Getter for the internal ``_ω`` attribute (*read-only*).
@@ -691,6 +715,11 @@ class CurvatureReconstructor:
         The total volume is then calculated as the sum of the volumes of these
         three tetrahedra.
 
+        Note that events outside the detector triangulation are **not**
+        reconstructed. This method tracks the reconstructed events by setting
+        the :attr:`mask_reconstruction` attribute with corresponding Boolean
+        values, which can then be used as a mask for filtering other properties.
+
 
         Parameters
         ----------
@@ -716,10 +745,9 @@ class CurvatureReconstructor:
 
         Returns
         -------
-        ids, xyz: (structured) ndarray, shape (N,)
-            The IDs and three-dimensional :math:`xyz` tip positions of the
-            :math:`N` reconstructed events, given as a structured array with
-            fields ``id``, ``x``, ``y``, and ``z``.
+        xyz: ndarray, shape (N, 3)
+            The three-dimensional :math:`xyz` tip positions of the
+            :math:`N` reconstructed events.
         """
         #
         #
@@ -855,9 +883,9 @@ class CurvatureReconstructor:
         #
         # loop through height profile pairs
         current_index = 0
-        Δz_tot = 0.0
-        ids = np.empty(len(self._xy_data))
-        xyz = np.empty((len(self._xy_data), 3))
+        Δz_tot        = 0.0
+        xyz           = np.empty((len(self._xy_data), 3))
+        self._mask_reconstruction = np.zeros(len(self._xy_data), dtype = bool)
         for p1, p2, tri in zip(p_list[:-1], p_list[1:], tri_list):
             # check order of height profiles
             if p1['sl'].start >= p2['sl'].start:
@@ -955,9 +983,8 @@ class CurvatureReconstructor:
                 r_1 + Δz_rel[:, np.newaxis] * (r_2 - r_1)
             #
             #
-            # set corresponding chemical IDs
-            ids[current_index : current_index + len(r_1)] = \
-                self._ids[sl][T['is_valid']]
+            # set mask specifying valid reconstructed events for current slice
+            self._mask_reconstruction[sl] = T['is_valid']
             #
             #
             # increment current index
@@ -969,20 +996,6 @@ class CurvatureReconstructor:
         # drop remaining array elements (events outside triangulation are not
         # reconstructed)
         xyz = xyz[0:current_index]
-        ids = ids[0:current_index]
-        #
-        #
-        # create structured array
-        id_xyz = np.empty(
-            len(ids),
-            dtype=np.dtype(
-                [('id', 'i8'), ('x', 'f8'), ('y', 'f8'), ('z', 'f8')]
-            )
-        )
-        id_xyz['id'] = ids
-        id_xyz['x'] = xyz[:, 0]
-        id_xyz['y'] = xyz[:, 1]
-        id_xyz['z'] = xyz[:, 2]
         #
         #
         #
@@ -991,9 +1004,9 @@ class CurvatureReconstructor:
         # positions
         print(
             "Reconstruction of {0:d} events took {1:.3f} s.".
-            format(len(ids), timer() - start)
+            format(len(xyz), timer() - start)
         )
-        return id_xyz
+        return xyz
     #
     #
     #
