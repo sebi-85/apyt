@@ -97,7 +97,8 @@ class CurvatureReconstructor:
     L0: float
         The distance between tip and detector (in mm)
     ξ: float
-        The image compression factor.
+        The image compression factor which is defined as :math:`\\xi =
+        \\frac{\\theta_{\\textnormal{crys}}}{\\tan\\theta_{\\textnormal{obs}}}`.
     ζ: float
         The detection efficiency.
     num_points_tip: int
@@ -178,7 +179,7 @@ class CurvatureReconstructor:
         #
         #
         # set aperture angle
-        self._ω = np.arctan(self._R0 / self._L0) * self._ξ
+        self._ω = self._R0 / self._L0 * self._ξ
         print(
             "(Half) aperture angle is {0:.2f}°.\n".format(np.rad2deg(self._ω))
         )
@@ -1351,7 +1352,8 @@ class CurvatureReconstructor:
             The distance between the tip and the detector.
         ξ : float
             The image compression factor which is defined as :math:`\\xi =
-            \\frac{\\theta_{\\textnormal{crys}}}{\\theta_{\\textnormal{obs}}}`.
+            \\frac{\\theta_{\\textnormal{crys}}}
+            {\\tan\\theta_{\\textnormal{obs}}}`.
 
         Returns
         -------
@@ -1380,7 +1382,7 @@ class CurvatureReconstructor:
         #
         # calculate tip polar angles (i.e. trajectory launching angles),
         # shape (n, 3)
-        θ_tip = np.arctan(np.sqrt(x * x + y * y) / L) * ξ
+        θ_tip = np.sqrt(x * x + y * y) / L * ξ
         #
         # calculate azimuthal detector angles, shape (n, 3)
         Φ_det = np.arctan2(y, x)
@@ -1539,7 +1541,7 @@ class CurvatureReconstructor:
         #
         # calculate detection angle and radial distance
         θ_tip = np.arctan(np.sqrt(H_x**2 + H_y**2))
-        r_det = np.tan(θ_tip / self._ξ) * self._L0
+        r_det = θ_tip * self._L0 / self._ξ
         #
         # calculate detector polar angle
         Φ_det = np.arctan2(H_y, H_x)
@@ -2094,8 +2096,8 @@ class CurvatureReconstructor:
         # calculate geometric center of each simplex
         C = np.mean(tri.points[tri.simplices], axis = 1)
         #
-        # calculate corresponding detection angle of each simplex
-        θ_det = np.arctan(np.linalg.norm(C, axis = 1) / self._L0) * self._ξ
+        # calculate corresponding tip launching angle of each simplex
+        θ_tip = np.linalg.norm(C, axis = 1) / self._L0 * self._ξ
         #
         #
         # calculate solid angles
@@ -2119,6 +2121,6 @@ class CurvatureReconstructor:
             'tri'     : tri,
             's'       : simplex_indices,
             'is_valid': is_valid,
-            'θ'       : θ_det,
+            'θ'       : θ_tip,
             'Ω'       : Ω
         }
