@@ -101,9 +101,12 @@ class CurvatureReconstructor:
         \\frac{\\theta_{\\textnormal{crys}}}{\\tan\\theta_{\\textnormal{obs}}}`.
     ζ: float
         The detection efficiency.
-    num_points_tip: int
-        The number of points used for the construction of the tip grid. Must be
-        an odd number. Defaults to ``101``.
+    copy_volumes: bool
+        Whether to create a copy of the provided volumes *V_at*. The volumes are
+        modified internally to account for the (local) detection efficiency. By
+        default, a copy of the volumes is created, leaving the original volumes
+        unchanged. To apply these changes directly to the provided volumes
+        in-place, set this flag to ``False``.
     local_efficiency_correction: callable
         A user-provided function to locally correct the detection efficiency
         (e.g., accounting for possible blind spots, etc.). This function is
@@ -113,6 +116,9 @@ class CurvatureReconstructor:
         Note that the detected atomic volumes are **multiplied** by the output
         of this function to artificially mimic a homogeneous density
         distribution.
+    num_points_tip: int
+        The number of points used for the construction of the tip grid. Must be
+        an odd number. Defaults to ``101``.
 
 
     The following class methods are provided:
@@ -148,14 +154,16 @@ class CurvatureReconstructor:
     #
     def __init__(
         self, xy_data, ids, V_at, R0, r0, L0, ξ, ζ,
-        num_points_tip = 101, local_efficiency_correction = None
+        copy_volumes = True,
+        local_efficiency_correction = None,
+        num_points_tip = 101
     ):
         #
         #
         # set instance attributes
         self._xy_data = xy_data
         self._ids     = ids
-        self._V_at    = V_at
+        self._V_at    = V_at.copy() if copy_volumes == True else V_at
         self._R0      = R0
         self._r0      = r0
         self._L0      = L0
