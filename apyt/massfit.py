@@ -151,7 +151,7 @@ The following methods are provided:
 #
 #
 #
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 __all__ = [
     'check_compatibility',
     'counts',
@@ -177,6 +177,7 @@ import re
 import warnings
 #
 # import some special functions/modules
+from base64 import b32decode, b32encode
 from packaging.version import Version
 from scipy.signal import find_peaks
 from scipy.special import erf
@@ -261,12 +262,22 @@ def check_compatibility(version):
     #
     # version 0.2.0 breaks backward compatibility due to change in analytic
     # description of background
-    if Version(__version__) >= Version('0.2.0') and \
-       Version('0.2.0') > Version(version):
+    if Version(version) < Version('0.2.0'):
         raise Exception(
             "Version incompatibility in {0:s}: Analytic description of "
             "background has been changed in version 0.2.0 (your version is "
             "{1:s}). You need to re-fit the mass spectrum.".
+            format(__name__, version)
+        )
+    #
+    #
+    # version 0.3.0 breaks backward compatibility due to generalization of peak
+    # shift parameters
+    if Version(version) < Version('0.3.0'):
+        raise Exception(
+            "Version incompatibility in {0:s}: Peak shift has been generalized "
+            "in version 0.3.0 (your version is {1:s}). You need to re-fit the "
+            "mass spectrum.".
             format(__name__, version)
         )
 #
@@ -506,14 +517,14 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
 
     Keyword Arguments
     -----------------
-    oxygen_shift : bool
-        Whether to use an additional shift for the (pure) oxygen peaks. The
-        parameter is implemented as an absolute shift which scales with the
-        square root of the peak position and applies to all peaks matching the
-        regular expression ``^I_O[0-9]*_[0-9]+$``. This shift was first
-        discovered in the vanadium pentoxide measurements of Simone Bauder in
-        2024. Defaults to ``False``, i.e. do not shift oxygen peaks, which
-        resembles a fixed value of ``0.0``.
+    peak_shift : list
+        Whether to apply additional shifts to selected peaks. Each shift
+        parameter represents an absolute shift that scales with the square root
+        of the peak position. It is applied to all peaks that match a
+        corresponding regular expression from the provided list. Each regular
+        expression defines one unique shift parameter. A systematic shift of
+        pure oxygen was first discovered in the vanadium pentoxide measurements
+        of Simone Bauder in 2024.
     scale_width : bool
         Whether to use a varying parameter for the peak width scaling.
         Theoretically, the peak width in the mass-to-charge scale is expected to
@@ -1128,6 +1139,33 @@ def _activation(x):
 #
 #
 #
+def _base32_decode(s):
+    """
+    Simple helper function for base32-decoding a string without padding.
+    """
+    #
+    #
+    # re-add padding (length must be divisible by 8)
+    s += '=' * ((8 - len(s) % 8) % 8)
+    #
+    # return decoded string
+    return b32decode(s.encode('utf8')).decode('utf-8')
+#
+#
+#
+#
+def _base32_encode(s):
+    """
+    Simple helper function for base32-encoding a string without padding.
+    """
+    #
+    #
+    # return encoded string (without padding)
+    return b32encode(s.encode('utf-8')).decode('utf8').rstrip('=')
+#
+#
+#
+#
 def _decay(x):
     """
     Exponential decay
@@ -1181,14 +1219,23 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
         print("Using peak width scaling γ.")
     #
     #
-    # add oxygen peak shift parameter (implemented as an absolute shift which
-    # scales with the square root of the peak position)
-    params.add(
-        'ΔO', value = 0.0, min = -0.1, max = 0.1,
-        vary = kwargs.get('oxygen_shift', False)
-    )
-    if kwargs.get('oxygen_shift', False) == True:
-        print("Using oxygen peak shift ΔO.")
+    # add peak shift parameter(s) (implemented as an absolute shift which scales
+    # with the square root of the peak position); peak groups for shifting are
+    # selected by matching their names against a regular expression which is
+    # base32-encoded in the parameter name; multiple parameters with individual
+    # patterns may be defined here
+    if 'peak_shift' in kwargs:
+        for reg_ex in kwargs.get('peak_shift'):
+            params.add(
+                'Δ_' + _base32_encode(reg_ex),
+                value = 0.0, min = -0.1, max = 0.1,
+            )
+            print(
+                "Using generalized shift parameter \"{0:s}\" for intensity "
+                "parameters matching regular expression 'I_{1:s}'.".format(
+                    'Δ_' + _base32_encode(reg_ex), reg_ex
+                )
+            )
     #
     #
     #
@@ -1611,13 +1658,21 @@ def _peak_generic(function, params, mode, arg_tuple):
         """
         #
         #
-        # shift all matching pure oxygen peaks (scaled with square root of peak
-        # position)
-        if re.fullmatch(r"^I_O[0-9]*_[0-9]+$", peak_name) is not None:
-            return params['ΔO'] * np.sqrt(x0)
+        # get all parameters which are associated with a peak shift, i.e.
+        # starting with "Δ_"
+        shift_params = [p for p in params.keys() if p[0:2] == "Δ_"]
+        #
+        #
+        # loop through all peak shift parameters
+        for p in shift_params:
+            # match peak name against the base32-encoded pattern in the shift
+            # parameter name
+            if re.fullmatch("^I_" + _base32_decode(p[2:]) + "$", peak_name) \
+               is not None:
+                # shift peaks (scaled with square root of peak position)
+                return params[p] * np.sqrt(x0)
         # no shift for all other peaks
-        else:
-            return 0.0
+        return 0.0
     #
     #
     #
