@@ -1219,30 +1219,11 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
         print("Using peak width scaling γ.")
     #
     #
-    # add peak shift parameter(s) (implemented as an absolute shift which scales
-    # with the square root of the peak position); peak groups for shifting are
-    # selected by matching their names against a regular expression which is
-    # base32-encoded in the parameter name; multiple parameters with individual
-    # patterns may be defined here
-    if 'peak_shift' in kwargs:
-        for reg_ex in kwargs.get('peak_shift'):
-            params.add(
-                'Δ_' + _base32_encode(reg_ex),
-                value = 0.0, min = -0.1, max = 0.1,
-            )
-            print(
-                "Using generalized shift parameter \"{0:s}\" for intensity "
-                "parameters matching regular expression 'I_{1:s}'.".format(
-                    'Δ_' + _base32_encode(reg_ex), reg_ex
-                )
-            )
-    #
-    #
-    #
-    #
     # estimate general peaks shape parameters and p(0), i.e. peak shape function
     # value at 0
     params, p_0 = _peak_generic(function, params, 'estimate', (data))
+    #
+    #
     #
     #
     # estimate baseline
@@ -1255,6 +1236,8 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
     #
     # add baseline parameter
     params.add('base', value = base)
+    #
+    #
     #
     #
     # estimate peak intensities
@@ -1290,6 +1273,32 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
         I = props['peak_heights'][0] / p_0 / peak['abundance'] * \
             peak['mass_charge_ratio']
         params.add(_get_intensity_name(peak), value = I, min = 0.0)
+    #
+    #
+    #
+    #
+    # add peak shift parameter(s) (implemented as an absolute shift which scales
+    # with the square root of the peak position); peak groups for shifting are
+    # selected by matching their names against a regular expression which is
+    # base32-encoded in the parameter name; multiple parameters with individual
+    # patterns may be defined here
+    if 'peak_shift' in kwargs:
+        for reg_ex in kwargs.get('peak_shift'):
+            params.add(
+                'Δ_' + _base32_encode(reg_ex),
+                value = 0.0, min = -0.1, max = 0.1,
+            )
+            params_matched = [
+                p for p in params.keys()
+                    if re.fullmatch("^I_" + reg_ex + "$", p) is not None
+            ]
+            print(
+                "Using generalized shift parameter \"{0:s}\" for intensity "
+                "parameters {1:s} matching regular expression '{2:s}'.".format(
+                    'Δ_' + _base32_encode(reg_ex), ', '.join(params_matched),
+                    reg_ex
+                )
+            )
     #
     #
     #
