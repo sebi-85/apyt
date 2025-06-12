@@ -107,6 +107,24 @@ class CurvatureReconstructor:
         default, a copy of the volumes is created, leaving the original volumes
         unchanged. To apply these changes directly to the provided volumes
         in-place, set this flag to ``False``.
+    extrapolation_mode: str
+        The mode used to extrapolate the relative curvature as seen by the
+        detector toward the tip boundary. Supported modes are:
+
+        ``'generic'``
+          Use mean value from interior for extrapolation.
+
+        ``'nearest'``
+          Use |griddata| from the SciPy interpolation module with
+          ``method='nearest'`` (check link for details).
+
+        Defaults to ``'generic'``.
+    extrapolation_range: float
+        The extrapolation range (between 0 and 1), which controls how far the
+        curvature as seen by the detector should be extrapolated toward the tip
+        boundary. Beyond this fractional range, the Gaussian curvature smoothly
+        transitions to :math:`K(r = r_0) = \\frac{1}{r_0^2}`, which resembles
+        the Gaussian curvature at the tip boundary. Defaults to ``0.75``.
     local_efficiency_correction: callable
         A user-provided function to locally correct the detection efficiency
         (e.g., accounting for possible blind spots, etc.). This function is
@@ -119,10 +137,6 @@ class CurvatureReconstructor:
     num_points_tip: int
         The number of points used for the construction of the tip grid. Must be
         an odd number. Defaults to ``101``.
-    ν: float
-        The extrapolation fraction ν, which controls how far the curvature as
-        seen by the detector should be extrapolated to the tip boundary.
-        Defaults to ``0.75``.
 
 
     The following class methods are provided:
@@ -153,15 +167,22 @@ class CurvatureReconstructor:
 
 
     Below is a list of all class objects with their detailed description.
+
+
+    .. |griddata| raw:: html
+
+        <a href="https://docs.scipy.org/doc/scipy/reference/generated/
+        scipy.interpolate.griddata.html" target="_blank">griddata</a>
     """
     #
     #
     def __init__(
         self, xy_data, ids, V_at, R0, r0, L0, ξ, ζ,
         copy_volumes = True,
+        extrapolation_mode = 'generic',
+        extrapolation_range = 0.75,
         local_efficiency_correction = None,
-        num_points_tip = 101,
-        ν = 0.75
+        num_points_tip = 101
     ):
         #
         #
@@ -177,6 +198,7 @@ class CurvatureReconstructor:
         #
         #
         # initialize other instance attributes
+        self._extrapolation_mode  = extrapolation_mode
         self._mask_reconstruction = None
         #
         #
@@ -205,7 +227,7 @@ class CurvatureReconstructor:
         #
         #
         # set up tip grid
-        self._setup_tip(self._r0, num_points_tip, ν)
+        self._setup_tip(self._r0, num_points_tip, extrapolation_range)
     #
     #
     #
@@ -1072,7 +1094,7 @@ class CurvatureReconstructor:
     #
     #
     #
-    def _extrapolate_curvature(self, κ, mode = 'nearest', apply_filter = True):
+    def _extrapolate_curvature(self, κ, apply_filter = True):
         """
         Extrapolate relative Gaussian curvature.
 
@@ -1082,16 +1104,6 @@ class CurvatureReconstructor:
             The Relative Gaussian curvature
             :math:`\\kappa = \\frac{K}{\\Delta z}`. Invalid points are
             represented by ``numpy.nan``.
-        mode: str
-            The mode used to extrapolate the relative curvature. Supported modes
-            are:
-
-            ``'generic'``: Use mean value from interior for extrapolation.
-
-            ``'nearest'``: Use |griddata| from the SciPy interpolation module
-            with ``method='nearest'``.
-
-            Defaults to ``'nearest'``.
         apply_filter: bool
             Whether to apply a Gaussian filter to the extrapolated curvature.
             Defaults to ``True``.
@@ -1112,7 +1124,7 @@ class CurvatureReconstructor:
         #
         #
         # generic extrapolation using fit
-        if mode == 'generic':
+        if self._extrapolation_mode == 'generic':
             # fit 2d surface to relative curvature
             c = self._polyfit2d(
                 self._X_tip[is_valid], self._Y_tip[is_valid], κ[is_valid], 0
@@ -1123,7 +1135,7 @@ class CurvatureReconstructor:
             κ[~is_valid] = polyval2d(
                 self._X_tip[~is_valid], self._Y_tip[~is_valid], c
             )
-        elif mode == 'nearest':
+        elif self._extrapolation_mode == 'nearest':
             κ[~is_valid] = griddata(
                 (self._X_tip[is_valid], self._Y_tip[is_valid]),
                 κ[is_valid],
@@ -1134,7 +1146,9 @@ class CurvatureReconstructor:
         #
         else:
             raise Exception(
-                "Unknown extrapolation mode '{0:s}' specified.".format(mode)
+                "Unknown extrapolation mode '{0:s}' specified.".format(
+                    self._extrapolation_mode
+                )
             )
         #
         #
@@ -1172,11 +1186,6 @@ class CurvatureReconstructor:
         ΔH: ndarray, shape (n, n)
             The extrapolated height profile.
 
-
-        .. |griddata| raw:: html
-
-            <a href="https://docs.scipy.org/doc/scipy/reference/generated/
-            scipy.interpolate.griddata.html" target="_blank">griddata</a>
 
         .. |stencils| raw:: html
 
