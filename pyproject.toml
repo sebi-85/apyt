@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling >= 1.26", "hatch-requirements-txt"]
+build-backend = "hatchling.build"
+
+[project]
+name = "APyT"
+version = "0.1.0"
+authors = [
+  { name="Sebastian M. Eich", email="Sebastian.Eich@imw.uni-stuttgart.de" },
+]
+description = """APyT is a Python package which provides modules for the
+evaluation of atom probe tomography (APT) data."""
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+dynamic = ["dependencies"]
+
+[project.urls]
+homepage = "https://apyt.mp.imw.uni-stuttgart.de/"
+source = "https://git.mp.imw.uni-stuttgart.de/cgit.cgi/apyt.git/"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "doc/",
+  "src/",
+]
+
+[tool.hatch.build.targets.wheel]
+include = [
+  "src/",
+]
+
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["requirements/requirements.txt"]

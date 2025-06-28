@@ -1,0 +1,9 @@
+findiff
+lmfit
+matplotlib
+numba>=0.57
+numpy
+packaging
+periodictable
+psutil
+scipy>=1.11
