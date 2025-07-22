@@ -5,6 +5,20 @@
 #
 #
 #
+# set script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#
+#
+# store current working directory
+PWD=$(pwd)
+#
+#
+#
+#
+# change into root folder
+cd ${SCRIPT_DIR}/../
+#
+#
 # create and activate virtual environment
 if [ ! -d "venv_build" ]; then
     echo -n "Creating virtual environment for package building…"
@@ -27,3 +41,9 @@ python3 -m twine upload --repository testpypi dist/*
 #
 # deactivate virtual environment
 deactivate
+#
+#
+#
+#
+# change back into initial directory
+cd $PWD
