@@ -4,8 +4,8 @@ The APyT file format conversion module
 
 Typically, several data file layouts exist to describe the same set of measured
 data, possibly even decoded as ASCII or raw binary data. This module provides
-ease-to-use :ref:`methods<apyt.conv:List of methods>` to convert one file format
-to another.
+easy-to-use :ref:`methods<apyt.io.conv:List of methods>` to convert one file
+format to another.
 
 Raw file format
 ---------------
@@ -174,7 +174,7 @@ def tapsim_to_raw(tapsim_file, raw_file, id_range_list):
     This function enables the conversion from a |TAPSim| ASCII file to a raw
     file for further processing (e.g. reconstruction). A certain subset of
     columns is imported from the TAPSim file, manipulated accordingly to match
-    the :ref:`raw file format<apyt.conv:Raw file format>`, and eventually
+    the :ref:`raw file format<apyt.io.conv:Raw file format>`, and eventually
     written to a binary file. A constant base voltage is used for all events and
     the time of flight is arranged such that it is constant for one distinct
     species. The epoch is set to a constant time plus 1 event/s, the pulse

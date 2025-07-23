@@ -28,7 +28,7 @@ The data of the :math:`n` measured events are expected to be of type *ndarray*
 with shape *(n, 4)* and data type *float32*, where each event contains the
 measured voltage :math:`U` (in V), :math:`x` and :math:`y` detector hit position
 (in mm), and the time of flight :math:`t` (in ns). (See also raw file
-:ref:`format<apyt.conv:Raw file format>`.)
+:ref:`format<apyt.io.conv:Raw file format>`.)
 
 Physical spectrum parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

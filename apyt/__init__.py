@@ -13,6 +13,7 @@ Sub-packages
    :maxdepth: 1
 
    The APyT analysis sub-package (apyt.analysis)<apyt.analysis>
+   The APyT file input/output sub-package (apyt.io)<apyt.io>
    The APyT reconstruction sub-package \
    (apyt.reconstruction)<apyt.reconstruction>
 
@@ -23,7 +24,6 @@ Package modules
 .. toctree::
    :maxdepth: 1
 
-   The APyT file format conversion module (apyt.conv)<apyt.conv>
    The APyT local composition module (apyt.locomp)<apyt.locomp>
    The APyT mass spectrum fitting module (apyt.masssfit)<apyt.massfit>
    The APyT mass spectrum module (apyt.massspec)<apyt.massspec>
@@ -35,4 +35,4 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['conv', 'locomp', 'massfit', 'massspec', 'sdm']
+__all__ = ['locomp', 'massfit', 'massspec', 'sdm']
