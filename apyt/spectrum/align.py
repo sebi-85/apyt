@@ -1,6 +1,6 @@
 """
-The APyT mass spectrum module
-=============================
+The APyT mass spectrum alignment module
+=======================================
 
 This module enables the automatic evaluation of high-quality mass spectra from
 raw measurement data including optimization routines to obtain peaks with

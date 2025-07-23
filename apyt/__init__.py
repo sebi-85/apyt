@@ -16,6 +16,7 @@ Sub-packages
    The APyT file input/output sub-package (apyt.io)<apyt.io>
    The APyT reconstruction sub-package \
    (apyt.reconstruction)<apyt.reconstruction>
+   The APyT mass spectrum sub-package (apyt.spectrum)<apyt.spectrum>
 
 
 Package modules
@@ -25,8 +26,6 @@ Package modules
    :maxdepth: 1
 
    The APyT local composition module (apyt.locomp)<apyt.locomp>
-   The APyT mass spectrum fitting module (apyt.masssfit)<apyt.massfit>
-   The APyT mass spectrum module (apyt.massspec)<apyt.massspec>
    The APyT SDM module (apyt.sdm)<apyt.sdm>
 
 
@@ -35,4 +34,4 @@ Package modules
 """
 
 __version__ = '0.1.0'
-__all__ = ['locomp', 'massfit', 'massspec', 'sdm']
+__all__ = ['locomp', 'sdm']
