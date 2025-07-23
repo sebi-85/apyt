@@ -6,6 +6,16 @@ This sub-package provides functions for the analysis of raw measurement data,
 calibrated mass spectra, and reconstructed three-dimensional tip coordinates.
 
 
+Sub-packages
+------------
+
+.. toctree::
+   :maxdepth: 1
+
+   The APyT chemistry analysis sub-package \
+   (apyt.analysis.chemistry)<apyt.analysis.chemistry>
+
+
 Package modules
 ---------------
 
