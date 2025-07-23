@@ -14,6 +14,8 @@ Sub-packages
 
    The APyT chemistry analysis sub-package \
    (apyt.analysis.chemistry)<apyt.analysis.chemistry>
+   The APyT crystallography analysis sub-package \
+   (apyt.analysis.crystallography)<apyt.analysis.crystallography>
 
 
 Package modules

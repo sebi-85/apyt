@@ -19,18 +19,9 @@ Sub-packages
    The APyT mass spectrum sub-package (apyt.spectrum)<apyt.spectrum>
 
 
-Package modules
----------------
-
-.. toctree::
-   :maxdepth: 1
-
-   The APyT SDM module (apyt.sdm)<apyt.sdm>
-
-
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 .. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 
 __version__ = '0.1.0'
-__all__ = ['sdm']
+__all__ = []
