@@ -3,10 +3,10 @@ The APyT mass spectrum fitting module
 =====================================
 
 This module enables semi-automatic fitting of high-quality mass spectra which
-have been obtained before from the
-:ref:`APyT mass spectrum module<apyt.massspec:The APyT mass spectrum module>`.
-This module makes intensive use of the isotope database provided by the
-|periodictable| package.
+have been obtained before from the :ref:`APyT mass spectrum alignment module
+<apyt.spectrum.align:The APyT mass spectrum alignment module>`. This module
+makes intensive use of the isotope database provided by the |periodictable|
+package.
 
 
 Howto
@@ -22,9 +22,9 @@ General peak shape parameter description
 ----------------------------------------
 
 The general peak shape :math:`p(x)` consists of an
-:ref:`exponential decay<apyt.massfit:Decay function>` function :math:`d(x)` and
-an :ref:`activation<apyt.massfit:Activation function>` function :math:`a(x)`,
-which describes the onset of the peak:
+:ref:`exponential decay<apyt.spectrum.fit:Decay function>` function :math:`d(x)`
+and an :ref:`activation<apyt.spectrum.fit:Activation function>`
+function :math:`a(x)`, which describes the onset of the peak:
 
 .. math::
     p(x) = a(x) d(x).
@@ -64,7 +64,7 @@ only one intensity parameter per isotope peak group.
 Also, the peak shape may be more complex so that the tailing decay may only be
 described by e.g. a sum of two exponential decay functions, i.e. using two decay
 constants. The general peak shape function to be used can be passed to several
-methods (cf. :ref:`List of methods<apyt.massfit:List of methods>`) and is
+methods (cf. :ref:`List of methods<apyt.spectrum.fit:List of methods>`) and is
 identified through one of the following strings:
 
 * ``error-expDecay``: Error function activation with exponential decay.
@@ -297,10 +297,10 @@ def counts(peaks_list, function, params, data_range, bin_width,
     ----------
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     function : str
         The string identifying the general peak shape function, as described in
-        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
+        :ref:`implementation notes<apyt.spectrum.fit:Implementation notes>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
@@ -325,7 +325,8 @@ def counts(peaks_list, function, params, data_range, bin_width,
     -------
     counts_list : list of dicts
         The list of all element count dictionaries, as described in
-        :ref:`element count dictionary<apyt.massfit:Element count dictionary>`.
+        :ref:`element count dictionary
+        <apyt.spectrum.fit:Element count dictionary>`.
     total_counts : int
         The total number of counts (without background).
     background : int
@@ -510,10 +511,10 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
         The mass spectrum histogram data.
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     function : str
         The string identifying the general peak shape function, as described in
-        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
+        :ref:`implementation notes<apyt.spectrum.fit:Implementation notes>`.
 
     Keyword Arguments
     -----------------
@@ -608,10 +609,10 @@ def map_ids(mc_ratio, r, x, peaks_list, function, params, group_charge = True,
         the histogram bin centers.
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     function : str
         The string identifying the general peak shape function, as described in
-        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
+        :ref:`implementation notes<apyt.spectrum.fit:Implementation notes>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
@@ -754,7 +755,8 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
     ----------
     element_dict : dict
         The dictionary containing the elements and their charge states, as
-        described in :ref:`element dictionary<apyt.massfit:Element dictionary>`.
+        described in
+        :ref:`element dictionary<apyt.spectrum.fit:Element dictionary>`.
 
     Keyword Arguments
     -----------------
@@ -778,7 +780,7 @@ def peaks_list(element_dict, mode = 'mass', mass_decimals = 3, verbose = False):
     -------
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     """
     #
     #
@@ -884,10 +886,10 @@ def spectrum(x, peaks_list, function, params, elements_list = None):
         The position(s) where to evaluate the mass spectrum.
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     function : str
         The string identifying the general peak shape function, as described in
-        :ref:`implementation notes<apyt.massfit:Implementation notes>`.
+        :ref:`implementation notes<apyt.spectrum.fit:Implementation notes>`.
     params : dict
         The dictionary with the fit parameter names as keys, and best-fit values
         as values, as described in the |best_params| |model_result| attribute of
@@ -941,7 +943,7 @@ def split_molecules(ids, xyz, peaks_list,
         The three-dimensional reconstructed positions of the *n* events.
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     group_charge : bool
         Whether to group all charge states of an individual element. Defaults to
         ``True``.
@@ -1548,7 +1550,7 @@ def _group_peaks(peaks_list, group_charge):
     ----------
     peaks_list : list of dicts
         The list of all occurring peaks in the mass spectrum, as described in
-        :ref:`peak dictionary<apyt.massfit:Peak dictionary>`.
+        :ref:`peak dictionary<apyt.spectrum.fit:Peak dictionary>`.
     group_charge : bool
         Whether to group all charge states of an individual element.
 

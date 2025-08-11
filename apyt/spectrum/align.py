@@ -102,10 +102,10 @@ determined in order to obtain sharp peaks, the mass spectrum still needs to be
 aligned properly. In principle, there are two parameters to be determined: The
 scaling factor :math:`\\alpha` of the voltage-to-flight length ratio and the
 time offset :math:`t_0` (see
-:ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`). These
-parameters can be obtained automatically by selecting two peak indices from the
-peak list and their corresponding known target positions, as illustrated in the
-following figure:
+:ref:`spectrum parameters<apyt.spectrum.align:Physical spectrum parameters>`).
+These parameters can be obtained automatically by selecting two peak indices
+from the peak list and their corresponding known target positions, as
+illustrated in the following figure:
 
 .. figure:: img/massspec_peak_align_init.png
     :align: center
@@ -271,11 +271,11 @@ def get_flight_correction(data, spec_par, **kwargs):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
 
     Keyword Arguments
     -----------------
@@ -284,7 +284,7 @@ def get_flight_correction(data, spec_par, **kwargs):
     hist : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
     size : float
         The minimum required size to take a certain detector segment into
         account for correction. The size is given relative to the number of
@@ -499,18 +499,18 @@ def get_mass_spectrum(data, spec_par, **kwargs):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
 
     Keyword Arguments
     -----------------
     hist : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -582,11 +582,11 @@ def get_voltage_correction(data, spec_par, **kwargs):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in:ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
 
     Keyword Arguments
     -----------------
@@ -595,7 +595,7 @@ def get_voltage_correction(data, spec_par, **kwargs):
     hist : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
     r_max : _np_float
         The optional radial range for filtering.
     size : float
@@ -774,11 +774,11 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in:ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     mode : str
         The string indicating which coefficients shall be optimized. Must be
         either ``voltage`` or ``flight``.
@@ -788,7 +788,7 @@ def optimize_correction(data, spec_par, mode, **kwargs):
     hist : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -841,9 +841,9 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
     been determined in order to obtain sharp peaks, the mass spectrum still
     needs to be aligned properly. In principle, there are two parameters to be
     determined: The scaling factor :math:`\\alpha` of the voltage-to-flight
-    length ratio and the time offset :math:`t_0` (see
-    :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`).
-    These parameters can be obtained by solving
+    length ratio and the time offset :math:`t_0` (see :ref:`spectrum parameters
+    <apyt.spectrum.align:Physical spectrum parameters>`. These parameters can be
+    obtained by solving
 
     .. math::
         \\frac m q = \\alpha \\left(\\frac m q\\right)_0 \
@@ -865,12 +865,14 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
         The two final peak target positions (amu/e) **after** alignment.
     voltage_coeffs : ndarray, shape(n,)
         The voltage correction coefficients, as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     L_0 : _np_float
         The nominal flight length.
     alpha : _np_float
         The current constant spectrum scaling factor, as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
         Required for iterative calls of this function if the current value is
         not equal to unity.
     U_guess : float, optional
@@ -933,7 +935,7 @@ def __filter_mass_to_charge_range(data, mc_ratio, min, max):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     mc_ratio : ndarray, shape (n,)
         The calculated mass-to-charge ratio for each event.
     min : float32
@@ -961,7 +963,7 @@ def __filter_radial_range(data, r_sqr):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     r_sqr : _np_float
         The squared maximum radius used for filtering.
 
@@ -985,7 +987,7 @@ def __filter_range(data, col, min, max):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     col : int
         The column of the input data used for filtering.
     min : float32
@@ -1013,7 +1015,7 @@ def __get_mass_to_charge_ratio(data, U, t_0, L_0, alpha):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     U : ndarray, shape (n,)
         The voltage for every event (with possible correction).
     t_0 : float32
@@ -1022,7 +1024,8 @@ def __get_mass_to_charge_ratio(data, U, t_0, L_0, alpha):
         The (nominal) distance between tip and detector.
     alpha : float32
         The scaling factor of the mass-to-charge spectrum, as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
 
     Returns
     -------
@@ -1067,15 +1070,15 @@ def _filter_mass_to_charge_range(data, spec_par, hist_par):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -1127,11 +1130,11 @@ def _get_mass_to_charge_ratio(data, spec_par):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
 
     Returns
     -------
@@ -1220,15 +1223,15 @@ def _optimize_flight_correction(data, spec_par, hist_par):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -1296,15 +1299,15 @@ def _optimize_voltage_correction(data, spec_par, hist_par):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -1389,15 +1392,15 @@ def _peak_width(data, spec_par, hist_par):
     ----------
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     spec_par : tuple
         The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        as described in :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
 
     Returns
     -------
@@ -1440,7 +1443,7 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, alpha, hist_par,
         coefficient).
     data : ndarray, shape (n, 4)
         The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
+        :ref:`event data<apyt.spectrum.align:Event data>`.
     t_0 : float32
         The time-of-flight offset.
     L_0 : float32
@@ -1450,11 +1453,12 @@ def _peak_width_minimizer(x, data, t_0, L_0, coeffs_stripped, alpha, hist_par,
         i.e. excluding the coefficients already given in *x*.
     alpha : float32
         The scaling factor of the mass-to-charge spectrum, as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
+        :ref:`spectrum parameters
+        <apyt.spectrum.align:Physical spectrum parameters>`.
     hist_par : dict
         The (optional) histogram parameters used to create the mass-to-charge
         histogram, as described in
-        :ref:`histogram parameters<apyt.massspec:Histogram parameters>`.
+        :ref:`histogram parameters<apyt.spectrum.align:Histogram parameters>`.
     mode : str
         The string indicating which coefficients shall be optimized. Must be
         either ``voltage`` or ``flight``.
