@@ -2,11 +2,11 @@
 The APyT mass spectrum alignment module
 =======================================
 
-This module enables the automatic evaluation of high-quality mass spectra from
-raw measurement data including optimization routines to obtain peaks with
-maximum possible sharpness. An XML parameter file containing all relevant
-information can be written to the working directory which can then be used for
-subsequent processing (e.g. reconstruction of ATP data) with external tools.
+This module enables the semi-automatic alignment of high-quality mass spectra
+from raw measurement data including optimization routines to obtain peaks with
+maximum possible sharpness. The resulting alignment parameters can then be used
+for subsequent processing (e.g. analytic fitting of the mass spectrum and
+reconstruction of APT data) with other submodules.
 
 
 Howto
@@ -127,57 +127,6 @@ is obtained:
     Final spectrum after automatic alignment.
 
 
-XML parameter file format
--------------------------
-The generated XML parameter file contains all relevant information necessary to
-reconstruct the high-quality mass spectrum with external tools. However, for
-historic reasons, the (internal) correction functions :math:`\\varphi` and
-:math:`\\psi` are used to construct an evenly spaced grid with support points
-for the voltage (1d) and flight length correction (2d), which shall then be
-applied by external tools using interpolation (legacy mode). The correction
-functions in this mode are supposed to be multiplicative factors of the form
-
-.. math::
-    \\frac m q = \\frac{2 U (t - t_0)^2} {L_0^2}
-                  \\hat\\varphi(U) \\hat\\psi(x, y),
-
-where :math:`\\hat\\varphi(U)` and :math:`\\hat\\psi(x, y)` are obtained from the
-(internal) correction functions :math:`\\varphi(U)` and :math:`\\psi(x, y)`,
-respectively. The :math:`n` voltage grid points are written as a comma-separated
-list with
-
-.. math::
-    \\hat\\varphi(U_\\textnormal{min}), \
-    \\hat\\varphi(U_\\textnormal{min} + \\Delta U), \\ldots, \
-    \\hat\\varphi(U_\\textnormal{min} + (n - 1)\\Delta U) = \
-    \\hat\\varphi(U_\\textnormal{max}).
-
-The constant spectrum scaling parameter :math:`\\alpha` is incorporated into the
-voltage correction factor :math:`\\hat\\varphi(U)` by definition.
-
-Similarly, the :math:`m_x \\times m_y` flight length correction points are
-written as a comma-separated list according to
-
-.. math::
-    &\\hat\\psi(x_\\textnormal{min}, y_\\textnormal{min}), \\ldots, \
-    \\hat\\psi(x_\\textnormal{min}, y_\\textnormal{max}), \\\\
-    \\hookrightarrow\\quad & \
-    \\hat\\psi(x_\\textnormal{min} + \\Delta x, y_\\textnormal{min}), \\ldots, \
-    \\hat\\psi(x_\\textnormal{min} + \\Delta x, y_\\textnormal{max})), \\\\
-    \\hookrightarrow\\quad &\\ldots, \\\\
-    \\hookrightarrow\\quad &
-    \\hat\\psi(x_\\textnormal{max}, y_\\textnormal{min}), \\ldots, \
-    \\hat\\psi(x_\\textnormal{max}, y_\\textnormal{max}).
-
-Further details can be obtained by inspecting a self-explanatory XML parameter
-file.
-
-For higher precision and without the need of interpolation, the coefficients of
-the correction functions :math:`\\varphi` and :math:`\\psi` are also written
-directly to the XML parameter file which can then be used by external tools to
-apply a continuous correction (default mode; recommended).
-
-
 List of methods
 ---------------
 
@@ -193,7 +142,6 @@ The following methods are provided:
 * :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
 * :meth:`optimize_correction`: Automatically optimize correction coefficients.
 * :meth:`peak_align`: Automatically align peak positions.
-* :meth:`write_xml`: Write XML file for subsequent usage.
 
 
 .. |polyval| raw:: html
@@ -228,7 +176,6 @@ __all__ = [
     'get_voltage_correction',
     'optimize_correction',
     'peak_align',
-    'write_xml'
 ]
 #
 #
@@ -238,7 +185,6 @@ __all__ = [
 import numba
 import numpy as np
 import warnings
-import xml.etree.ElementTree as ET
 #
 # import some special functions/modules
 from datetime import datetime
@@ -252,7 +198,6 @@ from scipy.optimize import fsolve, minimize
 from scipy.signal import find_peaks, peak_widths
 from sys import stderr
 from timeit import default_timer as timer
-from xml.dom import minidom
 #
 #
 #
@@ -971,217 +916,6 @@ def peak_align(peaks_init, peaks_final, voltage_coeffs, L_0, alpha,
     print("Automatically determined parameters for peak adjustment:\n"
           "α:  {0:10.6f}\nt₀: {1:+10.6f} ns".format(*params))
     return params
-#
-#
-#
-#
-def write_xml(file, data, spec_par, steps, pulse_coupling, detector_voltage):
-    """Write XML file for subsequent usage.
-
-    This function generates an XML parameter file containing all relevant data
-    to obtain a high-quality mass spectrum without further adjustments. This
-    file can then be used with external tools for subsequent processing (e.g.
-    reconstruction of ATP data).
-
-    Parameters
-    ----------
-    file : str
-        The file name used for output.
-    data : ndarray, shape (n, 4)
-        The *n* measured events, as described in
-        :ref:`event data<apyt.massspec:Event data>`.
-    spec_par : tuple
-        The physical parameters used to calculate the mass-to-charge spectrum,
-        as described in
-        :ref:`spectrum parameters<apyt.massspec:Physical spectrum parameters>`.
-    steps : tuple
-        The number of (equidistant) steps used to construct the grid of support
-        points for the voltage and flight length correction.
-    pulse_coupling : _np_float
-        The pulse coupling factor.
-    detector_voltage : _np_float
-        The detector voltage.
-    """
-    #
-    #
-    # unpack parameters for better readability
-    t_0, L_0, (voltage_coeffs, flight_coeffs), alpha = spec_par
-    #
-    #
-    # check for valid parameters
-    if L_0 <= 0.0:
-        raise Exception("Flight length must be positive.")
-    if voltage_coeffs is None or flight_coeffs is None:
-        raise Exception("Correction coefficients have not been set.")
-    if steps[0] < 0 or steps[1] < 0:
-        raise Exception("Number of grid points must not be negative.")
-    print("Writing parameter file \"{0:s}\".".format(file))
-    #
-    #
-    #
-    #
-    # set (positive) minimum and maximum voltage
-    U_min = max(data[:, 0].min(), 1.0)
-    U_max = data[:, 0].max()
-    #
-    # set voltage grid points
-    U = np.linspace(U_min, U_max, steps[0])
-    _debug("Voltage grid points are:\n" + str(U))
-    #
-    # set voltage correction points
-    U_corr = (1.0 + 1.0 / U * polyval(U, voltage_coeffs)) * alpha
-    #
-    #
-    # filter incompatible values (external tools may fail on negative numbers
-    # without prior checks)
-    if len(U_corr) > 0 and U_corr.min() <= 0.0:
-        # find index of *last* negative value
-        last_negative = len(U_corr) - np.argmax(U_corr[::-1] <= 0.0) - 1
-        #
-        U_corr = U_corr[last_negative + 1:]
-        U      = U[last_negative + 1:]
-        U_min  = U[0]
-        U_max  = U[-1]
-        if len(U_corr) != steps[0]:
-            warnings.warn("Number of voltage correction points has been "
-                          "reduced to {0:d} due to compatibility reasons "
-                          "(negative values encountered).".
-                          format(len(U_corr)))
-    _debug("Voltage correction values are:\n" + str(U_corr))
-    #
-    #
-    #
-    #
-    # set detector diameter based on absolute maximum hit position
-    diameter = 2.0 * max(
-        abs(data[:, 1].min()), abs(data[:, 1].max()),
-        abs(data[:, 2].min()), abs(data[:, 2].max()))
-    _debug("Detector diameter is {0:.3f} mm.".format(diameter))
-    #
-    # create meshgrid for evaluation of flight length correction points
-    X, Y = np.meshgrid(
-        np.linspace(-diameter / 2, diameter / 2, steps[1]),
-        np.linspace(-diameter / 2, diameter / 2, steps[1]),
-        indexing = 'ij')
-    _debug("Detector grid points are:\n" +
-           str(np.vstack(list(map(np.ravel, (X, Y)))).T))
-    #
-    # set flight length correction points
-    flight_corr = 1.0 / (
-        (1.0 + (X**2 + Y**2) / L_0**2) * polyval2d(X, Y, flight_coeffs)
-    )
-    # flatten flight length correction points
-    flight_corr = flight_corr.flatten()
-    _debug("Flight length correction values are:\n" + str(flight_corr))
-    #
-    #
-    #
-    #
-    # create xml document root
-    root = ET.Element("TAP-Parameters")
-    #
-    #
-    # set version information
-    file_info = ET.SubElement(root, "file-info")
-    ET.SubElement(file_info, "version"
-    ).text = "1.0"
-    ET.SubElement(file_info, "author",
-    ).text = "Automatically created by the massspec module from the APyT " \
-             "package"
-    ET.SubElement(file_info, "date",
-    ).text = str(datetime.now())
-    ET.SubElement(file_info, "info",
-    ).text = "Information available at: " \
-             "https://apyt.mp.imw.uni-stuttgart.de/apyt.massspec.html"
-    #
-    #
-    # create flight length and time offset elements
-    ET.SubElement(root, "item", {
-        "description": "Flightlength",
-        "unit": "mm"}
-    ).text = "{0:.3f}".format(L_0)
-    ET.SubElement(root, "item", {
-        "description": "Time-of-flight offset",
-        "unit": "ns"}
-    ).text = "{0:.6f}".format(t_0)
-    #
-    #
-    # create pulse coupling and detector voltage elements
-    ET.SubElement(root, "item", {
-        "description": "Pulse coupling",
-        "unit": "1"}
-    ).text = "{0:.3f}".format(pulse_coupling)
-    ET.SubElement(root, "item", {
-        "description": "Detector voltage",
-        "unit": "V"}
-    ).text = "{0:.3f}".format(detector_voltage)
-    #
-    #
-    # create voltage correction element
-    if len(U_corr) > 0:
-        ET.SubElement(root, "voltage-correction", {
-            "delta": "{0:.6f}".format((U_max - U_min) / (len(U_corr) - 1)),
-            "max":   "{0:.6f}".format(U_max),
-            "min":   "{0:.6f}".format(U_min),
-            "size":  "{0:d}".format(len(U_corr))}
-        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), U_corr))
-    #
-    #
-    # create flight length correction element
-    if len(flight_corr) > 0:
-        ET.SubElement(root, "flightlength-correction", {
-            "height":       "{0:.6f}".format(diameter),
-            "height-delta": "{0:.6f}".format(diameter / (steps[1] - 1)),
-            "height-size":  "{0:d}".format(steps[1]),
-            "width":        "{0:.6f}".format(diameter),
-            "width-delta":  "{0:.6f}".format(diameter / (steps[1] - 1)),
-            "width-size":   "{0:d}".format(steps[1])}
-        ).text = ','.join(map(lambda s: "{0:.6f}".format(s), flight_corr))
-    #
-    #
-    # create voltage correction coefficients element
-    ET.SubElement(root, "voltage-coeffs", {
-        "arg-unit": "V",
-        "degree": "{0:d}".format(len(voltage_coeffs) - 1),
-        "dimension": "1",
-        "type": "numpy.polynomial.polynomial.polyval",
-        "val-unit": "V"}
-    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s), voltage_coeffs))
-    #
-    #
-    # create flight length correction coefficients element
-    ET.SubElement(root, "flight-coeffs", {
-        "arg-unit": "mm",
-        "degree": "{0:d}".format(flight_coeffs.shape[0] - 1),
-        "dimension": "2",
-        "type": "numpy.polynomial.polynomial.polyval2d",
-        "val-unit": "1"}
-    ).text = ','.join(map(lambda s: "{0:+.6e}".format(s),
-                                    flight_coeffs.flatten()))
-    #
-    #
-    # create constant spectrum scaling factor element
-    ET.SubElement(root, "alpha", {
-        "type": "scalar",
-        "val-unit": "1"}
-    ).text = "{0:.6f}".format(alpha)
-    #
-    #
-    #
-    #
-    # create xml tree
-    tree = ET.ElementTree(root)
-    #
-    #
-    # indentation for ElementTree requires Python 3.9 or higher; use minidom
-    # for pretty indentation
-    xmlstr = minidom.parseString(ET.tostring(root)). \
-             toprettyxml(encoding = 'ISO-8859-1')
-    #
-    #
-    # write xml file
-    with open(file, 'wb') as f:
-        f.write(xmlstr)
 #
 #
 #
