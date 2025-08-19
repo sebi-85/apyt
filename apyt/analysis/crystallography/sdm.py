@@ -97,7 +97,7 @@ from lmfit import Model, Parameter
 from mpl_toolkits.mplot3d import Axes3D
 from numpy import exp, pi, sqrt
 from scipy.ndimage import gaussian_filter
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 from scipy.spatial.transform import Rotation
 from scipy.optimize import minimize
 #
@@ -174,7 +174,7 @@ def rdf_1d(data, min, max, w, dir_key):
     dir = _dir_dict.get(dir_key)
     #
     # build one-dimensional k-d tree
-    kd_tree = cKDTree(np.reshape(data[:, dir], (-1, 1)))
+    kd_tree = KDTree(np.reshape(data[:, dir], (-1, 1)))
     #
     # get pairs which are within cutoff
     pairs = kd_tree.query_pairs(max, output_type = "ndarray")
@@ -240,7 +240,7 @@ def rdf_lateral(data, min, max, w, dir_key, r_0, δ):
     #
     # build k-d tree for normal direction (normal direction is used for
     # filtering pairs)
-    kd_tree = cKDTree(np.reshape(data[:, dir], (-1, 1)))
+    kd_tree = KDTree(np.reshape(data[:, dir], (-1, 1)))
     #
     # get pairs which are within cutoff in normal direction
     pairs = kd_tree.query_pairs(r_0 + δ / 2, output_type = "ndarray")
@@ -983,7 +983,7 @@ def _sdm(data, max, n, dir_key, r0, δ):
     #
     # build k-d tree for normal direction (normal direction is used for
     # filtering pairs)
-    kd_tree = cKDTree(np.reshape(data[:, dir], (-1, 1)))
+    kd_tree = KDTree(np.reshape(data[:, dir], (-1, 1)))
     #
     # get pairs which are within cutoff in normal direction
     pairs = kd_tree.query_pairs(r0 + δ / 2, output_type = "ndarray")
