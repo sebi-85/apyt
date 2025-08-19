@@ -4,3 +4,4 @@ doc/build/
 dist/
 venv/
 venv_build/
+venv_doc/

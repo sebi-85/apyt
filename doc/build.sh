@@ -20,14 +20,17 @@ cd ${SCRIPT_DIR}/
 #
 #
 # create and activate virtual environment
-if [ ! -d "../venv" ]; then
+if [ ! -d "../venv_doc" ]; then
     echo -n "Creating virtual environment…"
-    python3 -m venv --prompt APyT ../venv
-    source ../venv/bin/activate
-    pip3 install -r ../requirements/requirements.txt > /dev/null
+    python3 -m venv --prompt APyT ../venv_doc
+    source ../venv_doc/bin/activate
+    pip3 install \
+      -r ../requirements/requirements.txt \
+      -r ../requirements/requirements_doc.txt \
+      > /dev/null > /dev/null
     echo " done."
 else
-    source ../venv/bin/activate
+    source ../venv_doc/bin/activate
 fi
 #
 #
