@@ -2,20 +2,13 @@
 The APyT mass spectrum alignment module
 =======================================
 
-This module enables the semi-automatic alignment of high-quality mass spectra
-from raw measurement data including optimization routines to obtain peaks with
-maximum possible sharpness. The resulting alignment parameters can then be used
-for subsequent processing (e.g. analytic fitting of the mass spectrum and
-reconstruction of APT data) with other submodules.
+This module provides methods for the semi-automatic alignment of high-quality
+mass spectra from raw atom probe measurement data. It includes routines for
+correcting instrumental and geometric distortions to optimize peak sharpness in
+the mass-to-charge spectrum.
 
-
-Howto
------
-
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_massspec.py``) which basically serves as a wrapper for
-this module. Detailed usage information can be obtained by invoking this script
-with the ``"--help"`` option.
+The resulting alignment parameters can be used in subsequent processing steps,
+such as analytical peak fitting or 3D reconstruction.
 
 
 General function parameter description
@@ -24,124 +17,124 @@ General function parameter description
 Event data
 ^^^^^^^^^^
 
-The data of the :math:`n` measured events are expected to be of type *ndarray*
-with shape *(n, 4)* and data type *float32*, where each event contains the
-measured voltage :math:`U` (in V), :math:`x` and :math:`y` detector hit position
-(in mm), and the time of flight :math:`t` (in ns). (See also raw file
-:ref:`format<apyt.io.conv:Raw file format>`.)
+Input data is expected as an *ndarray* of shape *(n, 4)* and data type
+*float32*, where each row represents one of the :math:`n` measured events. The
+four columns must contain:
+
+- Measured voltage :math:`U` (in V);
+- Detector hit positions :math:`x`, :math:`y` (in mm);
+- Time-of-flight :math:`t` (in ns).
+
+(Refer to the raw file :ref:`format<apyt.io.conv:Raw file format>` for more
+details.)
+
 
 Physical spectrum parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The spectrum of the mass-to-charge ratio is calculated according to
+The mass-to-charge ratio is computed using the following expression:
 
 .. math::
     \\frac m q = \\alpha \\frac{2 (U + \\varphi(U)) (t - t_0)^2}
                                {(L_0^2 + x^2 + y^2) \\psi(x, y)},
 
-where :math:`\\varphi(U)` accounts for the correction of the measured voltage,
-:math:`t_0` is the time-of-flight offset, :math:`L_0` is the (nominal) distance
-between tip and detector, and :math:`\\psi(x, y)` accounts for the deviation of
-the actual flight length from Pythagoras, depending on the detector hit position
-:math:`(x, y)`. Both :math:`t_0` and :math:`L_0` are specific machine
-parameters.
+where:
 
-Note that the correction in the center of the detector is zero by definition,
-i.e. :math:`\\psi(0, 0) \\equiv 1`. Also, by definition, the fix point of the
-voltage correction, :math:`U_\\textnormal{fix}`, i.e. the voltage at which no
-correction is applied (:math:`\\varphi(U_\\textnormal{fix}) = 0`), is determined
-as demonstrated in the following figure:
+- :math:`\\varphi(U)` — Voltage correction function;
+- :math:`t_0` — Time-of-flight offset;
+- :math:`L_0` — Nominal tip-to-detector distance;
+- :math:`\\psi(x, y)` — Flight length correction based on detector hit position;
+- :math:`\\alpha` — Scaling factor adjusting the voltage-to-distance ratio.
 
-.. figure:: img/massspec_voltage_correction.png
-    :align: center
-    :alt: Voltage correction
-    :width: 500
+The corrections are defined as follows:
 
-    Exemplary voltage correction.
+- :math:`\\varphi(U)` and :math:`\\psi(x, y)` are represented by polynomial
+  functions using |polyval| and |polyval2d| from NumPy.
+- The complete correction and alignment are specified by a tuple of parameters:
+  (:math:`t_0`, :math:`L_0`, (voltage_coeffs, flight_coeffs), :math:`\\alpha`),
+  where:
 
-First, the peak position in the mass-to-charge spectrum is obtained for all
-voltage subranges (data points). The weighted average (with respect to the
-number of events) of all voltage subranges is then set to be the peak target
-position for the voltage correction (black line). The intersection eventually
-determines the fix point of the voltage correction
-(:math:`U_\\textnormal{fix} \\approx 12\\,\\textnormal{kV}` in the figure).
+  - Coefficients are given as an *ndarray* (or `None` to disable correction);
+  - All values must be of type *float32*.
 
-Since the actual values for the voltage correction and flight length :math:`L_0`
-cannot be determined unambiguously, but are rather prescribed by the procedure,
-the ratio of the voltage and flight length is still subjected to a constant
-scaling factor :math:`\\alpha`, which is a free parameter along with :math:`t_0`
-for the final adjustment of the peak positions in the mass spectrum (cf.
-:meth:`peak_align`).
+Note:
 
-:math:`\\varphi(U)` and :math:`\\psi(x, y)` are given by 1d and 2d polynomials
-with coefficients as described in |polyval| and |polyval2d| from the *numpy*
-module, respectively. The spectrum parameters are expected to be a tuple with
-*(t_0, L_0, (voltage_coeffs, flight_coeffs), alpha)*, where the coefficients are
-expected to be an *ndarray*. If ``None`` is provided for the coefficients, no
-respective correction will be applied. Note that all values must be of type
-*float32*.
+- The center of the detector is assumed to have no correction:
+  :math:`\\psi(0, 0) ≡ 1`.
+- The fix point of voltage correction, :math:`U_\\textnormal{fix}`, is defined
+  where :math:`\\varphi(U_\\textnormal{fix}) = 0`, as demonstrated in the
+  following figure:
+
+  .. figure:: img/massspec_voltage_correction.png
+      :align: center
+      :alt: Voltage correction
+      :width: 500
+
+      Example of a voltage correction curve. The fix point is the intersection
+      of the peak-weighted average (black line) with the fit to the peak
+      position data from voltage subranges (orange line). Here:
+      :math:`U_\\textnormal{fix} \\approx 12\,\\text{kV}`.
+
+Because :math:`\\alpha` and :math:`t_0` remain adjustable even after correction,
+they are used in a final alignment step (see :func:`peak_align`).
 
 
 Histogram parameters
 ^^^^^^^^^^^^^^^^^^^^
 
-The mass-to-charge spectrum is calculated by the |numpy.histogram| function. The
-following parameters (given as a dictionary) can be passed through to that
-function:
+The mass spectrum is generated using the |numpy.histogram| function. You may
+pass the following parameters via a dictionary:
 
-- ``range``: The lower and upper bounds for the range of the bins.
-- ``width``: The desired bin width (will be translated into the ``bins``
-  parameter). Defaults to 0.05 amu/e.
+- ``range`` — Lower and upper bounds for histogram binning.
+- ``width`` — Desired bin width (used to construct the bins). Defaults to
+  **0.05 amu/e**.
 
 
 Automatic peak alignment
 ------------------------
 
-After the coefficients for the voltage and flight length correction have been
-determined in order to obtain sharp peaks, the mass spectrum still needs to be
-aligned properly. In principle, there are two parameters to be determined: The
-scaling factor :math:`\\alpha` of the voltage-to-flight length ratio and the
-time offset :math:`t_0` (see
-:ref:`spectrum parameters<apyt.spectrum.align:Physical spectrum parameters>`).
-These parameters can be obtained automatically by selecting two peak indices
-from the peak list and their corresponding known target positions, as
-illustrated in the following figure:
+After voltage and flight path corrections have been applied to optimize peak
+sharpness, the spectrum must still be aligned to known peak positions.
+
+This is achieved by automatically adjusting the two free parameters:
+
+- The scaling factor :math:`\\alpha`;
+- The time offset :math:`t_0`.
+
+Alignment is performed by selecting two prominent peaks and assigning them known
+target positions. These two known points are sufficient to determine the optimal
+values of :math:`\\alpha` and :math:`t_0`.
 
 .. figure:: img/massspec_peak_align_init.png
     :align: center
     :alt: Peak alignment
     :width: 500
 
-    Peak selection for automatic alignment.
+    Peak selection for spectrum alignment.
 
-The optimized values for :math:`\\alpha` and :math:`t_0` will be determined and
-updated accordingly. Usually, a change in the time-of-flight offset requires
-another correction cycle, after which the final spectrum with well-aligned peaks
-is obtained:
+After optimization, the resulting values are applied to finalize the spectrum:
 
 .. figure:: img/massspec_peak_align_final.png
     :align: center
     :alt: Peak alignment
     :width: 500
 
-    Final spectrum after automatic alignment.
+    Final aligned spectrum with corrected peak positions.
 
 
-List of methods
----------------
+List of functions
+-----------------
 
-This module provides some generic functions for the calculation of mass spectra
-from raw measurement data.
+This module provides the following functions for spectrum correction and
+alignment:
 
-The following methods are provided:
-
-* :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`get_flight_correction`: Obtain coefficients for flight length
+* :func:`enable_debug`: Enable or disable debug output.
+* :func:`get_flight_correction`: Obtain coefficients for flight length
   correction.
-* :meth:`get_mass_spectrum`: Calculate mass spectrum.
-* :meth:`get_voltage_correction`: Obtain coefficients for voltage correction.
-* :meth:`optimize_correction`: Automatically optimize correction coefficients.
-* :meth:`peak_align`: Automatically align peak positions.
+* :func:`get_mass_spectrum`: Calculate mass spectrum.
+* :func:`get_voltage_correction`: Obtain coefficients for voltage correction.
+* :func:`optimize_correction`: Automatically optimize correction coefficients.
+* :func:`peak_align`: Automatically align peak positions.
 
 
 .. |polyval| raw:: html
@@ -161,8 +154,7 @@ The following methods are provided:
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #
@@ -226,7 +218,7 @@ _np_float = np.float32
 _is_dbg = False
 """The global flag for debug output.
 
-This flag can be set through the :meth:`enable_debug` function."""
+This flag can be set through the :func:`enable_debug` function."""
 _mc_conversion_factor = _np_float(
     2.0 * constants.value('elementary charge') /
     constants.value('atomic mass constant') * 1.0e-12)

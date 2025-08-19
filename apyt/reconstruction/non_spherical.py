@@ -2,33 +2,28 @@
 The APyT advanced reconstruction module
 =======================================
 
-This module provides methods for the reconstruction of non-spherical tip shapes.
+This module provides methods for the reconstruction of atom probe tomography
+(APT) data using **non-spherical tip geometries**. Unlike classic reconstruction
+models that assume a hemispherical or conical tip shape, the methods here
+account for local variations in tip curvature, enabling more accurate
+reconstructions of complex or irregular specimen shapes.
 
-
-Howto
------
-
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_reconstruction_advanced.py``) which basically serves as
-a wrapper for this module. Detailed usage information can be obtained by
-invoking this script with the ``"--help"`` option.
+These advanced techniques are particularly useful for high-resolution
+applications or when the tip shape deviates significantly from idealized models.
 
 
 List of classes
 ---------------
 
-This module provides some generic classes for the reconstruction of raw
-measurement data without the restriction of a spherical tip shape.
-
-The following classes are provided:
+This module provides the following class for flexible, curvature-based
+reconstruction:
 
 * :class:`CurvatureReconstructor`: Reconstruct tip height profile based on
   Gaussian curvature.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #

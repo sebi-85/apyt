@@ -1,14 +1,23 @@
 """
-The APyT reconstruction sub-package
-===================================
+The APyT reconstruction subpackage
+==================================
 
-This sub-package enables the reconstruction of raw measurement data including
-some automatization and optimization routines to obtain the three-dimensional
-tip coordinates including chemical identification.
+The `apyt.reconstruction` subpackage provides tools for reconstructing
+three-dimensional atom probe tomography (APT) datasets from raw measurement
+data.
+
+It includes routines for both basic and advanced reconstructions, supporting
+semi-automated workflows and optimization techniques to extract spatial tip
+coordinates and chemical identities of atoms.
+
+These tools aim to enhance the accuracy and reproducibility of APT
+reconstructions, addressing different tip geometries and reconstruction models.
 
 
-Package modules
----------------
+Available modules
+-----------------
+
+The following modules are available in this subpackage:
 
 .. toctree::
    :maxdepth: 1
@@ -20,8 +29,6 @@ Package modules
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
-
 __version__ = '0.1.0'
 __all__ = ['basic', 'non_spherical']

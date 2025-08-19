@@ -1,74 +1,63 @@
 """
-The APyT SDM module
-===================
+The APyT spatial distribution map (SDM) module
+==============================================
 
 
 Introduction
 ------------
 
-It is well known that the reconstruction of an atom probe tomography (APT)
-sample introduces certain distortions into the lattice and that the
-reconstructed volume does not correctly match the lattice properties of the real
-physical sample.
+Atom probe tomography (APT) reconstructions are known to introduce geometric
+distortions, particularly affecting the fidelity of the crystal lattice. While
+the resolution along the detection (:math:`z`) axis is typically sufficient to
+resolve individual lattice planes—and to determine the correct
+:math:`z`-scaling—the scaling of the lateral (:math:`x` and :math:`y`)
+directions is less straightforward.
 
-While the :math:`z`-resolution is typically sufficiently high to resolve the
-individual lattice planes and, thus, the required :math:`z`-scaling, the correct
-scaling of the lateral directions is less obvious. It was shown by |Geiser| that
-spatial information in the lateral directions can still be obtained from atom
-probe data using so-called spatial distribution maps (SDMs).
+|Geiser| demonstrated that valuable crystallographic information can still be
+extracted from lateral directions using **spatial distribution maps (SDMs)**.
 
-An SDM is a two-dimensional histogram visualization of all interatomic distance
-vectors :math:`\\Delta \\vec r_{ij} = (\\Delta x_{ij}, \\Delta y_{ij}, \\Delta
-z_{ij})^T`, where the lateral components, i.e. :math:`\\Delta x_{ij}` and
-:math:`\\Delta y_{ij}`, are chosen for the two-dimensional histogram data.
-Depending on the lattice type and orientation, preferred combinations
-:math:`(\\Delta x_{ij}, \\Delta y_{ij})` exist which will be seen as maxima in the
+An SDM is a two-dimensional histogram of interatomic distance vectors
+:math:`\\Delta \\vec{r}_{ij} = (\\Delta x_{ij}, \\Delta y_{ij},
+\\Delta z_{ij})^T`, where the lateral components :math:`\\Delta x_{ij}` and
+:math:`\\Delta y_{ij}` are used as histogram axes. Depending on the crystal
+structure and orientation, certain combinations :math:`(\\Delta x_{ij},
+\\Delta y_{ij})` will occur more frequently, appearing as distinct maxima in the
 histogram.
 
-
-General procedure
+General Procedure
 -----------------
 
-As shown by |Geiser|, the lateral resolution is optimized if the
-:math:`(\\Delta x_{ij}, \\Delta y_{ij})` are chosen for atomic pairs within a
-very narrow :math:`\\Delta z`-separation, which requires an optimal alignment of
-the sample in :math:`z`-direction. The SDMs created this way do show distinct
-maxima, however, their positions are still distorted. Since the real
-crystallographic positions of these maxima are known, a system of linear
-equations can be solved which transforms the distorted SDM into its correct
-shape. The remaining :math:`z`-scaling factor can be determined easily.
+As shown by |Geiser|, the accuracy of lateral spatial resolution improves when
+atomic pairs are selected within a narrow separation along the :math:`z`-axis.
+This requires optimal alignment of the sample such that the :math:`z`-axis
+corresponds closely to a crystallographic direction. When constructed under
+these conditions, SDMs reveal distinct (but distorted) maxima.
+
+Since the ideal crystallographic positions of these maxima are known, a system
+of linear equations can be formulated and solved to transform the distorted SDM
+into its correct geometric representation. This transformation also allows for
+the determination of the remaining :math:`z`-scaling factor.
 
 
-Howto
------
+List of functions
+-----------------
 
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_sdm.py``) which basically serves as a wrapper for this
-module. Detailed usage information can be obtained by invoking this script with
-the ``"--help"`` option.
+This module provides several functions for generating, analyzing, and rectifying
+SDMs from 3D APT data. These include tools for alignment optimization, SDM
+construction, and spatial correction.
 
-
-List of methods
----------------
-
-This module provides some generic functions for the creation of SDMs from
-three-dimensional APT data with the option to rectify the SDMs (and the atomic
-positions).
-
-The following methods are provided:
-
-* :meth:`lattice_vectors`: Get vectors which span the lattice planes.
-* :meth:`optimize_alignment`: Get optimal alignment in normal direction.
-* :meth:`rdf`: Analytic model of (one-dimensional) radial distribution function
+* :func:`lattice_vectors`: Get vectors which span the lattice planes.
+* :func:`optimize_alignment`: Get optimal alignment in normal direction.
+* :func:`rdf`: Analytic model of (one-dimensional) radial distribution function
   in normal direction.
-* :meth:`rdf_1d`: Create histogram of radial distribution function in normal
+* :func:`rdf_1d`: Create histogram of radial distribution function in normal
   direction.
-* :meth:`rdf_lateral`: Create histogram of radial distribution function for
+* :func:`rdf_lateral`: Create histogram of radial distribution function for
   lateral directions.
-* :meth:`rectify_sdm`: Rectify SDMs (and atomic positions).
-* :meth:`rotate`: Rotate positions around two axes for alignment in normal
+* :func:`rectify_sdm`: Rectify SDMs (and atomic positions).
+* :func:`rotate`: Rotate positions around two axes for alignment in normal
   direction.
-* :meth:`sdm`: Create SDMs.
+* :func:`sdm`: Create SDMs.
 
 
 .. |Geiser| raw:: html
@@ -78,8 +67,7 @@ The following methods are provided:
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #
@@ -372,18 +360,18 @@ def optimize_alignment(angles, data, rdf_params, rdf_model_params):
     For optimal evaluation of the spatial distribution maps, the lattice planes
     in normal direction should be aligned in an optimal way. This is
     accomplished with an optimization routine which minimizes the standard
-    deviation of the Gaussian functions as described in :meth:`rdf`, i.e. the
+    deviation of the Gaussian functions as described in :func:`rdf`, i.e. the
     lattice planes are aligned in such a way that the peaks in the radial
     distribution function (RDF) become the sharpest.
 
     First, the RDF will be generated with the parameters specified in
-    `rdf_params` (see also :meth:`rdf_1d`). Then, the RDF will be fitted with
+    `rdf_params` (see also :func:`rdf_1d`). Then, the RDF will be fitted with
     the analytical model using the (initial) parameters specified in
-    `rdf_model_params` (see :meth:`rdf`).
+    `rdf_model_params` (see :func:`rdf`).
 
     A simplex algorithm is then used to find the minimal standard deviation by
     systematically varying the Euler angles around the two lateral axes (see
-    also :meth:`rotate`).
+    also :func:`rotate`).
 
     Parameters
     ----------
@@ -392,10 +380,10 @@ def optimize_alignment(angles, data, rdf_params, rdf_model_params):
     data : ndarray, shape (n, 3)
         The *n* three-dimensional coordinates.
     rdf_params : tuple
-        The parameters to generate the RDF as described in :meth:`rdf_1d`
+        The parameters to generate the RDF as described in :func:`rdf_1d`
         (excluding *data*).
     rdf_model_params : tuple
-        The parameters used for fitting the RDF as described in :meth:`rdf`
+        The parameters used for fitting the RDF as described in :func:`rdf`
         (excluding *r*). *N*, *n*, and *w* will be fixed and must be exact. The
         values for *sigma* and *d* should be approximate and will be used as
         initial values for fitting the RDF.
@@ -435,7 +423,7 @@ def lattice_vectors(data, angles, dir_key):
 
     This method accounts for this specific inclination and returns the vectors
     which span the lattice planes in lateral directions *before* and *after* the
-    angular alignment (see :meth:`optimize_alignment`). These vectors can then
+    angular alignment (see :func:`optimize_alignment`). These vectors can then
     be used to calculate the actual cross-sectional area of the lattice planes
     with the aid of the cross product.
 
@@ -646,18 +634,18 @@ def rectify_sdm(data, sdm_, dir_key, d, δ, plt_title, use_filter):
         The *n* three-dimensional coordinates.
     sdm : tuple
         The SDM histogram data **(H, xedges, yedges)**, as an element of the
-        list returned by :meth:`sdm`.
+        list returned by :func:`sdm`.
     dir_key : str
         The key indicating the normal Cartesian direction. Must be either
         ``"x"``, ``"y"``, or ``"z"``.
     d : float
         The current lattice spacing in normal direction which is required for
         correct scaling. Should be determined first from fitting the radial
-        distribution function in :meth:`rdf`.
+        distribution function in :func:`rdf`.
     δ : list
         The list containing the different widths of the distance window in
         normal direction, each of type `float`. Required for the calculation of
-        the rectified SDM(s) (see :meth:`sdm` for details).
+        the rectified SDM(s) (see :func:`sdm` for details).
     plt_title : str
         The title used in generated plots.
     use_filter : bool
@@ -671,7 +659,7 @@ def rectify_sdm(data, sdm_, dir_key, d, δ, plt_title, use_filter):
         The rectified *n* three-dimensional coordinates.
     [sdm_1, sdm_2, ...] : list
         The list containing the histogram data **(H, xedges, yedges)** of all
-        rectified SDMs (see :meth:`sdm` for details).
+        rectified SDMs (see :func:`sdm` for details).
     """
     #
     #
@@ -899,10 +887,10 @@ def _get_rdf_std_dev(angles, data, rdf_params, rdf_model_params):
     data : ndarray, shape (n, 3)
         The *n* three-dimensional coordinates.
     rdf_params : tuple
-        The parameters to generate the RDF as described in :meth:`rdf_1d`
+        The parameters to generate the RDF as described in :func:`rdf_1d`
         (excluding *data*).
     rdf_model_params : tuple
-        The parameters used for fitting the RDF as described in :meth:`rdf`
+        The parameters used for fitting the RDF as described in :func:`rdf`
         (excluding *r*). *N*, *n*, and *w* will be fixed and must be exact. The
         values for *sigma* and *d* should be approximate and will be used as
         initial values for fitting the RDF.
@@ -1036,7 +1024,7 @@ def _get_gaussian_center(sdm, x0, y0, r, dir_key, plt_title):
     ----------
     sdm : tuple
         The SDM histogram data **(H, xedges, yedges)**, as an element of the
-        list returned by :meth:`sdm`.
+        list returned by :func:`sdm`.
     x0 : float
         The approximate position of the maximum along the first dimension.
     y0 : float
@@ -1148,7 +1136,7 @@ def _get_local_hist_data(sdm, x0, y0, r):
     ----------
     sdm : tuple
         The SDM histogram data **(H, xedges, yedges)**, as an element of the
-        list returned by :meth:`sdm`.
+        list returned by :func:`sdm`.
     x0 : float
         The center along the first dimension.
     y0 : float

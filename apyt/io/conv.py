@@ -2,16 +2,24 @@
 The APyT file format conversion module
 ======================================
 
-Typically, several data file layouts exist to describe the same set of measured
-data, possibly even decoded as ASCII or raw binary data. This module provides
-easy-to-use :ref:`methods<apyt.io.conv:List of methods>` to convert one file
-format to another.
+APT data can exist in multiple file formats—often representing the same
+measurement dataset but stored differently (e.g., as raw binary or decoded
+ASCII). This module provides easy-to-use
+:ref:`functions<apyt.io.conv:List of functions>` to convert between various file
+formats commonly encountered in atom probe tomography (APT) workflows.
+
+It enables standardized preprocessing and ensures compatibility across software
+tools within the APyT ecosystem.
+
 
 Raw file format
 ---------------
-The atom probe tomography (APT) group at University of Stuttgart use a binary
-file to record APT measurements, which contains the following information for
-each evaporation event (with **Little Endian** byte ordering):
+
+The APT group at the University of Stuttgart uses a binary file format to record
+APT measurements. Each file entry corresponds to a single evaporation event and
+follows **Little Endian** byte ordering.
+
+The binary format includes the following fields:
 
 ============  =========  =================================
 Field         Data type  Description
@@ -26,26 +34,16 @@ epoch         int32      epoch of evaporation event
 pulse_num     uint32     pulse number of evaporation event
 ============  =========  =================================
 
-Howto
------
 
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_conv.py``) which basically serves as a wrapper for this
-module. Detailed usage information can be obtained by invoking this script with
-the ``"--help"`` option.
+List of functions
+-----------------
 
-List of methods
----------------
+The following functions are available for format conversion:
 
-This module provides some generic functions for the conversion from and to
-various file formats encountered in atom probe tomography.
-
-The following methods are provided:
-
-* :meth:`raw_concat`: Concatenate multiple raw files to a single one.
-* :meth:`raw_to_ascii`: Convert a raw measurement file to a human-readable ASCII
+* :func:`raw_concat`: Concatenate multiple raw files to a single one.
+* :func:`raw_to_ascii`: Convert a raw measurement file to a human-readable ASCII
   file.
-* :meth:`tapsim_to_raw`: Convert |TAPSim| ASCII file to raw file.
+* :func:`tapsim_to_raw`: Convert |TAPSim| ASCII file to raw file.
 
 
 .. |TAPSim| raw:: html
@@ -54,11 +52,9 @@ The following methods are provided:
     target="_blank">TAPSim</a>
 
 
-.. sectionauthor:: Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Jianshu Zheng <zheng.jianshu@mp.imw.uni-stuttgart.de>
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #

@@ -2,64 +2,61 @@
 The APyT local composition module
 =================================
 
-This module enables the evaluation of local compositions within spherical (sub-)
-volumes of any three-dimensional data set which includes additional information
-on the atomic types. In principle, there are two mutually excluding methods how
-to evaluate the local compositions:
+The `apyt.analysis.chemistry.locomp` module provides tools for evaluating local
+chemical compositions within spherical sub-volumes of a three-dimensional atom
+probe data set. This is particularly useful for analyzing spatial variations in
+composition at the nanoscale.
 
-1. Using spheres with a constant number of particles/neighbors.
-2. Using spheres with a constant radius/volume.
+The input data must contain 3D spatial coordinates along with atomic identity
+information (i.e., element type IDs).
 
-Either of these methods is supported and determined through a dictionary, which
-specifies the ``type`` (``"neighbor"`` or ``"volume"``) and the corresponding
-neighbor search parameter ``param`` which must be set to the number of neighbors
-or sphere radius, respectively.
+Local composition can be computed using one of two mutually exclusive methods:
 
-The spherical (sub-) volumes can be placed around every atom or the sphere
-centers can be arranged automatically to represent a three-dimensional regular
-grid, where a minimum separation between the grid points is ensured to exclude
-overlapping of the spheres (see :meth:`get_query_points` for details).
+1. **Fixed neighbor count**: Spheres are constructed to contain a constant
+   number of atoms (neighbors).
+2. **Fixed radius/volume**: Spheres are defined with a constant radius.
 
-Neighbor searches are preformed with the |SciPy_cKDTree| class from the SciPy
-package.
+These methods are controlled via a parameter dictionary with the following keys:
 
+* ``type``: either ``"neighbor"`` or ``"volume"``
+* ``param``: the number of neighbors (if type is ``"neighbor"``), or the radius
+  of the sphere (if type is ``"volume"``)
 
-Howto
------
+Spheres can be centered:
 
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_locomp.py``) which basically serves as a wrapper for
-this module. Detailed usage information can be obtained by invoking this script
-with the ``"--help"`` option.
+* Around every atom in the dataset, or
+* On a regular 3D grid with user-defined minimum spacing to avoid overlapping
+  spheres. (See :func:`get_query_points` for grid generation details.)
 
-
-List of methods
----------------
-
-This module provides some generic functions for the calculation of local
-composition histograms.
-
-The following methods are provided:
-
-* :meth:`calc_stats`: Calculate histogram and statistics.
-* :meth:`check_periodic_box`: Check periodic boundary conditions.
-* :meth:`emulate_efficiency`: Emulate detector efficiency for simulated data.
-* :meth:`get_composition`: Get local compositions for query points.
-* :meth:`get_extended_cell_geometry`: Get simulation cell geometry in \
-                                      *extended xyz* format.
-* :meth:`get_margin_filter`: Automatically filter margin region.
-* :meth:`get_query_points`: Get query points for neighbor search.
+Neighbor searches are performed using the
+|SciPy_KDTree| class from the SciPy library, ensuring efficient spatial queries
+even for large datasets.
 
 
-.. |SciPy_cKDTree| raw:: html
+List of functions
+-----------------
+
+This module provides the following functions for computing and analyzing local
+composition histograms and related statistics:
+
+* :func:`calc_stats`: Calculate histogram and statistics.
+* :func:`check_periodic_box`: Check periodic boundary conditions.
+* :func:`emulate_efficiency`: Emulate detector efficiency for simulated data.
+* :func:`get_composition`: Get local compositions for query points.
+* :func:`get_extended_cell_geometry`: Get simulation cell geometry in
+  *extended xyz* format.
+* :func:`get_margin_filter`: Automatically filter margin region.
+* :func:`get_query_points`: Get query points for neighbor search.
+
+
+.. |SciPy_KDTree| raw:: html
 
     <a href="https://docs.scipy.org/doc/scipy/reference/generated/
-    scipy.spatial.cKDTree.html" target="_blank">cKDTree</a>
+    scipy.spatial.KDTree.html" target="_blank">KDTree</a>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #

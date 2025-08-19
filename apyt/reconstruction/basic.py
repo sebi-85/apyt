@@ -2,39 +2,33 @@
 The APyT basic reconstruction module
 ====================================
 
-This module provides methods for the 'classic' and 'taper' geometry
-reconstruction scheme.
+This module provides methods for performing three-dimensional reconstructions
+of atom probe tomography (APT) data using the *classic* and *taper* geometry
+models.
+
+It is intended for standard reconstruction scenarios where the tip geometry
+can be approximated by well-defined analytical models. Both reconstruction
+approaches rely on geometric assumptions about the specimen shape, field
+evaporation behavior, and projection parameters.
 
 
-Howto
------
+List of functions
+-----------------
 
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_reconstruction.py``) which basically serves as a wrapper
-for this module. Detailed usage information can be obtained by invoking this
-script with the ``"--help"`` option.
+The following functions are provided for tip geometry calculation, evaporation
+field estimation, and APT data reconstruction:
 
-
-List of methods
----------------
-
-This module provides some generic functions for the reconstruction of raw
-measurement data.
-
-The following methods are provided:
-
-* :meth:`align_evaporation_field`: Automatically align evaporation field for
+* :func:`align_evaporation_field`: Automatically align evaporation field for
   taper geometry.
-* :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`get_evaporation_field`: Calculate evaporation field.
-* :meth:`get_geometry_classic`: Calculate tip geometry through 'classic' scheme.
-* :meth:`get_geometry_taper`: Calculate taper geometry.
-* :meth:`reconstruct`: Reconstruct :math:`xyz` tip positions.
+* :func:`enable_debug`: Enable or disable debug output.
+* :func:`get_evaporation_field`: Calculate evaporation field.
+* :func:`get_geometry_classic`: Calculate tip geometry through 'classic' scheme.
+* :func:`get_geometry_taper`: Calculate taper geometry.
+* :func:`reconstruct`: Reconstruct :math:`xyz` tip positions.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #
@@ -80,7 +74,7 @@ from sys import stderr
 _is_dbg = False
 """The global flag for debug output.
 
-This flag can be set through the :meth:`enable_debug` function."""
+This flag can be set through the :func:`enable_debug` function."""
 #
 #
 #

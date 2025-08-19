@@ -1,0 +1,6 @@
+.directory
+**/__pycache__/
+doc/build/
+dist/
+venv/
+venv_build/

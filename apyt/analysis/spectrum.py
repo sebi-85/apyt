@@ -2,20 +2,25 @@
 The APyT spectrum analysis module
 =================================
 
+The `apyt.analysis.spectrum` module provides functionality for the analysis of
+time-of-flight (ToF) and mass spectra acquired from atom probe tomography (APT)
+experiments.
+
+This module is intended to support workflows involving multi-event correlation,
+signal interpretation, and data preprocessing relevant to APT mass spectrometry.
+
 
 List of functions
 -----------------
 
-This module provides the following functions for the analysis of time-of-flight
-or mass spectra, respectively:
+The following functions are available:
 
 * :func:`correlation`: Calculate correlated mass-to-charge ratios for
   multi-events.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #

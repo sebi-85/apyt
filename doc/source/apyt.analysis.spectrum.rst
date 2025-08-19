@@ -1,4 +1,4 @@
-.. automodule:: apyt.analysis
+.. automodule:: apyt.analysis.spectrum
    :members:
    :undoc-members:
    :show-inheritance:

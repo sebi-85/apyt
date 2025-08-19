@@ -2,139 +2,138 @@
 The APyT mass spectrum fitting module
 =====================================
 
-This module enables semi-automatic fitting of high-quality mass spectra which
-have been obtained before from the :ref:`APyT mass spectrum alignment module
-<apyt.spectrum.align:The APyT mass spectrum alignment module>`. This module
-makes intensive use of the isotope database provided by the |periodictable|
-package.
+This module enables semi-automatic fitting of high-quality mass spectra
+previously processed using the :ref:`APyT mass spectrum alignment module
+<apyt.spectrum.align:The APyT mass spectrum alignment module>`. It leverages the
+isotope database from the |periodictable| package to support chemically
+meaningful deconvolution of complex spectra.
+
+The core functionality involves modeling the shape of individual isotope peaks,
+grouping them by chemical species and charge state, and fitting their
+contributions to the measured spectrum using constrained optimization.
 
 
-Howto
------
+General peak shape description
+------------------------------
 
-The usage of this module is demonstrated in an auxiliary script
-(``wrapper_scripts/apyt_massfit.py``) which basically serves as a wrapper for
-this module. Detailed usage information can be obtained by invoking this script
-with the ``"--help"`` option.
-
-
-General peak shape parameter description
-----------------------------------------
-
-The general peak shape :math:`p(x)` consists of an
-:ref:`exponential decay<apyt.spectrum.fit:Decay function>` function :math:`d(x)`
-and an :ref:`activation<apyt.spectrum.fit:Activation function>`
-function :math:`a(x)`, which describes the onset of the peak:
+The general peak shape :math:`p(x)` is modeled as the product of two components:
 
 .. math::
-    p(x) = a(x) d(x).
+    p(x) = a(x) \\, d(x),
+
+where:
+
+- :math:`a(x)` is the **activation function**, describing the rising edge of the
+  peak.
+- :math:`d(x)` is the **decay function**, modeling the asymmetric trailing tail.
+
 
 Decay function
 ^^^^^^^^^^^^^^
 
-The exponential decay is simply modeled through
+The decay component is defined as a simple exponential function:
 
 .. math::
     d(x) = \\exp(-x).
 
+
 Activation function
 ^^^^^^^^^^^^^^^^^^^
 
-The onset of the peak is modeled through a sigmoid-type error function of the
-form
+The onset of the peak is described by an error function:
 
 .. math::
     a(x) = \\frac 1 2 \\left(
         \\operatorname{erf}\\left(\\frac{\\sqrt \\pi}{2} x\\right) + 1
-        \\right),
+        \\right).
 
-where the prefactor :math:`\\frac{\\sqrt \\pi}{2}` ensures that the peak
-position is at zero, i.e. :math:`p'(0) = 0`.
+The prefactor ensures that the peak position is located at :math:`x = 0`, i.e.,
+:math:`p'(0) = 0`.
+
 
 Implementation notes
 ^^^^^^^^^^^^^^^^^^^^
 
-Fitting a complete spectrum requires a sum of peaks as described above, in
-principle one for each element, isotope, and charge state combination, each of
-these with a unique intensity parameter. However, the ratios of the intensity
-parameters are pre-determined from the natural abundances of the elements,
-reducing the number of independent fitting parameters, effectively resulting in
-only one intensity parameter per isotope peak group.
+Fitting a complete mass spectrum requires summing over all relevant peaks, each
+corresponding to a specific combination of element, isotope, and charge state.
+However, natural isotope abundances are used to constrain the relative
+intensities within each isotope group, reducing the number of independent
+fitting parameters to one intensity per group.
 
-Also, the peak shape may be more complex so that the tailing decay may only be
-described by e.g. a sum of two exponential decay functions, i.e. using two decay
-constants. The general peak shape function to be used can be passed to several
-methods (cf. :ref:`List of methods<apyt.spectrum.fit:List of methods>`) and is
-identified through one of the following strings:
+To allow for more flexible peak shapes, the decay component may also be modeled
+as a sum of two exponentials (a "double exponential decay"). The desired peak
+model is selected by passing one of the following identifiers:
 
-* ``error-expDecay``: Error function activation with exponential decay.
-* ``error-doubleExpDecay``: Error function activation with double exponential
-  decay.
+- ``error-expDecay``: Default single exponential decay with error-function
+  onset.
+- ``error-doubleExpDecay``: Double exponential decay with error-function onset.
 
-If a new general peak shape function shall be implemented, the method
-:meth:`_peak_generic` needs to be extended accordingly. (Note that this method
-is for internal use only and is not exposed by this module.)
+If custom peak shapes are needed, the internal function :func:`_peak_generic`
+must be extended (note: this function is not part of the public API).
 
-Data type description
----------------------
 
-This modules relies mainly on dictionaries for the input/output parameter
-interface which are described in the following.
+Data structure overview
+-----------------------
+
+This module primarily uses Python dictionaries for I/O interfaces, detailed
+below.
+
 
 Element dictionary
 ^^^^^^^^^^^^^^^^^^
 
-The element dictionary consists of key--value pairs, where each key represents
-one element (may also be a molecule) and the value is a (nested) tuple
-containing the occurring charge states of the respective element (also as a
-tuple) and the corresponding nominal volume (in nm³) of the element/molecule
-used for reconstruction.
+A dictionary where each key represents an element or molecule, and the value is
+a tuple containing:
+
+- A tuple of occurring charge states.
+- The nominal atomic or molecular volume (in nm³), used for subsequent
+  reconstruction.
+
 
 Peak dictionary
 ^^^^^^^^^^^^^^^
 
-The peak dictionary consists of the following keys:
+A dictionary summarizing the properties of an individual peak (i.e.
+element/charge state/abundance combination for a specific isotope):
 
-* ``element``: The associated element name (may also be a molecule).
-* ``charge``: The associated charge state.
-* ``mass_charge_ratio``: The mass-to-charge ratio for this peak.
-* ``abundance``: The isotope abundance (as a decimal fraction).
-* ``is_max``: Whether this peak has maximum abundance for the associated
-  element.
-* ``volume``: The atomic volume (in nm³) of the associated element required for
-  reconstruction.
+- ``element``: Chemical symbol or molecular identifier.
+- ``charge``: Charge state of the ion.
+- ``mass_charge_ratio``: Mass-to-charge ratio (amu/e).
+- ``abundance``: Isotopic abundance (as a decimal fraction).
+- ``is_max``: Boolean indicating if this is the most abundant isotope.
+- ``volume``: Atomic/molecular volume (nm³).
+
 
 Element count dictionary
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The element count dictionary consists of the following keys:
+A dictionary summarizing fitted results for each element/charge state
+combination, with:
 
-* ``element``: The element name (may also be a molecule).
-* ``charge``: The charge state.
-* ``count``: The number of counts for this element.
-* ``fraction``: The fraction of the counts for this element in relation to the
-  total counts (without background).
+- ``element``: Chemical symbol or molecular identifier.
+- ``charge``: Charge state of the ion.
+- ``count``: Number of determined counts for this element/charge state
+  combination.
+- ``fraction``: Relative fraction of counts (excluding background).
 
 
-List of methods
----------------
+List of functions
+-----------------
 
-This module provides some generic functions for the fitting of mass spectra
-from histogram data.
+This module provides the following functions for spectrum fitting and
+interpretation:
 
-The following methods are provided:
-
-* :meth:`check_compatibility`: Check compatibility of given version against
+* :func:`check_compatibility`: Check compatibility of given version against
   current module version.
-* :meth:`counts`: Get counts for all elements.
-* :meth:`enable_debug`: Enable or disable debug output.
-* :meth:`fit`: Fit mass spectrum.
-* :meth:`map_ids`: Map mass-to-charge ratios to chemical IDs.
-* :meth:`peaks_list`: Get list of all peaks for specified elements and
+* :func:`counts`: Get counts for all elements.
+* :func:`enable_debug`: Enable or disable debug output.
+* :func:`fit`: Fit mass spectrum.
+* :func:`map_ids`: Map mass-to-charge ratios to chemical IDs.
+* :func:`peaks_list`: Get list of all peaks for specified elements and
   charge states.
-* :meth:`spectrum`: Calculate spectrum for specified list of elements.
-* :meth:`split_molecules`: Split molecular events into individual atoms.
-* :meth:`version`: Get version of this module.
+* :func:`spectrum`: Calculate spectrum for specified list of elements.
+* :func:`split_molecules`: Split molecular events into individual atoms.
+* :func:`version`: Get version of this module.
 
 
 .. |periodictable| raw:: html
@@ -144,8 +143,7 @@ The following methods are provided:
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-.. moduleauthor::  Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
-
+.. codeauthor::    Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 #
 #
@@ -197,7 +195,7 @@ _abundance_thres = 1e-9
 _is_dbg = False
 """The global flag for debug output.
 
-This flag can be set through the :meth:`enable_debug` function."""
+This flag can be set through the :func:`enable_debug` function."""
 #
 #
 #
