@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26", "hatch-requirements-txt"]
 build-backend = "hatchling.build"
 
 [project]
-name = "APyT"
+name = "apyt"
 version = "0.1.0"
 authors = [
   { name="Sebastian M. Eich", email="Sebastian.Eich@imw.uni-stuttgart.de" },
@@ -32,12 +32,12 @@ source = "https://git.mp.imw.uni-stuttgart.de/cgit.cgi/apyt.git/"
 [tool.hatch.build.targets.sdist]
 include = [
   "doc/",
-  "src/",
+  "apyt/",
 ]
 
 [tool.hatch.build.targets.wheel]
 include = [
-  "src/",
+  "apyt/",
 ]
 
 [tool.hatch.metadata.hooks.requirements_txt]
