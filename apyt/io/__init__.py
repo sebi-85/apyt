@@ -22,10 +22,14 @@ The following modules are available in this subpackage:
 .. toctree::
    :maxdepth: 1
 
+   The APyT configuration module (apyt.io.config)<apyt.io.config>
    The APyT file format conversion module (apyt.io.conv)<apyt.io.conv>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
-__version__ = '0.1.0'
-__all__ = ['conv']
+__version__ = "0.1.0"
+__all__ = [
+   "config",
+   "conv"
+]
