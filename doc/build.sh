@@ -27,10 +27,16 @@ if [ ! -d "../venv_doc" ]; then
     pip3 install \
       -r ../requirements/requirements.txt \
       -r ../requirements/requirements_doc.txt \
-      > /dev/null > /dev/null
+      > /dev/null
     echo " done."
 else
     source ../venv_doc/bin/activate
+    #
+    # always check for *all* requirements
+    pip3 install \
+      -r ../requirements/requirements.txt \
+      -r ../requirements/requirements_doc.txt \
+      > /dev/null
 fi
 #
 #
