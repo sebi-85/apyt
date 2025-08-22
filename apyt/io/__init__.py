@@ -24,12 +24,10 @@ The following modules are available in this subpackage:
 
    The APyT configuration module (apyt.io.config)<apyt.io.config>
    The APyT file format conversion module (apyt.io.conv)<apyt.io.conv>
+   The APyT SQL module (apyt.io.sql)<apyt.io.sql>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
 """
 __version__ = "0.1.0"
-__all__ = [
-   "config",
-   "conv"
-]
+__all__ = ["config", "conv", "sql"]

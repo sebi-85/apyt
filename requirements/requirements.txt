@@ -1,4 +1,6 @@
 findiff
+fujson
+HTML2Text
 lmfit
 matplotlib
 numba>=0.57
@@ -7,4 +9,7 @@ packaging
 periodictable
 platformdirs
 psutil
+pyperclip
+requests
 scipy>=1.11
+ttkthemes
