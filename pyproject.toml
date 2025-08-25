@@ -31,14 +31,21 @@ source = "https://git.mp.imw.uni-stuttgart.de/cgit.cgi/apyt.git/"
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "doc/",
   "apyt/",
+  "apyt_cli/",
+  "doc/",
+  "scripts"
 ]
 
 [tool.hatch.build.targets.wheel]
 include = [
   "apyt/",
+  "apyt_cli/",
+  "scripts"
 ]
 
 [tool.hatch.metadata.hooks.requirements_txt]
 files = ["requirements/requirements.txt"]
+
+[project.scripts]
+apyt_spectrum_align = "scripts.apyt_spectrum_align:main"
