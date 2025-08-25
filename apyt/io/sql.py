@@ -53,6 +53,10 @@ Implementation notes
 """
 #
 #
+__version__ = "0.1.0"
+__all__ = ["download", "query", "update"]
+#
+#
 # import modules
 import logging
 import numpy as np

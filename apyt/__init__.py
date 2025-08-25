@@ -37,6 +37,7 @@ Available subpackages
    :maxdepth: 1
 
    The APyT analysis subpackage (apyt.analysis)<apyt.analysis>
+   The APyT GUI subpackage (apyt.gui)<apyt.gui>
    The APyT file input/output subpackage (apyt.io)<apyt.io>
    The APyT reconstruction subpackage (apyt.reconstruction)<apyt.reconstruction>
    The APyT mass spectrum subpackage (apyt.spectrum)<apyt.spectrum>
