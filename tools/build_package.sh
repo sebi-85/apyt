@@ -3,6 +3,37 @@
 # Simple script for building and uploading the Python package.
 #
 #
+# usage notes
+USAGE=$(cat << EOF
+Usage: $(basename $0) [--help] [--upload]
+
+Simple script for building and uploading the Python package.
+
+Script options:
+\t--help\t\tPrint this help message.
+\t--upload\tWhether to upload the package to PyPi.
+EOF
+)
+#
+#
+# parse optional command line parameters
+for i in "$@"; do
+    case $i in
+        # set density
+        --upload)
+            upload=DEFINED
+            shift
+            ;;
+        # print help
+        --help)
+            printf "$USAGE\n"
+            exit 0
+            ;;
+        # unknown option
+        *)
+            ;;
+    esac
+done
 #
 #
 # set script directory
@@ -35,8 +66,10 @@ fi
 python3 -m build
 #
 #
-# upload package
-python3 -m twine upload --repository testpypi dist/*
+# upload package if requested
+if [ ! -z ${upload+x} ]; then
+    python3 -m twine upload --repository testpypi dist/*
+fi
 #
 #
 # deactivate virtual environment
