@@ -1,3 +1,11 @@
-# additional requirements for building package documentation
-Sphinx
-sphinx-rtd-theme
+# Additional requirements for building the package documentation
+#
+# Dependency versions are pinned to ensure stable rendering. In particular, the
+# Read the Docs Theme has had issues with list formatting in recent releases,
+# see:
+#   - https://github.com/readthedocs/sphinx_rtd_theme/issues/1115
+#   - https://github.com/readthedocs/sphinx_rtd_theme/issues/1419
+#
+#
+Sphinx==5.1.1
+sphinx-rtd-theme==2.0.0
