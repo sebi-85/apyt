@@ -63,7 +63,7 @@ import numpy as np
 import requests
 #
 # import individual functions
-from apyt.io.config import get_setting
+from apyt.io.config import _RAW_FILE_DTYPE, get_setting
 from html2text import HTML2Text
 from os.path import isfile
 #
@@ -160,19 +160,10 @@ def download(id, use_cache = False, auth = None):
     #
     # download data from database
     if use_cache == False or isfile(cache_file) == False:
+        # download file from database
         logger.info(
             f"Downloading data for custom ID \"{custom_id}\" from database…"
         )
-        # define structured dtype
-        dt = np.dtype([
-            ('U_base', np.float32), ('U_pulse', np.float32),
-            ('U_reflectron', np.float32),
-            ('x_det', np.float32), ('y_det', np.float32), ('tof', np.float32),
-            ('epoch', np.int32),   ('pulse_num', np.uint32)
-        ])
-        #
-        #
-        # download file from database
         r = _request(
             get_setting("database.url") + "/download.php", {'id' : id}, auth
         )
@@ -184,7 +175,7 @@ def download(id, use_cache = False, auth = None):
         #
         #
         # copy buffer content to numpy array
-        data = np.frombuffer(r.content, dtype = dt).copy()
+        data = np.frombuffer(r.content, dtype = _RAW_FILE_DTYPE).copy()
         del r
     #
     #
@@ -251,7 +242,6 @@ def query(id, keys, auth = None):
     Notes
     -----
 
-    - The returned dictionary always includes the key ``'id'``.
     - If the field ``'custom_id'`` is present, it is converted to ``str`` (in
       case of a numeric-only custom ID).
     - Errors are logged with the module-level logger.
@@ -277,7 +267,7 @@ def query(id, keys, auth = None):
     #
     # convert query results to dictionary
     try:
-        record = r.json()[id]
+        record = r.json()[str(id)]
     except ValueError as e:
         logger.error(f"Failed to parse JSON response for record {id}: {e}")
         return r.status_code, None
