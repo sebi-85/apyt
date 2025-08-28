@@ -22,6 +22,7 @@ https://apyt.mp.imw.uni-stuttgart.de
 #
 #
 # import modules
+import apyt.io.localdb as localdb
 import apyt.io.sql as sql
 import apyt.spectrum.align as ms
 import argparse
@@ -60,7 +61,7 @@ parser = argparse.ArgumentParser(
     formatter_class = argparse.RawTextHelpFormatter
 )
 parser.add_argument(
-    "id", type = str,
+    "id", type = int,
     help = """\
 The record ID in the APT SQL measurement database.
 """
@@ -139,6 +140,14 @@ parser.add_argument(
 The mass range to use for voltage and flight length
 correction. Defaults to a narrow range around the
 maximum peak.
+"""
+)
+parser.add_argument(
+    "--no-sql", action = 'store_true',
+    help = """\
+Whether to read records from a local database instead
+of the SQL database. Measurement data will also be read
+from a local file.
 """
 )
 parser.add_argument(
@@ -391,6 +400,227 @@ def check_log_scale(label):
     #
     # update figures
     fig.canvas.draw_idle()
+#
+#
+#
+#
+def db_download(id, use_cache):
+    """
+    Download measurement data from the database.
+
+    This is a simple wrapper around the `apyt.io.localdb.download` and
+    `apyt.io.sql.download` functions, respectively.
+    """
+    #
+    #
+    # load file from local database if requested
+    if args.no_sql:
+        status, data = localdb.download(id)
+        return data
+    #
+    #
+    #
+    #
+    # first try with stored credentials (may be None)
+    logger.info(f"Downloading measurement data for database record {id}…")
+    global auth
+    status, data = sql.download(id, use_cache = use_cache, auth = auth)
+    if status == 200:
+        logger.info(f"Download for record {id} succeeded.")
+        return data
+    #
+    #
+    #
+    #
+    # create dummy root window to load custom Tk theme
+    root = ThemedTk(theme = "breeze")
+    root.withdraw()
+    #
+    #
+    # retry loop with interactive login
+    while True:
+        # get login credentials
+        auth = login()
+        #
+        # download measurement data
+        status, data = sql.download(id, use_cache = use_cache, auth = auth)
+        if status == 200:
+            root.destroy()
+            logger.info(f"Download for record {id} succeeded.")
+            return data
+        #
+        #
+        # ask for retry
+        retry = messagebox.askyesno(
+            "Download failed.", "Do you want to retry?", parent = root
+        )
+        if not retry:
+            root.destroy()
+            logging.error(f"Download for record {id} failed.")
+            raise Exception(f"Download for record {id} failed.")
+#
+#
+#
+#
+def db_query(id, fields):
+    """
+    Query one or more fields from a SQL database record.
+
+    This is a simple wrapper around the `apyt.io.localdb.query` and
+    `apyt.io.sql.query` functions, respectively.
+    """
+    #
+    #
+    # load record from local database if requested
+    if args.no_sql:
+        status, record = localdb.query(id, fields)
+        return record
+    #
+    #
+    #
+    #
+    # first try with stored credentials (may be None)
+    logger.info(f"Querying database record {id} for fields {fields}…")
+    global auth
+    status, record = sql.query(id, fields, auth = auth)
+    if status == 200:
+        logger.info(f"SQL query for record {id} succeeded.")
+        return record
+    #
+    #
+    #
+    #
+    # create dummy root window to load custom Tk theme
+    root = ThemedTk(theme = "breeze")
+    root.withdraw()
+    #
+    #
+    # retry loop with interactive login
+    while True:
+        # get login credentials
+        auth = login()
+        #
+        # query database
+        status, record = sql.query(id, fields, auth = auth)
+        if status == 200:
+            root.destroy()
+            logger.info(f"SQL query for record {id} succeeded.")
+            return record
+        #
+        #
+        # ask for retry
+        retry = messagebox.askyesno(
+            "SQL query failed.", "Do you want to retry?", parent = root
+        )
+        if not retry:
+            root.destroy()
+            logging.error(f"SQL query for record {id} failed.")
+            raise Exception(f"SQL query for record {id} failed.")
+#
+#
+#
+#
+def db_upload(_):
+    """
+    Upload spectrum parameters to the database.
+
+    This is a simple wrapper around the `apyt.io.localdb.update` and
+    `apyt.io.sql.update` functions, respectively.
+    """
+    #
+    #
+    # set data filters
+    data_filter = {}
+    data_filter['detector_radius'] = float(detector_radius)
+    if interval is not None:
+        data_filter['interval'] = interval
+    data_filter['mass_charge_range'] = [
+        float(tb_full_spec_min.text),
+        float(tb_full_spec_max.text)
+    ]
+    if args.voltage_range is not None:
+        data_filter['voltage_range'] = args.voltage_range
+    #
+    #
+    # set mass spectrum parameters (convert np.float32 to built-in data types)
+    spectrum_params = {
+        'alpha':            float(alpha),
+        'L_0':              float(flight_length),
+        't_0':              float(tof),
+        'voltage_coeffs':   coeffs[0].tolist(),
+        'flight_coeffs':    coeffs[1].tolist(),
+        'pulse_coupling':   float(args.pulse_coupling),
+        'detector_voltage': float(args.detector_voltage),
+        'bin_width':        sl_hist_bin_width.val
+    }
+    #
+    #
+    # set parameters dictionary
+    parameters = {
+        'data_filter':     data_filter,
+        'spectrum_params': spectrum_params
+    }
+    #
+    #
+    #
+    #
+    # update record in local database if requested
+    if args.no_sql:
+        localdb.update(args.id, "parameters", parameters)
+        return
+    #
+    #
+    #
+    #
+    # create dummy root window to load custom Tk theme
+    root = ThemedTk(theme = "breeze")
+    root.withdraw()
+    #
+    #
+    # only upload data if requested
+    if not messagebox.askyesno(
+        "SQL upload",
+        "Do you want to upload your spectrum parameters to the SQL database?",
+        parent = root
+    ):
+        root.destroy()
+        return
+    #
+    #
+    # upload always requires credentials
+    global auth
+    if auth == None:
+        auth = login()
+    #
+    #
+    # update SQL record
+    while True:
+        status, response = sql.update(
+            args.id, "parameters",
+            "'" + fujson.dumps(
+                parameters, ensure_ascii = False, float_format = '.9e'
+            ) + "'",
+            auth
+        )
+        #
+        # check for success
+        if status == 200 and response == "OK":
+            root.destroy()
+            logger.info("Upload of parameters to SQL database succeeded.")
+            return
+        #
+        #
+        retry = messagebox.askyesno(
+            "Upload failed", "Do you want to retry?", parent = root
+        )
+        if not retry:
+            root.destroy()
+            logging.error("Upload of parameters to SQL database failed.")
+            return
+        #
+        #
+        # retry with new authorization credentials
+        auth = login()
 #
 #
 #
@@ -764,197 +994,6 @@ def print_update_notification(show):
 #
 #
 #
-def sql_download(id, use_cache):
-    """
-    Download measurement data from the database.
-
-    This is a simple wrapper around the `apyt.io.sql.download` function that
-    allows the use of additional login credentials.
-    """
-    #
-    #
-    # first try with stored credentials (may be None)
-    logger.info(f"Downloading measurement data for database record {id}…")
-    global auth
-    status, data = sql.download(id, use_cache = use_cache, auth = auth)
-    if status == 200:
-        logger.info(f"Download for record {id} succeeded.")
-        return data
-    #
-    #
-    #
-    #
-    # create dummy root window to load custom Tk theme
-    root = ThemedTk(theme = "breeze")
-    root.withdraw()
-    #
-    #
-    # retry loop with interactive login
-    while True:
-        # get login credentials
-        auth = login()
-        #
-        # download measurement data
-        status, data = sql.download(id, use_cache = use_cache, auth = auth)
-        if status == 200:
-            root.destroy()
-            logger.info(f"Download for record {id} succeeded.")
-            return data
-        #
-        #
-        # ask for retry
-        retry = messagebox.askyesno(
-            "Download failed.", "Do you want to retry?"
-        )
-        if not retry:
-            root.destroy()
-            logging.error(f"Download for record {id} failed.")
-            raise Exception(f"Download for record {id} failed.")
-#
-#
-#
-#
-def sql_query(id, fields):
-    """
-    Query one or more fields from a SQL database record.
-
-    This is a simple wrapper around the `apyt.io.sql.query` function that allows
-    the use of additional login credentials.
-    """
-    #
-    #
-    # first try with stored credentials (may be None)
-    logger.info(f"Querying database record {id} for fields {fields}…")
-    global auth
-    status, record = sql.query(id, fields, auth = auth)
-    if status == 200:
-        logger.info(f"SQL query for record {id} succeeded.")
-        return record
-    #
-    #
-    #
-    #
-    # create dummy root window to load custom Tk theme
-    root = ThemedTk(theme = "breeze")
-    root.withdraw()
-    #
-    #
-    # retry loop with interactive login
-    while True:
-        # get login credentials
-        auth = login()
-        #
-        # query database
-        status, record = sql.query(id, fields, auth = auth)
-        if status == 200:
-            root.destroy()
-            logger.info(f"SQL query for record {id} succeeded.")
-            return record
-        #
-        #
-        # ask for retry
-        retry = messagebox.askyesno(
-            "SQL query failed.", "Do you want to retry?"
-        )
-        if not retry:
-            root.destroy()
-            logging.error(f"SQL query for record {id} failed.")
-            raise Exception(f"SQL query for record {id} failed.")
-#
-#
-#
-#
-def sql_upload(_):
-    """
-    Upload spectrum parameters to the SQL database.
-
-    This is a simple wrapper around the `apyt.io.sql.update` function that
-    allows the use of additional login credentials.
-    """
-    #
-    #
-    # set data filters
-    data_filter = {}
-    data_filter['detector_radius'] = detector_radius.astype(float)
-    if interval is not None:
-        data_filter['interval'] = interval
-    data_filter['mass_charge_range'] = [
-        float(tb_full_spec_min.text),
-        float(tb_full_spec_max.text)
-    ]
-    if args.voltage_range is not None:
-        data_filter['voltage_range'] = args.voltage_range
-    #
-    #
-    # set mass spectrum parameters (JSON converter does not support np.float32)
-    spectrum_params = {
-        'alpha':            alpha.astype(float),
-        'L_0':              flight_length.astype(float),
-        't_0':              tof.astype(float),
-        'voltage_coeffs':   coeffs[0].tolist(),
-        'flight_coeffs':    coeffs[1].tolist(),
-        'pulse_coupling':   args.pulse_coupling.astype(float),
-        'detector_voltage': args.detector_voltage.astype(float),
-        'bin_width':        sl_hist_bin_width.val
-    }
-    #
-    #
-    #
-    #
-    # create dummy root window to load custom Tk theme
-    root = ThemedTk(theme = "breeze")
-    root.withdraw()
-    #
-    #
-    # only upload data if requested
-    if not messagebox.askyesno(
-        "SQL upload",
-        "Do you want to upload your spectrum parameters to the SQL database?"
-    ):
-        root.destroy()
-        return
-    #
-    #
-    # upload always requires credentials
-    global auth
-    if auth == None:
-        auth = login()
-    #
-    #
-    # update SQL record
-    while True:
-        status, response = sql.update(
-            args.id, "parameters",
-            "'" + fujson.dumps(
-                {
-                    'data_filter': data_filter,
-                    'spectrum_params': spectrum_params
-                },
-                ensure_ascii = False, float_format = '.9e'
-            ) + "'",
-            auth
-        )
-        #
-        # check for success
-        if status == 200 and response == "OK":
-            root.destroy()
-            logger.info("Upload of parameters to SQL database succeeded.")
-            return
-        #
-        #
-        retry = messagebox.askyesno("Upload failed", "Do you want to retry?")
-        if not retry:
-            root.destroy()
-            logging.error("Upload of parameters to SQL database failed.")
-            return
-        #
-        #
-        # retry with new authorization credentials
-        auth = login()
-#
-#
-#
-#
 def tb_alpha_update(text):
     """
     Update spectrum scaling factor.
@@ -1217,7 +1256,7 @@ auth = None
 #
 #
 # get database record
-record = sql_query(args.id, ("device", "custom_id", "parameters"))
+record = db_query(args.id, ("device", "custom_id", "parameters"))
 device          = record['device']
 custom_id       = record['custom_id']
 data_filter     = record['parameters'].get('data_filter',     {})
@@ -1259,7 +1298,7 @@ logger.info(
 #
 #
 # download data from database
-data = sql_download(args.id, args.cache)
+data = db_download(args.id, args.cache)
 # convert structured to regular array (this interprets epoch and pulse number
 # incorrect as float32, but we drop these anyway)
 data = data.view((data.dtype[0], len(data.dtype.names)))
@@ -1597,7 +1636,7 @@ cid_tb_peak_align = tb_peak_align.on_submit(tb_peak_align_update)
 #
 #
 # callback function for SQL upload
-cid_bt_upload = bt_upload.on_clicked(sql_upload)
+cid_bt_upload = bt_upload.on_clicked(db_upload)
 #
 #
 #
@@ -1609,7 +1648,7 @@ plt.show()
 #
 #
 # upload spectrum parameters to SQL database
-sql_upload(None)
+db_upload(None)
 #
 #
 # auto-export complete spectrum
