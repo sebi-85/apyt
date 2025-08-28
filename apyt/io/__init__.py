@@ -2,16 +2,16 @@
 The APyT file input/output subpackage
 =====================================
 
-The `apyt.io` subpackage provides functions for reading, writing, converting,
-and managing raw measurement data and related files used in atom probe
-tomography (APT).
+The ``apyt.io`` subpackage provides tools for reading, writing, converting, and
+managing raw measurement data and related files used in atom probe tomography
+(APT).
 
-In addition to file format conversion and metadata handling, this subpackage
-also incorporates basic SQL database management for structured data storage,
-indexing, and efficient querying of large datasets.
+Beyond file format conversion and metadata handling, this subpackage also
+supports structured data management via both SQL and local YAML databases,
+enabling efficient storage, indexing, and querying of experimental data.
 
-These tools help facilitate interoperability between file formats and enable
-streamlined data workflows within the APyT framework.
+Together, these tools facilitate interoperability between file formats and
+provide streamlined data workflows within the APyT framework.
 
 
 Available modules
@@ -24,6 +24,7 @@ The following modules are available in this subpackage:
 
    The APyT configuration module (apyt.io.config)<apyt.io.config>
    The APyT file format conversion module (apyt.io.conv)<apyt.io.conv>
+   The APyT local database module (apyt.io.localdb)<apyt.io.localdb>
    The APyT SQL module (apyt.io.sql)<apyt.io.sql>
 
 

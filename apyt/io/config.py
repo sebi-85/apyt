@@ -26,12 +26,10 @@ using the ``platformdirs`` package.
 Default configuration structure
 -------------------------------
 
-The default configuration file (TOML format) has the following structure:
+The default configuration file is written in TOML format and has the following
+structure:
 
 .. code-block:: toml
-
-    [database]
-    url = "https://apt-upload.mp.imw.uni-stuttgart.de"
 
     [devices.metap]
     flight_length   = 144.0
@@ -44,6 +42,38 @@ The default configuration file (TOML format) has the following structure:
     [devices.tap]
     flight_length   = 305.0
     detector_radius = 60.0
+
+    [database]
+    url = "https://apt-upload.mp.imw.uni-stuttgart.de"
+
+    [localdb]
+    file = "~/APyT/db.yaml"
+    data = "~/APyT/data/"
+
+
+Explanation
+^^^^^^^^^^^
+
+- **[devices.<device>]**
+  Defines parameters for a specific atom probe device.
+
+  - Required keys:
+
+    - ``flight_length`` (float) — the flight path length of the device, i.e. the
+      nominal distance between tip and detector.
+    - ``detector_radius`` (float) — the radius of the detector.
+
+  - Multiple devices can be listed, each under its own section.
+
+- **[database]**
+  Contains the URL of the remote SQL database, if remote access is required.
+
+- **[localdb]**
+  Configures usage of a *local* database instead of the SQL backend.
+
+  - ``file`` — path to the local YAML database file
+    (see :ref:`apyt.io.localdb:The APyT local database module` for details).
+  - ``data`` — directory containing the associated measurement files.
 
 
 List of functions
@@ -72,6 +102,7 @@ __all__ = [
 #
 # import modules
 import logging
+import numpy as np
 import tomllib
 #
 # import special functions
@@ -101,9 +132,6 @@ _CONFIG_PATH = _CONFIG_DIR / _CONFIG_FILENAME
 #
 # default configuration content
 _DEFAULT_CONFIG_TEXT = """
-[database]
-url = "https://apt-upload.mp.imw.uni-stuttgart.de"
-
 # flight length and detector radius in mm
 [devices.metap]
 flight_length   = 144.0
@@ -116,7 +144,30 @@ detector_radius =  37.5
 [devices.tap]
 flight_length   = 305.0
 detector_radius =  60.0
+
+[database]
+url = "https://apt-upload.mp.imw.uni-stuttgart.de"
+
+[localdb]
+file = "~/APyT/db.yaml"
+data = "~/APyT/data/"
 """
+#
+#
+#
+#
+################################################################################
+#
+# global configuration variables
+#
+################################################################################
+# raw file data format
+_RAW_FILE_DTYPE = np.dtype([
+    ('U_base', np.float32), ('U_pulse', np.float32),
+    ('U_reflectron', np.float32),
+    ('x_det', np.float32), ('y_det', np.float32), ('tof', np.float32),
+    ('epoch', np.int32),   ('pulse_num', np.uint32)
+])
 #
 #
 #
