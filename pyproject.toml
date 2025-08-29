@@ -11,7 +11,7 @@ authors = [
 description = """APyT is a Python package which provides modules for the
 evaluation of atom probe tomography (APT) data."""
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
