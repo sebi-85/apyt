@@ -17,17 +17,23 @@ EOF
 #
 #
 # parse optional command line parameters
+verbose=""
 for i in "$@"; do
     case $i in
-        # set density
-        --upload)
-            upload=DEFINED
-            shift
-            ;;
         # print help
         --help)
             printf "$USAGE\n"
             exit 0
+            ;;
+        # optional upload
+        --upload)
+            upload=DEFINED
+            shift
+            ;;
+        # verbose upload
+        --verbose)
+            verbose="--verbose"
+            shift
             ;;
         # unknown option
         *)
@@ -68,7 +74,7 @@ python3 -m build
 #
 # upload package if requested
 if [ ! -z ${upload+x} ]; then
-    python3 -m twine upload --repository testpypi dist/*
+    python3 -m twine upload $verbose --repository testpypi dist/*
 fi
 #
 #
