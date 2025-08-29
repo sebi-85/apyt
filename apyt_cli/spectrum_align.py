@@ -564,14 +564,6 @@ def db_upload(_):
     #
     #
     #
-    # update record in local database if requested
-    if args.no_sql:
-        localdb.update(args.id, "parameters", parameters)
-        return
-    #
-    #
-    #
-    #
     # create dummy root window to load custom Tk theme
     root = ThemedTk(theme = "breeze")
     root.withdraw()
@@ -579,12 +571,23 @@ def db_upload(_):
     #
     # only upload data if requested
     if not messagebox.askyesno(
-        "SQL upload",
-        "Do you want to upload your spectrum parameters to the SQL database?",
+        "Database upload",
+        "Do you want to upload your spectrum parameters to the database?",
         parent = root
     ):
         root.destroy()
         return
+    #
+    #
+    #
+    #
+    # update record in local database if requested
+    if args.no_sql:
+        localdb.update(args.id, "parameters", parameters)
+        root.destroy()
+        return
+    #
+    #
     #
     #
     # upload always requires credentials
@@ -1532,7 +1535,7 @@ row += 2
 # create flight length correction sliders
 sl_flight_length_bin_width = Slider(
     ax = plt.subplot(gs[row, col:col+3]), label = "Bin width",
-    valmin = 0.01, valmax = 0.5, valinit = 0.05, valstep = 0.01, 
+    valmin = 0.01, valmax = 0.5, valinit = 0.05, valstep = 0.01,
     valfmt = '%0.2f', dragging = False)
 row += 1
 sl_flight_length_steps = Slider(
