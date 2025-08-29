@@ -4,9 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "apyt"
-version = "0.1.0"
+version = "0.1.0.dev2"
 authors = [
-  { name="Sebastian M. Eich", email="Sebastian.Eich@imw.uni-stuttgart.de" },
+  {
+    name  = "Sebastian M. Eich",
+    email = "Sebastian.Eich@imw.uni-stuttgart.de"
+  }
 ]
 description = """APyT is a Python package which provides modules for the
 evaluation of atom probe tomography (APT) data."""
