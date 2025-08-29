@@ -32,6 +32,9 @@ List of functions
 
 * :func:`download`: Download and (optionally) cache measurement data from the
   database.
+* :func:`dump_record`: Dump a single SQL database record to a JSON file.
+* :func:`load_record`: Load a JSON record from file and upload it to the SQL
+  database.
 * :func:`query`: Query one or more fields from a SQL database record.
 * :func:`update`: Update a specific field of a database record.
 
@@ -54,18 +57,24 @@ Implementation notes
 #
 #
 __version__ = "0.1.0"
-__all__ = ["download", "query", "update"]
+__all__ = ["download", "dump_record", "load_record", "query", "update"]
 #
 #
 # import modules
+import fujson
+import json
 import logging
 import numpy as np
 import requests
+import warnings
 #
 # import individual functions
 from apyt.io.config import _RAW_FILE_DTYPE, get_setting
+from datetime import datetime
 from html2text import HTML2Text
 from os.path import isfile
+from pathlib import Path
+from time import sleep
 #
 #
 #
@@ -202,6 +211,149 @@ def download(id, use_cache = False, auth = None):
 #
 #
 #
+def dump_record(id, file_name = None):
+    """
+    Dump a single SQL database record to a JSON file.
+
+    This function retrieves a measurement record from the SQL database and
+    writes its content to a JSON file. If no output filename is provided, one
+    will be generated automatically based on the record's ``custom_id`` and the
+    current timestamp.
+
+
+    Parameters
+    ----------
+
+    id : int
+        The measurement ID of the record to retrieve.
+    file_name : str or Path, optional
+        The name of the output file. If ``None``, the filename is constructed as
+        ``<custom_id>_<YYYYMMDD_HHMMSS>.rec``.
+
+
+    Returns
+    -------
+
+    str or None
+        The path to the created JSON file, or ``None`` if the query failed.
+
+    Warns
+    -----
+
+    UserWarning
+        If the SQL query does not succeed.
+    """
+    #
+    #
+    # retrieve database record
+    logger.info(f"Retrieving record {id} from SQL database.")
+    status, record = query(id, "*")
+    if status != requests.codes.ok:
+        warnings.warn(
+            f"Failed to retrieve record {id} (status={status}).", UserWarning
+        )
+        return None
+    #
+    #
+    # generate output filename if not provided
+    if file_name is None:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        file_name = f"{record['custom_id']}_{timestamp}.rec"
+    #
+    #
+    # write JSON data
+    file_path = Path(file_name)
+    logger.info(f"Writing record {id} to \"{file_path}\".")
+    with open(file_path, "w", encoding = "utf-8") as f:
+        fujson.dump(
+            record, f, ensure_ascii = False, float_format = ".9e", indent = 4
+        )
+    #
+    #
+    # return path to the created JSON file
+    return str(file_path)
+#
+#
+#
+#
+def load_record(id, file_name, auth):
+    """
+    Load a JSON record from file and upload it to the SQL database.
+
+    This function reads a JSON file containing record data and updates the
+    corresponding entry in the SQL database. Each key--value pair is uploaded
+    individually via the :func:`update` function, except for read-only fields.
+
+    Parameters
+    ----------
+
+    id : int
+        The measurement ID of the record in the SQL database.
+    file_name : str or Path
+        Path to the JSON file containing the record data.
+    auth : tuple of (str, str)
+        Authentication credentials (username, password) for the SQL database.
+
+
+    Returns
+    -------
+
+    bool
+        ``True`` if all fields were uploaded successfully, ``False`` if the
+        input file is missing or if any upload fails.
+
+
+    Warns
+    -----
+
+    UserWarning
+        - If the input file does not exist.
+        - If uploading any field fails.
+    """
+    #
+    #
+    # check file existence
+    file_path = Path(file_name)
+    if not file_path.is_file():
+        warnings.warn(f"File \"{file_name}\" does not exist.", UserWarning)
+        return False
+    #
+    #
+    # read JSON data from file
+    logger.info(f"Reading record from file \"{file_name}\".")
+    with open(file_path, "r", encoding = "utf-8") as f:
+        record = json.load(f)
+    #
+    #
+    # upload parameters to SQL database
+    ro_keys = ('id', 'last_modified', 'file', 'checksum', 'user')
+    for key, value in record.items():
+        # skip read-only and empty fields
+        if key in ro_keys or value == "":
+            continue
+        #
+        #
+        # update field
+        status, response = update(id, key, value, auth = auth)
+        if status != requests.codes.ok or response != "OK":
+            warnings.warn(
+                f"Failed to upload \"{key}\" for record {id} "
+                f"(status={status}, response={response}).",
+                UserWarning
+            )
+            return False
+        #
+        #
+        # throttle queries
+        sleep(0.1)
+    #
+    #
+    # return True on success
+    return True
+#
+#
+#
+#
 def query(id, keys, auth = None):
     """
     Query one or more fields from a SQL database record.
@@ -218,7 +370,8 @@ def query(id, keys, auth = None):
         The measurement ID of the record in the SQL database.
     keys : str or iterable of str
         The field(s) to retrieve from the database entry. If a single string is
-        provided, it is automatically converted to a tuple.
+        provided, it is automatically converted to a tuple. ``"*"`` retrieves
+        all fields from the database entry.
     auth : tuple of (str, str), optional
         A tuple ``(username, password)`` providing authorization credentials. If
         ``None``, access to the database may fail, depending on its
@@ -248,13 +401,13 @@ def query(id, keys, auth = None):
     """
     #
     #
-    # normalize keys
-    if isinstance(keys, str):
-        keys = (keys,)
-    #
-    #
     # build SQL query
-    sql = "SELECT id, " + ", ".join(keys) + " FROM data WHERE id = " + str(id)
+    if keys == "*":
+        sql = f"SELECT * FROM data WHERE id = {id}"
+    elif isinstance(keys, str):
+        sql = f"SELECT id, {keys} FROM data WHERE id = {id}"
+    else:
+        sql = f"SELECT id, {', '.join(keys)} FROM data WHERE id = {id}"
     payload = {"format": "json", "sql": sql}
     #
     #
@@ -338,11 +491,16 @@ def update(id, key, value, auth = None, method = 'GET'):
         return requests.codes.bad_request, None
     #
     #
-    # update database record
+    # floats in "parameters" field shall be in scientific notation
+    if key == "parameters":
+        value = fujson.dumps(value, ensure_ascii = False, float_format = ".9e")
+    #
+    #
+    # update database record (value needs to be quoted)
     logger.info(f"Updating \"{key}\" for record {id} in database… ")
     r = _request(
         get_setting("database.url") + "/update.php",
-        {'id': id, 'key': key, 'value': value},
+        {'id': id, 'key': key, 'value': f"'{value}'"},
         auth, method
     )
     if r.status_code != requests.codes.ok:

@@ -26,7 +26,6 @@ import apyt.io.localdb as localdb
 import apyt.io.sql as sql
 import apyt.spectrum.align as ms
 import argparse
-import fujson
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -598,13 +597,7 @@ def db_upload(_):
     #
     # update SQL record
     while True:
-        status, response = sql.update(
-            args.id, "parameters",
-            "'" + fujson.dumps(
-                parameters, ensure_ascii = False, float_format = '.9e'
-            ) + "'",
-            auth
-        )
+        status, response = sql.update(args.id, "parameters", parameters, auth)
         #
         # check for success
         if status == 200 and response == "OK":

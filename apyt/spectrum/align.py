@@ -73,7 +73,7 @@ Note:
       Example of a voltage correction curve. The fix point is the intersection
       of the peak-weighted average (black line) with the fit to the peak
       position data from voltage subranges (orange line). Here:
-      :math:`U_\\textnormal{fix} \\approx 12\,\\text{kV}`.
+      :math:`U_\\textnormal{fix} \\approx 12\\,\\text{kV}`.
 
 Because :math:`\\alpha` and :math:`t_0` remain adjustable even after correction,
 they are used in a final alignment step (see :func:`peak_align`).
