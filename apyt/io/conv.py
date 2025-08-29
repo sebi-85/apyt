@@ -2,13 +2,12 @@
 The APyT file format conversion module
 ======================================
 
-APT data can exist in multiple file formats—often representing the same
-measurement dataset but stored differently (e.g., as raw binary or decoded
+APT data can exist in multiple file formats---often representing the same
+measurement dataset, but stored differently (e.g., as raw binary or decoded
 ASCII). This module provides easy-to-use
 :ref:`functions<apyt.io.conv:List of functions>` to convert between various file
-formats commonly encountered in atom probe tomography (APT) workflows.
-
-It enables standardized preprocessing and ensures compatibility across software
+formats commonly encountered in atom probe tomography (APT) workflows. It
+enables standardized preprocessing and ensures compatibility across software
 tools within the APyT ecosystem.
 
 
@@ -40,7 +39,7 @@ List of functions
 
 The following functions are available for format conversion:
 
-* :func:`raw_concat`: Concatenate multiple raw files to a single one.
+* :func:`epos_to_raw`: Convert an ePOS file to a RAW file.
 * :func:`raw_to_ascii`: Convert a raw measurement file to a human-readable ASCII
   file.
 * :func:`tapsim_to_raw`: Convert |TAPSim| ASCII file to raw file.
@@ -60,23 +59,28 @@ The following functions are available for format conversion:
 #
 #
 #
-__version__ = '0.1.0'
-__all__ = [
-    "raw_concat",
-    "raw_to_ascii",
-    "tapsim_to_raw"
-]
+__version__ = "0.1.0"
+__all__ = ["epos_to_raw", "raw_to_ascii", "tapsim_to_raw"]
 #
 #
 #
 #
 # import modules
+import logging
 import numpy as np
 import warnings
 #
 # import some special functions
+from apyt.io.config import _EPOS_FILE_DTYPE, _RAW_FILE_DTYPE
 from datetime import datetime
+from pathlib import Path
 from struct import pack, unpack
+#
+#
+#
+#
+# set up logger
+logger = logging.getLogger(__name__)
 #
 #
 #
@@ -97,30 +101,74 @@ _bin_fmt = "<ffffffiI"
 # public functions
 #
 ################################################################################
-def raw_concat(raw_files, out_file):
-    """Concatenate multiple raw files to a single one.
+def epos_to_raw(epos_file, raw_file = None):
+    """
+    Convert an ePOS file to a RAW file.
 
-    This function combines several raw files from a continuous measurement by
-    concatenating.
+    This function reads an input ePOS file, maps overlapping fields between the
+    ePOS and RAW data types, and writes the converted data to a binary RAW file.
+    Fields that exist in both formats are copied directly.
+
 
     Parameters
     ----------
-    raw_files : list
-        The list of the raw file names, each of type `str`.
-    out_file: str
-        The name of the output file.
+
+    epos_file : str or Path
+        Path to the input ePOS file.
+    raw_file : str or Path, optional
+        Path to the output RAW file. If not provided, it will be generated
+        automatically by replacing the extension of `epos_file` with `.raw`.
+
+
+    Returns
+    -------
+
+    Path or None
+        Path to the generated RAW file, or ``None`` if the input file does not
+        exist.
+
+
+    Warns
+    -----
+
+    UserWarning
+        If the input ePOS file does not exist.
     """
     #
     #
-    # open output file for binary write
-    print("Concatenating files {0:s} ...".format(str(raw_files)))
-    with open(out_file, 'wb') as f_out:
-        # loop through list of raw files
-        for i in raw_files:
-            # open input file for binary read
-            with open(i, 'rb') as f_in:
-                # append input file to output file
-                f_out.write(f_in.read())
+    # check existence of input ePOS file
+    epos_file = Path(epos_file)
+    if not epos_file.is_file():
+        warnings.warn(
+            f"Input ePOS file \"{epos_file}\" does not exist.", UserWarning
+        )
+        return None
+    #
+    # load input ePOS file
+    logger.info(f"Reading ePOS file \"{epos_file}\".")
+    data_in = np.fromfile(epos_file, dtype = _EPOS_FILE_DTYPE)
+    #
+    #
+    # copy overlapping fields
+    data_out = np.zeros(len(data_in), dtype = _RAW_FILE_DTYPE)
+    for name in (set(_EPOS_FILE_DTYPE.names) & set(_RAW_FILE_DTYPE.names)):
+        data_out[name] = data_in[name]
+    #
+    #
+    # set raw file name if not provided
+    if raw_file is None:
+        raw_file = epos_file.with_suffix(".raw")
+    else:
+        raw_file = Path(raw_file)
+    #
+    #
+    # write raw output file
+    logger.info(f"Writing raw file \"{raw_file}\".")
+    data_out.tofile(raw_file)
+    #
+    #
+    # return path to output file
+    return raw_file
 #
 #
 #

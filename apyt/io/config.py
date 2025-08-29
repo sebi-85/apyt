@@ -161,12 +161,20 @@ data = "~/APyT/data/"
 # global configuration variables
 #
 ################################################################################
-# raw file data format
+# ePOS file format
+_EPOS_FILE_DTYPE = np.dtype([
+    ('x', '>f4'), ('y', '>f4'), ('z', '>f4'),
+    ('mq', '>f4'), ('tof', '>f4'),
+    ('U_base', '>f4'), ('U_pulse', '>f4'),
+    ('x_det', '>f4'), ('y_det', '>f4'),
+    ('delta_pulse', '>u4'), ('events', '>u4')
+])
+#
+# raw file format
 _RAW_FILE_DTYPE = np.dtype([
-    ('U_base', np.float32), ('U_pulse', np.float32),
-    ('U_reflectron', np.float32),
-    ('x_det', np.float32), ('y_det', np.float32), ('tof', np.float32),
-    ('epoch', np.int32),   ('pulse_num', np.uint32)
+    ('U_base', '<f4'), ('U_pulse', '<f4'), ('U_reflectron', '<f4'),
+    ('x_det', '<f4'), ('y_det', '<f4'), ('tof', '<f4'),
+    ('epoch', '<i4'),   ('pulse_num', '<u4')
 ])
 #
 #
