@@ -41,6 +41,7 @@ from matplotlib.widgets import Button, RadioButtons, Slider, TextBox
 from numpy.polynomial.polynomial import polyval
 from scipy.signal import find_peaks, peak_widths
 from scipy.stats import binned_statistic
+from threading import RLock
 from tkinter import messagebox
 from ttkthemes import ThemedTk
 #
@@ -50,6 +51,10 @@ from ttkthemes import ThemedTk
 # set up logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
+#
+#
+# reentrant lock for 'UPDATING' overlay
+r_mutex = RLock()
 #
 #
 #
@@ -956,36 +961,43 @@ def plot_voltage():
 #
 def print_update_notification(show):
     """
-    Print update notification in the background to inform about running
-    operations.
+    Display or remove an "UPDATING" overlay to indicate that a background
+    operation is in progress.
     """
     #
     #
-    # initialize nesting counter
-    if not hasattr(print_update_notification, 'counter'):
-        print_update_notification.counter = 0
-    #
-    #
-    if show == True:
-        # only print if not already present (might be triggered by several
-        # functions in a nested way)
-        if print_update_notification.counter == 0:
-            print_update_notification.text = fig.text(
-                0.5, 0.5, "UPDATING", horizontalalignment = 'center',
-                verticalalignment = 'center', transform = fig.transFigure,
-                color = 'red', fontsize = 100, alpha = 0.40)
-            fig.canvas.draw()
-            fig.canvas.flush_events()
+    # the following section must be executed exclusively
+    with r_mutex:
+        # initialize nesting counter
+        if not hasattr(print_update_notification, 'counter'):
+            print_update_notification.counter = 0
         #
-        # increment counter
-        print_update_notification.counter += 1
-    elif show == False:
-        # decrement counter
-        print_update_notification.counter -= 1
         #
-        # remove update notification
-        if print_update_notification.counter == 0:
-            print_update_notification.text.remove()
+        if show:
+            # increment counter
+            print_update_notification.counter += 1
+            #
+            # show overlay if it's the first request (might be triggered by
+            # several functions in a nested way)
+            if not hasattr(print_update_notification, 'text'):
+                print_update_notification.text = fig.text(
+                    0.5, 0.5, "UPDATING",
+                    horizontalalignment = 'center',
+                    verticalalignment = 'center',
+                    transform = fig.transFigure,
+                    color = 'red', fontsize = 100, alpha = 0.40
+                )
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+        else:
+            # decrement counter
+            print_update_notification.counter -= 1
+            #
+            # remove update notification
+            if print_update_notification.counter == 0 and \
+            hasattr(print_update_notification, 'text'):
+                print_update_notification.text.remove()
+                delattr(print_update_notification, 'text')
 #
 #
 #
