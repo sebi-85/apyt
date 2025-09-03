@@ -49,3 +49,4 @@ files = ["requirements/requirements.txt"]
 
 [project.scripts]
 apyt_spectrum_align = "scripts.apyt_spectrum_align:main"
+apyt_spectrum_fit = "scripts.apyt_spectrum_fit:main"
