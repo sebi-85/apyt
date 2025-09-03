@@ -65,7 +65,7 @@ Note:
   where :math:`\\varphi(U_\\textnormal{fix}) = 0`, as demonstrated in the
   following figure:
 
-  .. figure:: img/massspec_voltage_correction.png
+  .. figure:: img/apyt.spectrum.align.voltage_correction.png
       :align: center
       :alt: Voltage correction
       :width: 500
@@ -105,7 +105,7 @@ Alignment is performed by selecting two prominent peaks and assigning them known
 target positions. These two known points are sufficient to determine the optimal
 values of :math:`\\alpha` and :math:`t_0`.
 
-.. figure:: img/massspec_peak_align_init.png
+.. figure:: img/apyt.spectrum.align.peak_align_init.png
     :align: center
     :alt: Peak alignment
     :width: 500
@@ -114,7 +114,7 @@ values of :math:`\\alpha` and :math:`t_0`.
 
 After optimization, the resulting values are applied to finalize the spectrum:
 
-.. figure:: img/massspec_peak_align_final.png
+.. figure:: img/apyt.spectrum.align.peak_align_final.png
     :align: center
     :alt: Peak alignment
     :width: 500

@@ -1478,7 +1478,7 @@ sl_voltage_steps = Slider(
     dragging = False)
 row += 1
 sl_voltage_degree = Slider(
-    ax = plt.subplot(gs[row, col]), label = "Poly. deg.",
+    ax = plt.subplot(gs[row, col]), label = "DoF",
     valmin = 0, valmax = 5, valinit = 1, valstep = 1, valfmt = '%d',
     dragging = False)
 sl_voltage_peak_thres = Slider(
@@ -1581,7 +1581,7 @@ tb_tof = TextBox(
     plt.axes([ll + 0.090, bb + hh, 0.050, 0.025]), "$t_0$ (ns)",
     initial = "{0:.3f}".format(tof))
 tb_peak_align = TextBox(
-    plt.axes([ll + ww - 0.090, bb + hh, 0.090, 0.025]), "Peak selection",
+    plt.axes([ll + ww - 0.120, bb + hh, 0.120, 0.025]), "Peak selection",
     initial = "")
 #
 #
