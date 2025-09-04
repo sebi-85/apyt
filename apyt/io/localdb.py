@@ -338,7 +338,9 @@ def update(id, key, value):
     #
     # update complete database file
     with open(db_file, 'w') as f:
-        yaml.safe_dump(records, f, default_flow_style = False)
+        yaml.safe_dump(
+            records, f, default_flow_style = False, allow_unicode = True
+        )
     logger.info(f"Updated key \"{key}\" for record {id}.")
     #
     #

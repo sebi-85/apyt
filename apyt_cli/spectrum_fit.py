@@ -359,9 +359,9 @@ def db_upload():
         'values': fit_result.params.valuesdict(),
         'errors': errors_dict,
         'stats':  {
-            'chi-square': fit_result.chisqr,
-            'redchi':     fit_result.redchi,
-            'R-squared':  fit_result.rsquared
+            'chi-square': float(fit_result.chisqr),
+            'redchi':     float(fit_result.redchi),
+            'R-squared':  float(fit_result.rsquared)
             },
         'peaks': peaks_dict
     }
