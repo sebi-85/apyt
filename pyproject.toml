@@ -48,5 +48,6 @@ include = [
 files = ["requirements/requirements.txt"]
 
 [project.scripts]
+apyt_reconstruction = "scripts.apyt_reconstruction:main"
 apyt_spectrum_align = "scripts.apyt_spectrum_align:main"
-apyt_spectrum_fit = "scripts.apyt_spectrum_fit:main"
+apyt_spectrum_fit   = "scripts.apyt_spectrum_fit:main"
