@@ -46,6 +46,7 @@ The following command line tools are included with **APyT**:
    :maxdepth: 1
 
    The APyT mass spectrum alignment script<apyt_cli.spectrum_align>
+   The APyT mass spectrum fitting script<apyt_cli.spectrum_fit>
 
 Each script is documented individually, including its available options,
 expected input/output formats, and usage examples. For convenience, a
