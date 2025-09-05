@@ -44,6 +44,42 @@ from ttkthemes import ThemedTk
 #
 #
 #
+# default reconstruction parameters
+_REC_DEFAULTS = {
+    'background'       : False,
+    'beta'             : 3.3,
+    'efficiency'       : 0.5,
+    'export_volumes'   : False,
+    'image_compression': 1.43,
+    'module'           : "taper",
+    'split_charge'     : False,
+    'split_molecules'  : [False, False],
+    'classic'          : {
+        'E_0': 30.0
+    },
+    'taper'            : {
+        'alpha': {
+            'value': 10.0,
+            'fixed': False
+        },
+        'beta': {
+            'fixed': True
+        },
+        'field_align': {
+            'E_0': 30.0,
+            'min':  0.0,
+            'max':  1.0
+        },
+        'r_0': {
+            'value': 60.0,
+            'fixed': False
+        }
+    }
+}
+#
+#
+#
+#
 # set up logger
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
@@ -324,6 +360,43 @@ def db_upload():
     This is a simple wrapper around the `apyt.io.localdb.update` and
     `apyt.io.sql.update` functions, respectively.
     """
+    #
+    #
+    # set numeric values and check box states
+    rec_params['background']        = cb_background.get_status()[0]
+    rec_params['beta']              = float(tb_beta.text)
+    rec_params['efficiency']        = float(tb_efficiency.text)
+    rec_params['export_volumes']    = cb_export_volumes.get_status()[0]
+    rec_params['image_compression'] = float(tb_image_compression.text)
+    rec_params['split_charge']      = cb_charge_split.get_status()[0]
+    rec_params['split_molecules']   = cb_molecule_split.get_status()
+    #
+    # only update parameters for currently *active* reconstruction module
+    if rec_params['module'] == "classic":
+        rec_params['classic'] = {
+            'E_0': float(tb_field_target.text)
+        }
+    elif rec_params['module'] == "taper":
+        rec_params['taper'] = {
+            'r_0' : {
+                'value': float(tb_radius.text),
+                'fixed': cb_radius.get_status()[0]
+            },
+            'alpha': {
+                'value': float(tb_alpha.text),
+                'fixed': cb_alpha.get_status()[0]
+            },
+            'beta': {
+                'fixed': cb_beta.get_status()[0]
+            },
+            'field_align': {
+                'E_0': float(tb_field_target.text),
+                'min': float(tb_field_align_min.text),
+                'max': float(tb_field_align_max.text)
+            }
+        }
+    #
+    #
     #
     #
     # create dummy root window to load custom Tk theme
@@ -668,7 +741,7 @@ def plot(z, r, U, E, num_points = 1000):
     ax_field.plot(z[sl], E[sl])
     #
     # add reference lines for automatic field alignment in taper geometry
-    if args.module == 'taper':
+    if rec_params['module'] == 'taper':
         E_mean = np.average(
             E[int(float(tb_field_align_min.text) * len(E)):
             int(float(tb_field_align_max.text) * len(E))]
@@ -726,23 +799,48 @@ def reconstruct(_):
 #
 #
 #
+def set_defaults(config, defaults):
+    """
+    Recursively update config with missing keys from defaults.
+    """
+    #
+    #
+    # loop through all default values
+    for key, default_value in defaults.items():
+        if key not in config:
+            # if the key is missing, take the default
+            config[key] = default_value
+        else:
+            # if both values are dicts, recurse
+            if isinstance(default_value, dict) and \
+               isinstance(config[key], dict):
+                set_defaults(config[key], default_value)
+    #
+    #
+    return config
+#
+#
+#
+#
 ################################################################################
 ###                                                                          ###
 ###     DATA PROCESSING / FILTERING                                          ###
 ###                                                                          ###
 ################################################################################
-# get custom ID and spectrum parameters and authorization details
+# get custom ID and spectrum parameters
 record = db_query(args.id, ("custom_id", "parameters"))
 #
 #
 # do some simple error and compatibility checks
-if not 'spectrum_fit' in record['parameters']:
+if 'spectrum_fit' not in record['parameters']:
     raise Exception(
         "Could not find fitting parameters for mass spectrum in database entry."
     )
 mf.check_compatibility(
     record['parameters']['spectrum_fit']['info']['version']
 )
+if args.module is not None and args.module not in ("classic", "taper"):
+    raise Exception(f"Unknown reconstruction module \"{args.module}\".")
 #
 #
 # parse database entries
@@ -751,67 +849,21 @@ data_filter     = record['parameters']['data_filter']
 spectrum_fit    = record['parameters']['spectrum_fit']
 spectrum_params = record['parameters']['spectrum_params']
 #
+#
 # get reconstruction parameters from database or initialize with default values
 if 'reconstruction' not in record['parameters']:
-    record['parameters']['reconstruction'] = {
-        'efficiency'       : 0.5,
-        'image_compression': 1.43,
-        'beta'             : 3.3,
-        'background'       : False,
-        'split_charge'     : False
-    }
-reconstruction_params = record['parameters']['reconstruction']
-# initialize molecule splitting if not present
-if not 'split_molecules' in reconstruction_params:
-    reconstruction_params['split_molecules'] = [False, False]
-# initialize volume export
-if not 'export_volumes' in reconstruction_params:
-    reconstruction_params['export_volumes'] = [False]
+    record['parameters']['reconstruction'] = _REC_DEFAULTS
+else:
+    set_defaults(record['parameters']['reconstruction'], _REC_DEFAULTS)
+#
+# set shorthand for reconstruction parameters
+rec_params = record['parameters']['reconstruction']
 #
 #
-#
-#
-# check for presence of reconstruction module in database if not provided
-# explicitly
-if args.module is None:
-    if 'module' in reconstruction_params:
-        args.module = reconstruction_params['module']
-    else:
-        args.module = "taper"
-#
-# set reconstruction function
-if args.module not in ["classic", "taper"]:
-    raise Exception(
-        "Unknown reconstruction module \"{0:s}\".".format(args.module)
-    )
-get_geometry = globals()["get_geometry_" + args.module]
-#
-#
-# check for presence of classic module
-if args.module == 'classic' and 'classic' not in reconstruction_params:
-    reconstruction_params['classic'] = {
-        'E_0': 30.0
-    }
-# check for presence of taper module
-elif args.module == 'taper' and 'taper' not in reconstruction_params:
-    reconstruction_params['taper'] = {
-        'r_0': {
-            'value': 60.0,
-            'fixed': False
-        },
-        'alpha': {
-            'value': 10.0,
-            'fixed': False
-        },
-        'beta': {
-            'fixed': True
-        },
-        'field_align': {
-            'E_0': 30.0,
-            'min':  0.0,
-            'max':  1.0
-        }
-    }
+# set reconstruction module if provided explicitly
+if args.module is not None:
+    rec_params['module'] = args.module
+get_geometry = globals()["get_geometry_" + rec_params['module']]
 #
 #
 #
@@ -991,36 +1043,36 @@ h_tb = 0.025
 tb_efficiency = TextBox(
     plt.axes([ll + ww - w_tb, bb + hh + 14 * h_tb, w_tb, h_tb]),
     label = "$\\zeta$", label_pad = 0.05,
-    initial = "{0:.3f}".format(reconstruction_params['efficiency'])
+    initial = "{0:.3f}".format(rec_params['efficiency'])
 )
 # create text box for image compression factor
 tb_image_compression = TextBox(
     plt.axes([ll + ww - w_tb, bb + hh + 13 * h_tb, w_tb, h_tb]),
     label = "$\\xi$", label_pad = 0.05,
-    initial = "{0:.3f}".format(reconstruction_params['image_compression'])
+    initial = "{0:.3f}".format(rec_params['image_compression'])
 )
 # create text box for field factor
 tb_beta = TextBox(
     plt.axes([ll + ww - w_tb, bb + hh + 9.5 * h_tb, w_tb, h_tb]),
     label = "$\\beta$", label_pad = 0.05,
-    initial = "{0:.3f}".format(reconstruction_params['beta'])
+    initial = "{0:.3f}".format(rec_params['beta'])
 )
 #
 #
 # create text boxes and check buttons for taper geometry
-if args.module == 'taper':
+if rec_params['module'] == 'taper':
     tb_radius = TextBox(
         plt.axes([ll + ww - w_tb, bb + hh + 11.5 * h_tb, w_tb, h_tb]),
         label = "$r_0$ (nm)", label_pad = 0.05,
         initial = "{0:.3f}".format(
-            reconstruction_params['taper']['r_0']['value']
+            rec_params['taper']['r_0']['value']
         )
     )
     tb_alpha = TextBox(
         plt.axes([ll + ww - w_tb, bb + hh + 10.5 * h_tb, w_tb, h_tb]),
         label = "$\\alpha$ (°)", label_pad = 0.05,
         initial = "{0:.3f}".format(
-            reconstruction_params['taper']['alpha']['value']
+            rec_params['taper']['alpha']['value']
         )
     )
     #
@@ -1028,47 +1080,47 @@ if args.module == 'taper':
         plt.axes([ll, bb - 0.09, w_tb, h_tb]),
         label = "min", label_pad = 0.05,
         initial = "{0:.2f}".format(
-            reconstruction_params['taper']['field_align']['min']
+            rec_params['taper']['field_align']['min']
         )
     )
     tb_field_align_max = TextBox(
         plt.axes([ll + ww - w_tb, bb - 0.09, w_tb, h_tb]),
         label = "max", label_pad = 0.05,
         initial = "{0:.2f}".format(
-            reconstruction_params['taper']['field_align']['max']
+            rec_params['taper']['field_align']['max']
         )
     )
     #
     cb_radius = CheckButtons(
         plt.axes([ll + ww, bb + hh + 11.5 * h_tb, w_tb, h_tb]),
         labels = ["fixed"],
-        actives = [reconstruction_params['taper']['r_0']['fixed']]
+        actives = [rec_params['taper']['r_0']['fixed']]
     )
     cb_alpha = CheckButtons(
         plt.axes([ll + ww, bb + hh + 10.5 * h_tb, w_tb, h_tb]),
         labels = ["fixed"],
-        actives = [reconstruction_params['taper']['alpha']['fixed']]
+        actives = [rec_params['taper']['alpha']['fixed']]
     )
     cb_beta = CheckButtons(
         plt.axes([ll + ww, bb + hh + 9.5 * h_tb, w_tb, h_tb]),
         labels = ["fixed"],
-        actives = [reconstruction_params['taper']['beta']['fixed']]
+        actives = [rec_params['taper']['beta']['fixed']]
     )
     #
     tb_field_target = TextBox(
         plt.axes([ll + (ww - w_tb) / 2.0, bb - 0.09, w_tb, h_tb]),
         label = "$E_0$", label_pad = 0.05,
         initial = "{0:.2f}".format(
-            reconstruction_params['taper']['field_align']['E_0']
+            rec_params['taper']['field_align']['E_0']
         )
     )
 #
 # create text boxes and check buttons for classic module
-elif args.module == 'classic':
+elif rec_params['module'] == 'classic':
     tb_field_target = TextBox(
         plt.axes([ll + (ww - w_tb) / 2.0, bb - 0.09, w_tb, h_tb]),
         label = "$E_0$", label_pad = 0.05,
-        initial = "{0:.2f}".format(reconstruction_params['classic']['E_0'])
+        initial = "{0:.2f}".format(rec_params['classic']['E_0'])
     )
 #
 #
@@ -1076,25 +1128,25 @@ elif args.module == 'classic':
 cb_export_volumes = CheckButtons(
     plt.axes([ll + ww - w_tb, bb + hh + 8 * h_tb, 2 * w_tb, h_tb]),
     labels = ["Export volumes"],
-    actives = [reconstruction_params['export_volumes']]
+    actives = [rec_params['export_volumes']]
 )
 # create check buttons for molecule splitting
 cb_molecule_split = CheckButtons(
     plt.axes([ll + ww - w_tb, bb + hh + 6 * h_tb, 2 * w_tb, 2 * h_tb]),
     labels = ["Split molecules", "Shuffle"],
-    actives = reconstruction_params['split_molecules']
+    actives = rec_params['split_molecules']
 )
 # create check button for charge splitting
 cb_charge_split = CheckButtons(
     plt.axes([ll + ww - w_tb, bb + hh + 5 * h_tb, 2 * w_tb, h_tb]),
     labels = ["Split charge"],
-    actives = [reconstruction_params['split_charge']]
+    actives = [rec_params['split_charge']]
 )
 # create check button for background atoms
 cb_background = CheckButtons(
     plt.axes([ll + ww - w_tb, bb + hh + 4 * h_tb, 2 * w_tb, h_tb]),
     labels = ["Background"],
-    actives = [reconstruction_params['background']]
+    actives = [rec_params['background']]
 )
 # create reconstruction button
 bt_rec = Button(
@@ -1123,7 +1175,7 @@ cid_tb_beta = tb_beta.on_submit(get_geometry)
 #
 #
 # taper geometry
-if args.module == 'taper':
+if rec_params['module'] == 'taper':
     cid_tb_radius = tb_radius.on_submit(get_geometry)
     cid_tb_alpha  = tb_alpha.on_submit(get_geometry)
     #
@@ -1173,44 +1225,6 @@ plt.show()
 ###     DB UPLOAD / EXPORT                                                   ###
 ###                                                                          ###
 ################################################################################
-# set reconstruction dictionary for upload to database (keep possible other
-# reconstruction modules by only updating specific keys)
-reconstruction_params['efficiency']        = float(tb_efficiency.text)
-reconstruction_params['export_volumes']    = cb_export_volumes.get_status()[0]
-reconstruction_params['image_compression'] = float(tb_image_compression.text)
-reconstruction_params['beta']              = float(tb_beta.text)
-reconstruction_params['module']            = args.module
-reconstruction_params['background']        = cb_background.get_status()[0]
-reconstruction_params['split_charge']      = cb_charge_split.get_status()[0]
-reconstruction_params['split_molecules']   = cb_molecule_split.get_status()
-#
-# parameters specific to classic scheme
-if args.module == 'classic':
-    reconstruction_params['classic'] = {
-        'E_0': float(tb_field_target.text)
-    }
-# parameters specific to taper geometry
-elif args.module == 'taper':
-    reconstruction_params['taper'] = {
-        'r_0' : {
-            'value': float(tb_radius.text),
-            'fixed': cb_radius.get_status()[0]
-        },
-        'alpha': {
-            'value': float(tb_alpha.text),
-            'fixed': cb_alpha.get_status()[0]
-        },
-        'beta': {
-            'fixed': cb_beta.get_status()[0]
-        },
-        'field_align': {
-            'E_0': float(tb_field_target.text),
-            'min': float(tb_field_align_min.text),
-            'max': float(tb_field_align_max.text)
-        }
-    }
-#
-#
 # upload reconstruction parameters to database
 db_upload()
 #
