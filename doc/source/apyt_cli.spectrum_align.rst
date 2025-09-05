@@ -48,6 +48,11 @@ Three commonly used options are:
       The cache file is created automatically on the first run and reused for
       subsequent runs on the same measurement ID.
 
+   .. note::
+
+      This option only takes effect when the measurement data is retrieved from
+      the SQL database.
+
 3. ``--check-voltage`` --- Inspect the voltage evolution during the measurement.
    This option helps verify stable measurement conditions and identify a
    suitable interval for spectral analysis.
@@ -56,7 +61,7 @@ A typical invocation might look like:
 
 .. code-block:: bash
 
-   apyt_spectrum_align --cache --no-sql 1
+   apyt_spectrum_align --no-sql 1
 
 
 Graphical user interface
@@ -123,9 +128,18 @@ Hit position correction
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 The flight length / hit position correction (top right) accounts for variations
-of the peak position across the detector. Sliders behave as in voltage
-correction, but visualization is three-dimensional. Defaults usually give good
-results; the orange fit grid should match the data points closely.
+of the peak position across the detector. The available sliders behave similarly
+to those in the voltage correction step, but the visualization is
+three-dimensional:
+
+- **Bin width** --- Resolution of peak position detection.
+- **Steps** --- Number of segments/grid points the detector is divided into
+  along the *x* and *y* directions.
+- **Peak threshold** --- Relative threshold for peak tracking (see
+  :ref:`voltage correction<apyt_cli.spectrum_align:Voltage correction>`).
+
+In most cases, the default values work well. If the orange fit grid closely
+matches the data points, the chosen parameters are appropriate.
 
 .. note::
 
@@ -187,24 +201,25 @@ Alignment requires two parameters:
 - :math:`\alpha` --- Scaling factor for the nominal distance :math:`L_0`
 - :math:`t_0` --- Time-of-flight offset
 
-To align, provide two peaks and their exact reference positions in the **peak
-selection** field (comma-separated). For the tungsten example:
+To perform the alignment, select two identified peaks from the list on the right
+and provide their exact reference positions in the **peak selection** field as a
+comma-separated list. For example, for the tungsten measurement:
 
 .. code-block:: text
 
-   1,4,60.649,61.985
+   2,5,60.649,61.985
 
 Paste values with ``CTRL+V``. Repeat as needed until the alignment is
 satisfactory.
 
-.. note::
+.. attention::
 
    Always use the **exact isotope mass**. Do not round to integers or fractions
    for higher mass-to-charge states.
 
 .. note::
 
-   Alignment accuracy is limited by the binning width in the
+   Alignment accuracy is limited by the binning width specified in the
    :ref:`correction window<apyt_cli.spectrum_align:Correction window>` and
    should be within :math:`\pm 2` bins.
 
@@ -219,5 +234,7 @@ A correct calibration should yield :math:`\alpha \approx 1` and
 Finally, the **Upload** button saves adjustment parameters to the database.
 Upload also occurs automatically when closing the window.
 
-For further technical details, see the
-:doc:`spectrum alignment module<apyt.spectrum.align>`.
+.. seealso::
+
+   For further technical details, see the
+   :doc:`spectrum alignment module<apyt.spectrum.align>`.
