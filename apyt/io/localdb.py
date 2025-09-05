@@ -298,10 +298,11 @@ def update(id, key, value):
         Status code for compatibility with
         :ref:`apyt.io.sql:The APyT SQL module`.
 
-        - ``200`` indicates success.
+        - ``200`` indicates success, all other codes indicate failure.
 
     response : str
-        ``"OK"`` when the update is successful.
+        ``"OK"`` when the update is successful. Otherwise, an error message is
+        returned.
 
 
     Notes
@@ -337,11 +338,17 @@ def update(id, key, value):
     records[id][key] = value
     #
     # update complete database file
-    with open(db_file, 'w') as f:
-        yaml.safe_dump(
-            records, f, default_flow_style = False, allow_unicode = True
-        )
-    logger.info(f"Updated key \"{key}\" for record {id}.")
+    try:
+        with open(db_file, 'w') as f:
+            yaml.safe_dump(
+                records, f, default_flow_style = False, allow_unicode = True
+            )
+        logger.info(f"Updated key \"{key}\" for record {id}.")
+    except Exception as e:
+        logger.error(f"Updating key \"{key}\" for record {id} failed: {e}")
+        logger.info(f"Restoring database file \"{db_file}\" from backup.")
+        shutil.copy2(backup_file, db_file)
+        return codes.internal_server_error, "Updating database file failed."
     #
     #
     # return status
