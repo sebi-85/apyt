@@ -47,6 +47,7 @@ The following command line tools are included with **APyT**:
 
    The APyT mass spectrum alignment script<apyt_cli.spectrum_align>
    The APyT mass spectrum fitting script<apyt_cli.spectrum_fit>
+   The APyT reconstruction script<apyt_cli.reconstruction>
 
 Each script is documented individually, including its available options,
 expected input/output formats, and usage examples. For convenience, a

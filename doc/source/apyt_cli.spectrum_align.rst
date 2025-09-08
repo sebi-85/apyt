@@ -238,3 +238,6 @@ Upload also occurs automatically when closing the window.
 
    For further technical details, see the
    :doc:`spectrum alignment module<apyt.spectrum.align>`.
+
+
+.. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
