@@ -11,6 +11,7 @@ User Guide
 
    installation
    apyt_cli
+   example
 
 
 Installation
@@ -26,6 +27,18 @@ Command line interface
 The recommended way to interact with the APyT package is through the provided
 :doc:`command line scripts<apyt_cli>`. Each script is documented in detail,
 including available options, expected input/output formats, and usage examples.
+
+
+Example usage
+-------------
+
+The APyT package includes a small exemplary measurement file to allow users to
+explore its functionality without requiring their own raw data. This makes it
+easy to test the workflow, try out the command line scripts, and familiarize
+yourself with the graphical interfaces.
+
+For step-by-step instructions on using the example measurement, see the
+:doc:`example usage instructions<example>`.
 
 
 Developer Guide

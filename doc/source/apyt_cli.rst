@@ -94,4 +94,10 @@ This provides a fully reproducible analysis path from raw input files to
 processed, interpretable scientific data.
 
 
+.. hint::
+
+   For detailed instructions on working with an exemplary measurement dataset,
+   please refer to the :doc:`example usage instructions<example>`.
+
+
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
