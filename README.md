@@ -5,21 +5,27 @@ atom probe tomography (APT) data. It offers a suite of modules that automate key
 steps in APT processing, from mass spectrum calibration to three-dimensional
 sample reconstruction. Its modular architecture ensures seamless integration
 with external tools through standardized input/output interfaces, supporting
-both Linux and Windows environments.
+both Linux and Windows environments. Users can import and use each module
+independently, or integrate them in custom workflows or GUI applications.
 
-Key features include high efficiency with NumPy and Numba, a low memory
-footprint, and extensive documentation. The modules are highly automated,
-requiring minimal user input to achieve accurate results. The package also
-integrates SQL database management for raw measurement data and corresponding
-metadata.
+For ready-to-use scenarios or testing, a command line interface (CLI) is
+provided. The CLI offers lightweight wrappers around the core modules, enabling
+users to process raw measurement data without writing additional Python code. It
+is particularly useful for exploratory analysis, quick prototyping, and
+stand-alone usage.
+
+Key features include high efficiency with [NumPy][numpy] and [Numba][numba], a
+low memory footprint, and extensive documentation. The modules are highly
+automated, requiring minimal user input to achieve accurate results. The package
+also integrates SQL or local database management for raw measurement data and
+corresponding metadata.
 
 
-# Module Usage
+# User Guide
 
-While documentation for the modules is available, they are not intended for
-standalone use. Usage examples will be provided separately—either through
-command-line wrappers or a graphical user interface (GUI)—once publicly
-available, and will be linked here.
+For detailed installation instructions, configuration options, and usage
+examples, please refer to the official APyT documentation available through the
+homepage (see project links in the navigation section on this page).
 
 
 # License Notice – Use in Modifications and Derivative Works
@@ -61,4 +67,6 @@ disclosure, feel free to contact the project maintainer for clarification.
 
 
 
-[agpl]: https://www.gnu.org/licenses/agpl-3.0.html
+[numpy]: https://numpy.org/
+[numba]: https://numba.pydata.org/
+[agpl]:  https://www.gnu.org/licenses/agpl-3.0.html
