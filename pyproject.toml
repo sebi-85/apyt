@@ -33,15 +33,17 @@ source = "https://git.mp.imw.uni-stuttgart.de/cgit.cgi/apyt.git/"
 include = [
   "apyt/",
   "apyt_cli/",
+  "data/apyt_W_calibration_tap_01_trimmed.raw",
   "doc/",
-  "scripts"
+  "scripts/"
 ]
 
 [tool.hatch.build.targets.wheel]
 include = [
   "apyt/",
   "apyt_cli/",
-  "scripts"
+  "data/apyt_W_calibration_tap_01_trimmed.raw",
+  "scripts/"
 ]
 
 [tool.hatch.metadata.hooks.requirements_txt]
