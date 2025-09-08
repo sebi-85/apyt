@@ -5,13 +5,15 @@
 #
 # usage notes
 USAGE=$(cat << EOF
-Usage: $(basename $0) [--help] [--upload]
+Usage: $(basename $0) [--help] [--official] [--upload]
 
 Simple script for building and uploading the Python package.
 
 Script options:
 \t--help\t\tPrint this help message.
-\t--upload\tWhether to upload the package to PyPi.
+\t--official\tWhether to upload the package to the *real* PyPI index.
+\t\t\tMust be given together with --upload.
+\t--upload\tWhether to upload the package to PyPI.
 EOF
 )
 #
@@ -24,6 +26,11 @@ for i in "$@"; do
         --help)
             printf "$USAGE\n"
             exit 0
+            ;;
+        # upload to official PyPI index
+        --official)
+            official=DEFINED
+            shift
             ;;
         # optional upload
         --upload)
@@ -74,7 +81,13 @@ python3 -m build
 #
 # upload package if requested
 if [ ! -z ${upload+x} ]; then
-    python3 -m twine upload $verbose --repository testpypi dist/*
+    if [ ! -z ${official+x} ]; then
+        # upload to official PyPI index
+        python3 -m twine upload $verbose dist/*
+    else
+        # upload to PyPI testing index
+        python3 -m twine upload $verbose --repository testpypi dist/*
+    fi
 fi
 #
 #
