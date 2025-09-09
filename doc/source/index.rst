@@ -72,6 +72,14 @@ The following list provides an overview of the main APyT subpackages:
 - :doc:`The APyT mass spectrum subpackage (apyt.spectrum)<apyt.spectrum>`
 
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Release History
+   :hidden:
+
+   release
+
+
 Indices and Tables
 ==================
 
