@@ -1,12 +1,11 @@
 Installation instructions
 =========================
 
-The simplest way to install the APyT package is using the official PyPi
-(testing) repository.
+The simplest way to install the |apyt| is using the official PyPI repository:
 
 .. code-block:: bash
 
-    pip3 install --extra-index-url https://test.pypi.org/simple/ apyt
+    pip3 install apyt
 
 This command will also install all required dependencies.
 
@@ -22,3 +21,12 @@ This command will also install all required dependencies.
 
         python3 -m venv --prompt APyT apyt-env
         source apyt-env/bin/activate
+
+
+.. |apyt| raw:: html
+
+        <a href="https://pypi.org/project/apyt/" target="_blank">
+        APyT package</a>
+
+
+.. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
