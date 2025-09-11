@@ -226,10 +226,13 @@ satisfactory.
 A correct calibration should yield :math:`\alpha \approx 1` and
 :math:`t_0` around a few nanoseconds.
 
-.. note::
+.. attention::
 
-   Manual editing of :math:`\alpha` and :math:`t_0` is possible, but automatic
-   alignment via the peak selection field is recommended.
+   While manual editing of :math:`\alpha` and :math:`t_0` is possible, automatic
+   alignment via the **Peak selection** field is generally recommended. In
+   manual mode, **only** the full spectrum plot in the bottom-right panel is
+   updated, under the assumption that voltage and hit position corrections are
+   independent of the exact values of :math:`\alpha` and :math:`t_0`.
 
 Finally, the **Upload** button saves adjustment parameters to the database.
 Upload also occurs automatically when closing the window.
