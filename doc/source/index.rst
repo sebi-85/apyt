@@ -74,9 +74,10 @@ The following list provides an overview of the main APyT subpackages:
 
 .. toctree::
    :maxdepth: 1
-   :caption: Release History
+   :caption: About this Project
    :hidden:
 
+   comparison
    release
 
 
