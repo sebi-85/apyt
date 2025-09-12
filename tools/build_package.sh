@@ -75,6 +75,10 @@ else
 fi
 #
 #
+# clear dist folder to avoid upload of old files
+rm -f dist/*
+#
+#
 # build package
 python3 -m build
 #
