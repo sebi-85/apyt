@@ -38,6 +38,7 @@ include = [
   "apyt_cli/",
   "data/apyt_W_calibration_tap_01_trimmed.raw",
   "doc/",
+  "requirements/",
   "scripts/"
 ]
 
