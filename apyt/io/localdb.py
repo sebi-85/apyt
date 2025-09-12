@@ -7,15 +7,15 @@ in YAML format. It implements convenience functions for **downloading**,
 **querying**, and **updating** measurement records.
 
 The primary design goal is to provide a consistent API for accessing
-experimental data in Python (see also :ref:`apyt.io.sql:The APyT SQL module`).
+experimental data in Python (see also the :doc:`SQL module<apyt.io.sql>`).
 
 
 Configuration
 -------------
 
 General database settings are configured in the ``[localdb]`` section of the
-global TOML configuration file
-(see :ref:`apyt.io.config:Default configuration structure`).
+global TOML
+:ref:`configuration file<apyt.io.config:Default configuration structure>`.
 
 
 Typical use cases
@@ -58,8 +58,8 @@ Explanation
   ``localdb.data`` directory).
 
 - ``device`` Identifier of the atom probe device. Must match one of the devices
-  defined in the global configuration file (see
-  :ref:`apyt.io.config:Default configuration structure`).
+  defined in the global
+  :ref:`configuration file<apyt.io.config:Default configuration structure>`.
 
 - ``custom_id``: A user-defined identifier for the measurement. This may be any
   string and is useful for referencing records by name rather than by numeric
@@ -86,8 +86,8 @@ Implementation notes
 - Binary measurement datasets are read and converted directly into structured
   NumPy arrays.
 - Error handling and logging are integrated throughout the code.
-- The API is designed to be fully compatible with
-  :ref:`apyt.io.sql:The APyT SQL module`.
+- The API is designed to be fully compatible with the
+  :doc:`SQL module<apyt.io.sql>`.
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -143,8 +143,7 @@ def download(id):
     Returns
     -------
     status : int
-        Status code (for compatibility with
-        :ref:`apyt.io.sql:The APyT SQL module`).
+        Status code for compatibility with the :doc:`SQL module<apyt.io.sql>`.
 
         - ``200`` indicates success.
 
@@ -163,8 +162,8 @@ def download(id):
     -----
 
     - Errors are logged with the module-level logger.
-    - The status code is returned only for compatibility with
-      :ref:`apyt.io.sql:The APyT SQL module`.
+    - The status code is returned only for compatibility with the
+      :doc:`SQL module<apyt.io.sql>`.
     """
     #
     #
@@ -215,8 +214,7 @@ def query(id, keys):
     -------
 
     status : int
-        Status code for compatibility with
-        :ref:`apyt.io.sql:The APyT SQL module`.
+        Status code for compatibility with the :doc:`SQL module<apyt.io.sql>`.
 
         - ``200`` indicates success.
 
@@ -239,8 +237,8 @@ def query(id, keys):
     - If the key ``'custom_id'`` is present, it is converted to ``str`` (in
       case of a numeric-only custom ID).
     - Errors are logged with the module-level logger.
-    - The status code is returned only for compatibility with
-      :ref:`apyt.io.sql:The APyT SQL module`.
+    - The status code is returned only for compatibility with the
+      :doc:`SQL module<apyt.io.sql>`.
     """
     #
     #
@@ -295,8 +293,7 @@ def update(id, key, value):
     -------
 
     status : int
-        Status code for compatibility with
-        :ref:`apyt.io.sql:The APyT SQL module`.
+        Status code for compatibility with the :doc:`SQL module<apyt.io.sql>`.
 
         - ``200`` indicates success, all other codes indicate failure.
 
@@ -307,13 +304,13 @@ def update(id, key, value):
 
     Notes
     -----
-    - The status code is returned only for compatibility with
-      :ref:`apyt.io.sql:The APyT SQL module`.
+    - The status code is returned only for compatibility with the
+      :doc:`SQL module<apyt.io.sql>`.
     """
     #
     #
     # get records from local database file
-    db_file = expanduser(get_setting("localdb.file"))
+    db_file = Path(expanduser(get_setting("localdb.file")))
     if not isfile(db_file):
         raise FileNotFoundError(
             f"Could not find local database file \"{db_file}\"."
@@ -329,7 +326,8 @@ def update(id, key, value):
     #
     #
     # create backup file with current timestamp
-    backup_file = f"{db_file}.{datetime.now().strftime('%Y%m%d_%H%M%S')}.bak"
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_file = db_file.with_name(f"{db_file.stem}_{timestamp}.yaml")
     shutil.copy2(db_file, backup_file)
     logger.info(f"Created backup of database file at \"{backup_file}\".")
     #
@@ -369,7 +367,7 @@ def _get_record(id):
     #
     #
     # get records from local database file
-    db_file = expanduser(get_setting("localdb.file"))
+    db_file = Path(expanduser(get_setting("localdb.file")))
     if not isfile(db_file):
         raise FileNotFoundError(
             f"Could not find local database file \"{db_file}\"."
