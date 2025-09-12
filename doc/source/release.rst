@@ -26,3 +26,6 @@ Features
 - Example dataset (``apyt_W_calibration_tap_01_trimmed.raw``) included for quick
   testing and demonstration.
 - Documentation with user and developer guides.
+
+
+.. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>

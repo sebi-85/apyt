@@ -46,7 +46,7 @@ Developer Guide
 
 .. toctree::
    :maxdepth: 1
-   :caption: Package Documentation
+   :caption: API Documentation
    :hidden:
 
    The APyT analysis subpackage (apyt.analysis)<apyt.analysis>
@@ -79,6 +79,7 @@ The following list provides an overview of the main APyT subpackages:
 
    comparison
    release
+   source
 
 
 Indices and Tables
