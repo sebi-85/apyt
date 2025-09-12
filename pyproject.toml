@@ -26,8 +26,11 @@ license-files = ["LICENSE"]
 dynamic = ["dependencies"]
 
 [project.urls]
-homepage = "https://apyt.mp.imw.uni-stuttgart.de/"
-source = "https://git.mp.imw.uni-stuttgart.de/cgit.cgi/apyt.git/"
+Homepage      = "https://apyt.mp.imw.uni-stuttgart.de/"
+Documentation = "https://apyt.mp.imw.uni-stuttgart.de/"
+Changelog     = "https://apyt.mp.imw.uni-stuttgart.de/release.html"
+Repository    = "https://github.com/sebi-85/apyt"
+Issues        = "https://github.com/sebi-85/apyt/issues"
 
 [tool.hatch.build.targets.sdist]
 include = [
