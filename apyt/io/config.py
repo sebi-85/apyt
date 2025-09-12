@@ -18,9 +18,13 @@ Nested configuration settings can be accessed using dot notation.
 Configuration file location
 ---------------------------
 
-The configuration file is stored in a platform-specific user directory
-(e.g. ``~/.config/apyt/config.toml`` on Linux). This location is determined
-using the ``platformdirs`` package.
+The configuration file is stored in a platform-specific user directory. For
+example:
+
+- Linux: ``~/.config/apyt/config.toml``
+- Windows: ``%USERPROFILE%\\AppData\\Local\\apyt\\apyt\\config.toml``
+
+These locations are determined automatically using the |platformdirs| package.
 
 
 Default configuration structure
@@ -72,7 +76,7 @@ Explanation
   Configures usage of a *local* database instead of the SQL backend.
 
   - ``file`` — path to the local YAML database file
-    (see :ref:`apyt.io.localdb:The APyT local database module` for details).
+    (see :doc:`local database module<apyt.io.localdb>` for details).
   - ``data`` — directory containing the associated measurement files.
 
 
@@ -82,6 +86,12 @@ List of functions
 * :func:`get_setting`: Retrieve a nested setting from the configuration.
 * :func:`load_config`: Load configuration from file (or cache if already
   loaded).
+
+
+.. |platformdirs| raw:: html
+
+        <a href="https://platformdirs.readthedocs.io/en/latest/"
+        target="_blank">platformdirs</a>
 
 
 .. sectionauthor:: Sebastian M. Eich <Sebastian.Eich@imw.uni-stuttgart.de>
@@ -131,7 +141,7 @@ _CONFIG_PATH = _CONFIG_DIR / _CONFIG_FILENAME
 #
 #
 # default configuration content
-_DEFAULT_CONFIG_TEXT = """
+_DEFAULT_CONFIG_TEXT = """\
 # flight length and detector radius in mm
 [devices.metap]
 flight_length   = 144.0
