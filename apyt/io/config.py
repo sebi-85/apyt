@@ -64,8 +64,8 @@ Explanation
   - Required keys:
 
     - ``flight_length`` (float) — the flight path length of the device, i.e. the
-      nominal distance between tip and detector.
-    - ``detector_radius`` (float) — the radius of the detector.
+      nominal distance between tip and detector (in mm).
+    - ``detector_radius`` (float) — the radius of the detector (in mm).
 
   - Multiple devices can be listed, each under its own section.
 
@@ -78,6 +78,11 @@ Explanation
   - ``file`` — path to the local YAML database file
     (see :doc:`local database module<apyt.io.localdb>` for details).
   - ``data`` — directory containing the associated measurement files.
+
+  .. hint::
+
+    The ``~`` symbol is expanded to the user's home directory on both Linux and
+    Windows systems.
 
 
 List of functions

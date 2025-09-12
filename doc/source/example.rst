@@ -17,18 +17,19 @@ Python one-liner:
 
     python3 -c "from importlib.resources import files; from shutil import copy; copy(files('data').joinpath('apyt_W_calibration_tap_01_trimmed.raw'), '.')"
 
-Before using the example dataset, please ensure that your
-:doc:`global configuration<apyt.io.config>` is set up for local database
-management and that the exemplary measurement file is placed in the correct
-location.
+.. note::
 
-.. attention::
+    Before proceeding with this example dataset, it is recommended to first
+    familiarize yourself with the
+    :doc:`global configuration file <apyt.io.config>` and the structure of the
+    :doc:`local database format <apyt.io.localdb>`. It is also recommended to
+    read the documentation for the :doc:`command-line interface <apyt_cli>`
+    beforehand.
 
-    The ``[devices.tap]`` section must be present in your global
-    :ref:`configuration file<apyt.io.config:Default configuration structure>`
-    for this exemplary measurement.
-
-You should then prepare your :doc:`local database<apyt.io.localdb>` file as follows:
+You should then prepare your :doc:`local YAML database <apyt.io.localdb>` file
+as shown below, and store it in the location specified in the ``[localdb.file]``
+section of the
+:ref:`configuration file <apyt.io.config:Default configuration structure>`:
 
 .. code-block:: yaml
 
@@ -38,12 +39,27 @@ You should then prepare your :doc:`local database<apyt.io.localdb>` file as foll
       file: apyt_W_calibration_tap_01_trimmed.raw
       parameters: {}
 
+Make sure that the ``apyt_W_calibration_tap_01_trimmed.raw`` file you copied to
+your working directory is moved to the ``[localdb.data]`` location specified in
+the :ref:`configuration file <apyt.io.config:Default configuration structure>`.
+
+.. attention::
+
+    The ``[devices.tap]`` section must be present in your global
+    :ref:`configuration file<apyt.io.config:Default configuration structure>`
+    for this exemplary measurement.
+
 You can then perform the alignment of the mass spectrum using the
 ``apyt_spectrum_align`` :doc:`command line script<apyt_cli.spectrum_align>`:
 
 .. code-block:: bash
 
     apyt_spectrum_align --no-sql 1
+
+.. hint::
+
+    If any setting is misconfigured, you will see a warning or error on the
+    command line indicating the exact problem and the expected configuration.
 
 This will load the exemplary measurement file from your local database and open
 the graphical interface for spectrum alignment.
