@@ -1,6 +1,12 @@
 Release history
 ===============
 
+v0.1.0.dev2 (2025-10-07)
+------------------------
+
+- Fixed Unicode encoding issue when writing the local database on Windows
+
+
 v0.1.0.dev1 (2025-09-08)
 ------------------------
 

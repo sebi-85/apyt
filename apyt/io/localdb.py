@@ -316,7 +316,7 @@ def update(id, key, value):
             f"Could not find local database file \"{db_file}\"."
         )
     logger.info(f"Reading records from local database file \"{db_file}\".")
-    with open(db_file) as f:
+    with open(db_file, encoding = 'utf-8') as f:
         records = yaml.safe_load(f)
     #
     #
@@ -337,7 +337,7 @@ def update(id, key, value):
     #
     # update complete database file
     try:
-        with open(db_file, 'w') as f:
+        with open(db_file, 'w', encoding = 'utf-8') as f:
             yaml.safe_dump(
                 records, f, default_flow_style = False, allow_unicode = True
             )
@@ -372,7 +372,7 @@ def _get_record(id):
         raise FileNotFoundError(
             f"Could not find local database file \"{db_file}\"."
         )
-    with open(db_file) as f:
+    with open(db_file, encoding = 'utf-8') as f:
         records = yaml.safe_load(f)
     #
     #
