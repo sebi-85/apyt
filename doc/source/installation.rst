@@ -48,7 +48,7 @@ This command will also install all required dependencies.
 
 .. |ms_issues| raw:: html
 
-        <a href="https://docs.python.org/3/using/windows.html#known-issues"
+        <a href="https://docs.python.org/3.13/using/windows.html#known-issues"
         target="_blank">issues</a>
 
 .. |python| raw:: html
