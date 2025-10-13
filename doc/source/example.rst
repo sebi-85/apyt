@@ -8,28 +8,40 @@ Example usage
     the APyT package may not be found.
 
 If you followed the :doc:`installation instructions<installation>`, a small
-exemplary measurement dataset, ``apyt_W_calibration_tap_01_trimmed.raw``, is
-automatically installed in your virtual environment. The easiest way to access
-this file is to copy it to your current working directory using the following
-Python one-liner:
+example dataset, ``apyt_W_calibration_tap_01_trimmed.raw``, is automatically
+installed in your virtual environment. The easiest way to access this file is to
+copy it to your current working directory using the following Python one-liner:
 
 .. code-block:: bash
 
     python3 -c "from importlib.resources import files; from shutil import copy; copy(files('data').joinpath('apyt_W_calibration_tap_01_trimmed.raw'), '.')"
 
-.. note::
+.. hint::
 
-    Before proceeding with this example dataset, it is recommended to first
-    familiarize yourself with the
-    :doc:`global configuration file <apyt.io.config>` and the structure of the
-    :doc:`local database format <apyt.io.localdb>`. It is also recommended to
-    read the documentation for the :doc:`command-line interface <apyt_cli>`
-    beforehand.
+    To use the **default configuration** (recommended for testing), APyT expects
+    the following directory structure and file locations within your home
+    directory:
 
-You should then prepare your :doc:`local YAML database <apyt.io.localdb>` file
-as shown below, and store it in the location specified in the ``[localdb.file]``
-section of the
-:ref:`configuration file <apyt.io.config:Default configuration structure>`:
+    **Linux / macOS:**
+
+    .. code-block:: bash
+
+        /home/<user>/APyT/db.yaml
+        /home/<user>/APyT/data/<measurement_files>
+
+    **Windows:**
+
+    .. code-block:: bat
+
+        C:\Users\<user>\APyT\db.yaml
+        C:\Users\<user>\APyT\data\<measurement_files>
+
+    These locations can be customized in the
+    :doc:`global configuration file <apyt.io.config>`, but the defaults are
+    recommended for first-time use and testing.
+
+Next, prepare your :doc:`local YAML database <apyt.io.localdb>` file and save it
+as ``db.yaml`` in the path shown above:
 
 .. code-block:: yaml
 
@@ -39,18 +51,17 @@ section of the
       file: apyt_W_calibration_tap_01_trimmed.raw
       parameters: {}
 
-Make sure that the ``apyt_W_calibration_tap_01_trimmed.raw`` file you copied to
-your working directory is moved to the ``[localdb.data]`` location specified in
-the :ref:`configuration file <apyt.io.config:Default configuration structure>`.
+Ensure that the ``apyt_W_calibration_tap_01_trimmed.raw`` file you copied
+earlier is placed in the ``data`` directory specified above.
 
-.. attention::
+.. note::
 
-    The ``[devices.tap]`` section must be present in your global
-    :ref:`configuration file<apyt.io.config:Default configuration structure>`
-    for this exemplary measurement.
+    Before proceeding, it is recommended to review the documentation for the
+    :doc:`command-line interface <apyt_cli>` to familiarize yourself with the
+    available commands and options.
 
-You can then perform the alignment of the mass spectrum using the
-``apyt_spectrum_align`` :doc:`command line script<apyt_cli.spectrum_align>`:
+You can now perform the mass spectrum alignment using the
+``apyt_spectrum_align`` :doc:`command-line tool <apyt_cli.spectrum_align>`:
 
 .. code-block:: bash
 
@@ -58,11 +69,12 @@ You can then perform the alignment of the mass spectrum using the
 
 .. hint::
 
-    If any setting is misconfigured, you will see a warning or error on the
-    command line indicating the exact problem and the expected configuration.
+    If any configuration setting is incorrect, the command line will display a
+    warning or error message describing the issue and the expected setup. If you
+    followed the default configuration, the command should run without errors.
 
-This will load the exemplary measurement file from your local database and open
-the graphical interface for spectrum alignment.
+Running this command loads the example dataset from your local database and
+opens the graphical interface for spectrum alignment.
 
 .. attention::
 

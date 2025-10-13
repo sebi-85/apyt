@@ -1,13 +1,15 @@
 Installation instructions
 =========================
 
-The simplest way to install the |apyt| is using the official PyPI repository:
+The simplest way to install the |apyt| is via the official PyPI repository:
 
 .. code-block:: bash
 
     pip3 install apyt
 
-This command will also install all required dependencies.
+This command automatically installs all required dependencies. After
+installation, you can verify the setup and test the package using the included
+example dataset by following the :doc:`example usage <example>` section.
 
 .. note::
 
