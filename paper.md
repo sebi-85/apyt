@@ -75,8 +75,8 @@ correlative microscopy or atomistic modeling workflows.
 
 APyT provides a complete workflow for APT analysis:
 
-- **Mass spectrum alignment**: Corrects voltage and hit-position effects for
-  sharp peaks including accurate alignment.
+- **Mass spectrum alignment**: Corrects voltage and hit-position effects to
+  obtain sharp peaks including accurate alignment.
 - **Spectrum fitting**: Chemical identification based on analytic peak-shape
   models; supports both atoms and molecules.
 - **Three-dimensional reconstruction**: Classic voltage-based radius model or
@@ -106,7 +106,8 @@ The APyT package is shipped with an exemplary measurement dataset, allowing
 users to perform test reconstructions out of the box. The documentation provides
 a detailed guide for performing spectrum calibration and reconstruction via the
 command-line interface (CLI) with simple GUIs from Matplotlib. The example
-dataset and workflow description are available in the online documentation.
+dataset and workflow description are available in the online documentation
+[@apyt].
 
 # Comparison with existing software
 
@@ -118,13 +119,13 @@ Python scientific libraries such as NumPy, SciPy, and Matplotlib.
 
 The following table provides an overview of available software packages:
 
-| Software           | Open source                 | License    | Interface         | Scriptable | Complete workflow | Database management |
-|--------------------|-----------------------------|------------|-------------------|------------|-------------------|---------------------|
-| **APyT**           | ✅                           | AGPLv3     | CLI + Python API  | ✅         | ✅                 | ✅                  |
-| IVAS/AP Suite      | ❌                           | Commercial | GUI               | ❌         | ✅                 | ❌                   |
-| Atom Probe Toolbox | ⚙️ Partial (Matlab required) | GPLv3      | Matlab            | ✅         | ✅                 | ❌                   |
-| APAV               | ✅                           | GPLv2      | Python API        | ✅         | ❌                 | ❌                   |
-| APTTools           | ✅                           | GPLv3      | GUI + limited API | ⚙️ Partial | ❌                 | ❌                   |
+| Software           | Open source           | License    | Interface         | Scriptable | Complete workflow | Database management |
+|--------------------|-----------------------|------------|-------------------|------------|-------------------|---------------------|
+| **APyT**           | Yes                   | AGPLv3     | CLI + Python API  | Yes        | Yes               | Yes                 |
+| IVAS/AP Suite      | No                    | Commercial | GUI               | No         | Yes               | No                  |
+| Atom Probe Toolbox | Yes (Matlab required) | GPLv3      | Matlab            | Yes        | Yes               | No                  |
+| APAV               | Yes                   | GPLv2      | Python API        | Yes        | No                | No                  |
+| APTTools           | Yes                   | GPLv3      | GUI + limited API | Partial    | No                | No                  |
 
 # Data architecture and storage considerations
 
@@ -177,7 +178,7 @@ APT workflows — the hybrid SQL + binary model adopted by APyT remains the more
 practical and scalable solution.  Nevertheless, APyT’s architecture remains
 flexible and can accommodate future HDF5 integration for long-term archiving or
 standardized data exchange formats, such as those promoted by FAIR data
-initiatives.
+initiatives [@Wilkinson2016].
 
 # Future development
 
@@ -190,7 +191,10 @@ interoperability, and broaden the range of supported APT workflows.
 # Software availability
 
 The source code, issue tracker, and documentation for APyT are available at
-[https://github.com/sebi-85/apyt](https://github.com/sebi-85/apyt).
+[https://github.com/sebi-85/apyt](https://github.com/sebi-85/apyt) and
+[https://apyt.mp.imw.uni-stuttgart.de](https://apyt.mp.imw.uni-stuttgart.de),
+respectively. The APyT package can be installed directly from
+[PyPI](https://pypi.org/project/apyt/).
 
 # Acknowledgments
 
