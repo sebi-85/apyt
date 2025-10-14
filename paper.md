@@ -119,13 +119,13 @@ Python scientific libraries such as NumPy, SciPy, and Matplotlib.
 
 The following table provides an overview of available software packages:
 
-| Software           | Open source           | License    | Interface         | Scriptable | Complete workflow | Database management |
-|--------------------|-----------------------|------------|-------------------|------------|-------------------|---------------------|
-| **APyT**           | Yes                   | AGPLv3     | CLI + Python API  | Yes        | Yes               | Yes                 |
-| IVAS/AP Suite      | No                    | Commercial | GUI               | No         | Yes               | No                  |
-| Atom Probe Toolbox | Yes (Matlab required) | GPLv3      | Matlab            | Yes        | Yes               | No                  |
-| APAV               | Yes                   | GPLv2      | Python API        | Yes        | No                | No                  |
-| APTTools           | Yes                   | GPLv3      | GUI + limited API | Partial    | No                | No                  |
+| Software           | Open source       | Interface         | Scriptable | Full workflow | DB management |
+|--------------------|-------------------|-------------------|------------|---------------|---------------|
+| **APyT**           | Yes               | CLI + Python API  | Yes        | Yes           | Yes           |
+| IVAS/AP Suite      | No                | GUI               | No         | Yes           | No            |
+| Atom Probe Toolbox | Yes (Matlab req.) | Matlab            | Yes        | Yes           | No            |
+| APAV               | Yes               | Python API        | Yes        | No            | No            |
+| APTTools           | Yes               | GUI + limited API | Partial    | No            | No            |
 
 # Data architecture and storage considerations
 
