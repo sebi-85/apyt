@@ -446,6 +446,7 @@ def fit_spectrum():
     # perform fit
     fit_result = mf.fit(
         hist_data, peaks_list, rb_function.value_selected, verbose = True,
+        peak_scale  = tb_peak_scale.text.split(),
         peak_shift  = tb_peak_shift.text.split(),
         scale_width = (rb_width_scaling.value_selected == 'width scaling on')
     )
@@ -629,10 +630,11 @@ w_rb  = 1 # relative width of radio buttons
 #
 # create GridSpec for subplots
 gs = GridSpec(
-    7, 2, hspace = 0.0, wspace = 0.0,
+    10, 2, hspace = 0.0, wspace = 0.0,
     left = 0.10, top = 0.95, bottom = 0.02, right = 0.98,
     height_ratios = [
-        0.07 * h_fig, 0.07 * h_fig, 0.07 * h_fig, 0.03 * h_fig, 0.76 * h_fig,
+        0.07 * h_fig, 0.07 * h_fig, 0.07 * h_fig, 0.03 * h_fig, 0.07 * h_fig,
+        0.03 * h_fig, 0.07 * h_fig, 0.59 * h_fig,
         h_spacing, h_sl
     ],
     width_ratios  = [w_fig, w_rb]
@@ -644,7 +646,7 @@ col = 0
 #
 #
 # create plot axis for mass spectrum
-ax = plt.subplot(gs[row:row+5, col])
+ax = plt.subplot(gs[row:row+8, col])
 #
 #
 # create radio buttons
@@ -665,14 +667,24 @@ rb_function = RadioButtons(
 # text box for peak shift
 tb_peak_shift = TextBox(
     ax = plt.subplot(gs[row+3, col+1]),
-    label = "RegEx's for peak shifts (space-\nseparated)\n"
+    label = "RegEx's for peak shifts\n(space-separated)\n"
             "Example: O[0-9]*_[0-9]+"
 )
 label = tb_peak_shift.ax.get_children()[0]
 label.set_position([0.05, -0.2])
 label.set_horizontalalignment('left')
 label.set_verticalalignment('top')
-row += 6
+# text box for peak width scaling
+tb_peak_scale = TextBox(
+    ax = plt.subplot(gs[row+5, col+1]),
+    label = "RegEx's for peak widths\n(space-separated)\n"
+            "Example: O[0-9]*_[0-9]+"
+)
+label = tb_peak_scale.ax.get_children()[0]
+label.set_position([0.05, -0.2])
+label.set_horizontalalignment('left')
+label.set_verticalalignment('top')
+row += 9
 #
 #
 # create sliders
@@ -688,6 +700,7 @@ cid_rb_log_scale     = rb_log_scale.on_clicked(callback_replot)
 cid_rb_width_scaling = rb_width_scaling.on_clicked(callback_refit)
 cid_rb_function      = rb_function.on_clicked(callback_refit)
 cid_tb_peak_shift    = tb_peak_shift.on_submit(callback_refit)
+cid_tb_peak_scale    = tb_peak_scale.on_submit(callback_refit)
 sl_abundance_thres.on_changed(callback_replot)
 #
 #
