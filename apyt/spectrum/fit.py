@@ -360,7 +360,7 @@ def counts(peaks_list, function, params, data_range, bin_width,
     counts_list = []
     total_counts = 0.0
     for peak in peaks_list:
-        # calculate element count only from peak with maximum abundance
+        # calculate element count only once (use peak with maximum abundance)
         if peak['is_max'] == False:
             continue
         #
@@ -516,6 +516,11 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
 
     Keyword Arguments
     -----------------
+    peak_scale : list
+        Whether to apply individual width scaling to selected peaks. Each scale
+        parameter represents a scaling factor and it is applied to all peaks
+        that match a corresponding regular expression from the provided list.
+        Each regular expression defines one unique shift parameter.
     peak_shift : list
         Whether to apply additional shifts to selected peaks. Each shift
         parameter represents an absolute shift that scales with the square root
@@ -1277,6 +1282,29 @@ def _estimate_fit_parameters(data, peaks_list, function, **kwargs):
     #
     #
     #
+    # add peak scaling parameter(s); peak groups for scaling are selected by
+    # matching their names against a regular expression which is base32-encoded
+    # in the parameter name; multiple parameters with individual patterns may be
+    # defined here
+    if 'peak_scale' in kwargs:
+        for reg_ex in kwargs.get('peak_scale'):
+            params.add(
+                'λ_' + _base32_encode(reg_ex),
+                value = 1.0, min = 0.1, max = 10.0,
+            )
+            params_matched = [
+                p for p in params.keys()
+                    if re.fullmatch("^I_" + reg_ex + "$", p) is not None
+            ]
+            print(
+                "Using generalized scaling parameter \"{0:s}\" for intensity "
+                "parameters {1:s} matching regular expression '{2:s}'.".format(
+                    'λ_' + _base32_encode(reg_ex), ', '.join(params_matched),
+                    reg_ex
+                )
+            )
+    #
+    #
     # add peak shift parameter(s) (implemented as an absolute shift which scales
     # with the square root of the peak position); peak groups for shifting are
     # selected by matching their names against a regular expression which is
@@ -1660,6 +1688,30 @@ def _peak_generic(function, params, mode, arg_tuple):
         return np.s_[max(0, i0 - Δi[0]) : min(len(x) - 1, i0 + Δi[1] + 1)]
     #
     #
+    def peak_scale(peak_name, params):
+        """
+        Small helper function to apply an additional width scaling based on the
+        peak name.
+        """
+        #
+        #
+        # get all parameters which are associated with a width scaling, i.e.
+        # starting with "λ_"
+        scale_params = [p for p in params.keys() if p[0:2] == "λ_"]
+        #
+        #
+        # loop through all peak shift parameters
+        for p in scale_params:
+            # match peak name against the base32-encoded pattern in the scaling
+            # parameter name
+            if re.fullmatch("^I_" + _base32_decode(p[2:]) + "$", peak_name) \
+               is not None:
+                # return scaling parameter
+                return params[p]
+        # no scaling for all other peaks
+        return 1.0
+    #
+    #
     def peak_shift(peak_name, params, x0):
         """
         Small helper function to apply an additional specific shift based on the
@@ -1752,15 +1804,21 @@ def _peak_generic(function, params, mode, arg_tuple):
             I  = params[_get_intensity_name(peak)]
             x0 = peak['mass_charge_ratio']
             #
+            # set peak width scaling parameter
+            λ = x0**γ * peak_scale(_get_intensity_name(peak), params)
             #
             # set additional possible shift based on peak name
             Δ = peak_shift(_get_intensity_name(peak), params, x0)
             #
             #
+            # set effective width for current peak (τ is normalized width)
+            τ = τ * λ
+            #
+            #
             # evaluation range is limited to multiple of decay constant on
             # either side of the peak; 0.0 elsewhere
             # (prevents possible overflow and is considerably faster)
-            Δmax = 20.0 * τ * x0**γ
+            Δmax = 20.0 * τ
             #
             #
             # get evaluation range around peak
@@ -1770,7 +1828,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = (x[peak_range] - x0 - Δ) / (x0**γ * τ)
+                x_t = (x[peak_range] - x0 - Δ) / τ
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1778,7 +1836,7 @@ def _peak_generic(function, params, mode, arg_tuple):
                 # intensities are calculated for hypothetical peak position at
                 # unity to account for the scaling with respect to the mass-to-
                 # charge ratio
-                y[peak_range] = I / x0**γ * peak['abundance'] * \
+                y[peak_range] = I / λ * peak['abundance'] * \
                     _activation(x_t) * _decay(x_t)
                 #
                 # return result
@@ -1787,9 +1845,9 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = (x - x0 - Δ) / (x0**γ * τ)
+                x_t = (x - x0 - Δ) / τ
                 #
-                return I / x0**γ * peak['abundance'] * \
+                return I / λ * peak['abundance'] * \
                     _activation(x_t) * _decay(x_t)
             #
             # input was scalar, but outside evaluation range
@@ -1842,16 +1900,24 @@ def _peak_generic(function, params, mode, arg_tuple):
             I  = params[_get_intensity_name(peak)]
             x0 = peak['mass_charge_ratio']
             #
+            # set peak width scaling parameter
+            λ = x0**γ * peak_scale(_get_intensity_name(peak), params)
             #
             # set additional possible shift based on peak name
             Δ = peak_shift(_get_intensity_name(peak), params, x0)
+            #
+            #
+            # set effective width for current peak (τ is normalized width)
+            τ1 = τ1 * λ
+            τ2 = τ2 * λ
+            w  = w  * λ
             #
             #
             # evaluation range is limited to multiple of width of error function
             # onset on the left side and largest decay constant on the right
             # side; 0.0 elsewhere (prevents possible overflow and is
             # considerably faster)
-            Δmax = (20.0 * w * x0**γ, 20.0 * max(τ1, τ2) * x0**γ)
+            Δmax = (20.0 * w, 20.0 * max(τ1, τ2))
             #
             #
             # get evaluation range around peak
@@ -1861,7 +1927,7 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was array; use slice
             if isinstance(peak_range, slice):
                 # transform data (only in evaluation interval)
-                x_t = (x[peak_range] - x0 - Δ) / x0**γ
+                x_t = x[peak_range] - x0 - Δ
                 #
                 # pre-fill results with zeros
                 y = np.zeros_like(x)
@@ -1870,7 +1936,7 @@ def _peak_generic(function, params, mode, arg_tuple):
                 # unity to account for the scaling with respect to the mass-to-
                 # charge ratio
                 y[peak_range] = \
-                    I / x0**γ * peak['abundance'] * _activation(x_t / w) * (
+                    I / λ * peak['abundance'] * _activation(x_t / w) * (
                         φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
                     )
                 #
@@ -1880,10 +1946,10 @@ def _peak_generic(function, params, mode, arg_tuple):
             # input was scalar and in evaluation range
             elif peak_range == True:
                 # transform data
-                x_t = (x - x0 - Δ) / x0**γ
+                x_t = x - x0 - Δ
                 #
                 return \
-                    I / x0**γ * peak['abundance'] * _activation(x_t / w) * (
+                    I / λ * peak['abundance'] * _activation(x_t / w) * (
                         φ * _decay(x_t / τ1) + (1.0 - φ) * _decay(x_t / τ2)
                     )
             #
