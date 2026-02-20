@@ -1,6 +1,6 @@
 """
-The APyT Package: From Raw Atom Probe Data to Three-Dimensional Reconstruction
-==============================================================================
+APyT: A modular open-source Python framework for atom probe tomography data evaluation
+======================================================================================
 
 The APyT package is an advanced, open-source Python framework for evaluating
 atom probe tomography (APT) data. It offers a suite of modules that automate key

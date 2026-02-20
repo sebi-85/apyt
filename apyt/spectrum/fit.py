@@ -520,7 +520,7 @@ def fit(spectrum, peaks_list, function, verbose = False, **kwargs):
         Whether to apply individual width scaling to selected peaks. Each scale
         parameter represents a scaling factor and it is applied to all peaks
         that match a corresponding regular expression from the provided list.
-        Each regular expression defines one unique shift parameter.
+        Each regular expression defines one unique scale parameter.
     peak_shift : list
         Whether to apply additional shifts to selected peaks. Each shift
         parameter represents an absolute shift that scales with the square root
@@ -1700,7 +1700,7 @@ def _peak_generic(function, params, mode, arg_tuple):
         scale_params = [p for p in params.keys() if p[0:2] == "λ_"]
         #
         #
-        # loop through all peak shift parameters
+        # loop through all peak scale parameters
         for p in scale_params:
             # match peak name against the base32-encoded pattern in the scaling
             # parameter name

@@ -1,6 +1,12 @@
 Release history
 ===============
 
+v0.1.0.dev3 (2026-02-20)
+------------------------
+
+- Add optional width scaling for individual peaks
+
+
 v0.1.0.dev2 (2025-10-07)
 ------------------------
 

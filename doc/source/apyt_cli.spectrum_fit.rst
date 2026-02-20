@@ -144,7 +144,13 @@ The right-hand controls include:
       peaks are genuinely shifted in the spectrum. This option should not be
       used to correct or "heal" a misaligned mass spectrum.
 
-5. **R² value** (bottom right) --- Coefficient of determination, a measure of
+5. **RegEx's for peak width scaling** --- In rare cases, certain species may
+   exhibit evaporation behavior that differs from the rest of the species in the
+   mass spectrum, resulting in peaks with substantially different widths.
+   Additional width-scaling parameters can be applied to peaks that match a
+   specified |regular_expression|. (See also the details above regarding peak
+   shifts.)
+6. **R² value** (bottom right) --- Coefficient of determination, a measure of
    the fit quality.
 
 During fitting, additional details on species intensities, abundances, and

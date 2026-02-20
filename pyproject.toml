@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "apyt"
-version = "0.1.0.dev2"
+version = "0.1.0.dev3"
 authors = [
   { name  = "Sebastian M. Eich", email = "Sebastian.Eich@imw.uni-stuttgart.de" }
 ]
